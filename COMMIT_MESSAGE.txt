@@ -1,0 +1,5 @@
+feat(strategist): initialize v0.1.0 site-bound setup foundation
+
+- Add single-site GSC property binding and confirmation
+- Add Home, SiteConfig, audit log and site validation guard
+- Document P0-only scope and setup procedure
