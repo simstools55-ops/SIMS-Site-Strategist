@@ -1,1 +1,1 @@
-feat(strategist): add resumable SBM-first setup wizard (v0.1.91)
+refactor(strategist): bundle setup wizard HTML into Code.gs (v0.1.93)
