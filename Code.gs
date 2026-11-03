@@ -1,5 +1,5 @@
-/** SIMS Site Strategist v0.1.93 | repair HTML-to-GAS bridge; resumable setup wizard; preserve analytics. */
-const SSS_VERSION = '0.1.93';
+/** SIMS Site Strategist v0.1.94 | repair HTML-to-GAS bridge; resumable setup wizard; preserve analytics. */
+const SSS_VERSION = '0.1.94';
 const SSS_PREFIX = 'SSS_';
 const SSS_CONFIG_SHEET = 'SiteConfig';
 const SSS_AUDIT_SHEET = 'AuditLog';

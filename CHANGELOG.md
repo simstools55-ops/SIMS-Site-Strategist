@@ -1,3 +1,8 @@
+## v0.1.94
+- SBMの別スプレッドシートを開くため、OAuthスコープを spreadsheets.currentonly から spreadsheets に変更。
+- セットアップウィザードとGSC収集・分析ロジックは変更なし。
+- マニフェスト更新と再承認の手順をREADMEに追記。GAS実機試験は未実施。
+
 ## v0.1.92
 - Added resumable single-dialog setup wizard for GSC site selection, blog name, SBM spreadsheet URL verification, and Drive folder preparation.
 - Existing registered sites resume at SBM connection; existing storage resumes at completion.
