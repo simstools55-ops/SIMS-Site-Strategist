@@ -1,1 +1,1 @@
-fix(strategist): verify Manager site settings before sharing blog folder (v0.1.90)
+feat(strategist): add resumable SBM-first setup wizard (v0.1.91)

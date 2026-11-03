@@ -1,5 +1,5 @@
-/** SIMS Site Strategist v0.1.90 | use blog-name folders for new development data; preserve analytics. */
-const SSS_VERSION = '0.1.90';
+/** SIMS Site Strategist v0.1.91 | resumable setup wizard; preserve analytics. */
+const SSS_VERSION = '0.1.91';
 const SSS_PREFIX = 'SSS_';
 const SSS_CONFIG_SHEET = 'SiteConfig';
 const SSS_AUDIT_SHEET = 'AuditLog';
@@ -7,7 +7,7 @@ function onOpen() {
   sssRefreshVersion_();
   SpreadsheetApp.getUi().createMenu('SIMS Site Strategist')
     .addItem('Homeを開く', 'sssHome')
-    .addItem('初回セットアップ', 'sssSetup')
+    .addItem('初回セットアップ', 'sssSetupWizard')
     .addItem('登録サイトを確認', 'sssShowSite')
     .addItem('ブログ別保存先を準備・確認', 'sssSetupDriveFolders')
     .addItem('Managerサイト設定を照合（読取専用）', 'sssP83CompareManagerSiteSettings')
@@ -169,6 +169,65 @@ function sssSetup() {
   if(confirm!==ui.Button.YES)return;
   sssBindSite_(uri,name);
   sssHome();
+}
+// v0.1.91: resumable, single-dialog setup. Existing site binding is immutable.
+function sssWizardStatus_(){
+  const c=sssConfig_(),map=sssDriveFolderMap_();
+  return {locked:!!c.lockedAt,siteName:c.siteName||'',propertyUri:c.propertyUri||'',siteId:c.siteId||'',storageReady:!!map,folderName:map?map.siteFolderName:'',version:SSS_VERSION};
+}
+function sssWizardSites_(){return sssListProperties().map(x=>({uri:x.uri,permission:x.permission}));}
+function sssWizardBind_(uri,name){
+  const c=sssConfig_();if(c.lockedAt)throw new Error('サイトはすでに固定されています。');
+  name=String(name||'').trim();if(!name||name.length>100)throw new Error('ブログ名を1～100文字で入力してください。');
+  sssBindSite_(String(uri||''),name);return sssWizardStatus_();
+}
+function sssWizardManagerId_(value){
+  const v=String(value||'').trim();
+  const match=v.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]{25,120})(?:[/?#]|$)/);
+  const id=match?match[1]:v;
+  if(!/^[A-Za-z0-9_-]{25,120}$/.test(id))throw new Error('SBMのスプレッドシートURL、またはIDを入力してください。');
+  return id;
+}
+function sssWizardCheckManager_(value){
+  const c=sssConfig_();if(!c.lockedAt)throw new Error('先にサイトを登録してください。');
+  const info=sssCheckManagerIdentityForSetup_(sssWizardManagerId_(value),c);
+  return {blogName:info.blogName,blogUrl:info.blogUrl,managerSpreadsheetId:info.managerSpreadsheetId};
+}
+function sssWizardCreateStorage_(value){
+  const c=sssConfig_();if(!c.lockedAt)throw new Error('先にサイトを登録してください。');
+  const old=sssDriveFolderMap_();if(old){sssDriveVerifyMap_(old);return sssWizardStatus_();}
+  const run=sdscGetRun_();if(run&&['RUNNING','PAUSED_AUTO_RESUME','ERROR'].includes(run.status))throw new Error('収集が未完了です。');
+  const lock=LockService.getDocumentLock();if(!lock.tryLock(30000))throw new Error('別の設定処理が実行中です。');
+  try{
+    const prior=sssDriveFolderMap_();if(prior){sssDriveVerifyMap_(prior);return sssWizardStatus_();}
+    const safeName=c.siteName.replace(/[\\/:*?"<>|]/g,'-').trim().slice(0,75);
+    if(!safeName||safeName==='.'||safeName==='..')throw new Error('ブログ名が保存先に使えません。');
+    const roots=DriveApp.getRootFolder().getFoldersByName('SIMS');
+    if(!roots.hasNext())throw new Error('SBMのSIMSフォルダーがありません。先にSBMをセットアップしてください。');
+    const root=roots.next();if(roots.hasNext())throw new Error('SIMSフォルダーが複数あります。');
+    const matches=root.getFoldersByName(safeName);
+    if(!matches.hasNext())throw new Error('SBMのブログフォルダーがありません。先にSBMをセットアップしてください。');
+    const site=matches.next();if(matches.hasNext())throw new Error('同名ブログフォルダーが複数あります。');
+    const managers=site.getFoldersByName('Manager');
+    if(!managers.hasNext())throw new Error('SBMのManagerフォルダーがありません。');
+    managers.next();if(managers.hasNext())throw new Error('Managerフォルダーが複数あります。');
+    const info=sssCheckManagerIdentityForSetup_(sssWizardManagerId_(value),c);
+    const stratMatches=site.getFoldersByName('Strategist');
+    if(stratMatches.hasNext())throw new Error('既存のStrategistフォルダーがあります。自動共用しません。');
+    const strat=site.createFolder('Strategist');
+    const ev=sssDriveChild_(strat,'Evidence');
+    const baseline=sssDriveChild_(ev,'Baseline'),delta=sssDriveChild_(ev,'Delta'),archive=sssDriveChild_(ev,'Archive');
+    const reports=sssDriveChild_(strat,'Reports'),exp=sssDriveChild_(strat,'Export');
+    const map={siteId:c.siteId,propertyUri:c.propertyUri,siteFolderName:safeName,rootId:root.getId(),siteIdFolder:site.getId(),strategistId:strat.getId(),evidenceId:ev.getId(),baselineId:baseline.getId(),deltaId:delta.getId(),archiveId:archive.getId(),reportsId:reports.getId(),exportId:exp.getId()};
+    sssDriveVerifyMap_(map);
+    sssProperties_().setProperty(SSS_DRIVE_PROP,JSON.stringify(map));
+    sssAudit_('DRIVE_FOLDERS_CONFIGURED',c.siteId,'strategistFolderId='+strat.getId()+'; managerChecked=true; source=wizard');
+    return sssWizardStatus_();
+  }finally{lock.releaseLock();}
+}
+function sssSetupWizard(){
+  const html=HtmlService.createHtmlOutputFromFile('SetupWizard').setWidth(670).setHeight(590);
+  SpreadsheetApp.getUi().showModalDialog(html,'S3 初回セットアップ');
 }
 function sssBindSite_(propertyUri,siteName){
   const lock=LockService.getDocumentLock();if(!lock.tryLock(30000))throw new Error('別のセットアップ処理が実行中です。');

@@ -1,4 +1,11 @@
-## v0.1.90
+## v0.1.91
+- Added resumable single-dialog setup wizard for GSC site selection, blog name, SBM spreadsheet URL verification, and Drive folder preparation.
+- Existing registered sites resume at SBM connection; existing storage resumes at completion.
+- Fail closed when SBM blog folder does not exist, as SBM is installed first.
+- Kept collection and analysis logic unchanged.
+- GAS runtime test pending.
+
+## v0.1.91
 - 開発中データの移行方針を廃止し、新規収集へ変更。
 - ブログ名フォルダー保存方式を維持し、移行関連メニューを非表示。
 - 既存保存先bindingは自動変更せず、新規開発用シートでの再収集を案内。
@@ -377,7 +384,7 @@ hangelog
 ## v0.1.86
 - メニュー非公開のステージングコピー試作。1回1ファイル、SHA-256照合、状態ID拘束。切替・削除なし。実機未検証。
 
-## v0.1.90
+## v0.1.91
 - 新規セットアップのブログ名を保存先に使用。既存Managerフォルダーを共用する場合はManagerスプレッドシートのBlogName、SearchConsoleProperty、BlogUrl範囲を読取照合し、不一致時は停止。
 - 同名フォルダー重複、既存Strategist、Manager不在の既存ブログフォルダーは安全停止。移行処理は実行しない。
 - 既存の収集・分析処理は変更しない。GAS実機未検証。
