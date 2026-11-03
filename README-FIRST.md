@@ -1,4 +1,4 @@
-SIMS Site Strategist v0.1.94 — 単一 Code.gs 配布版
+SIMS Site Strategist v0.1.95 — 単一 Code.gs 配布版
 
 【更新方法】
 既存のApps Scriptの Code.gs を本ZIPの Code.gs に置き換え、保存し、スプレッドシートを再読み込みしてください。

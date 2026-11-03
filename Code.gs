@@ -1,5 +1,5 @@
-/** SIMS Site Strategist v0.1.94 | repair HTML-to-GAS bridge; resumable setup wizard; preserve analytics. */
-const SSS_VERSION = '0.1.94';
+/** SIMS Site Strategist v0.1.95 | repair HTML-to-GAS bridge; resumable setup wizard; preserve analytics. */
+const SSS_VERSION = '0.1.95';
 const SSS_PREFIX = 'SSS_';
 const SSS_CONFIG_SHEET = 'SiteConfig';
 const SSS_AUDIT_SHEET = 'AuditLog';
@@ -4327,30 +4327,40 @@ function sssP70AuditManagerMatches(){
 }
 
 /** Domain property covers host and subdomains; URL-prefix property covers exact scheme, host, port and path prefix. */
+function sssP72ParseUrl_(raw){
+  // Apps Script V8 does not provide the WHATWG URL constructor.
+  // Accept only absolute HTTP(S) URLs; reject userinfo, fragments, malformed hosts and ports.
+  const value=String(raw||'').trim();
+  const match=/^(https?):\/\/([^\/?#]+)(\/[^?#]*)?(\?[^#]*)?$/i.exec(value);
+  if(!match)return null;
+  const scheme=match[1].toLowerCase(),authority=match[2];
+  if(authority.indexOf('@')!==-1||/\s/.test(authority))return null;
+  const hostMatch=/^([a-z0-9.-]+)(?::([0-9]{1,5}))?$/i.exec(authority);
+  if(!hostMatch)return null;
+  const host=hostMatch[1].toLowerCase().replace(/\.$/,'');
+  if(!host||host.startsWith('.')||host.includes('..')||!host.includes('.'))return null;
+  const port=hostMatch[2]||'';
+  if(port&&(+port<1||+port>65535))return null;
+  const effectivePort=port&&!(scheme==='https'&&port==='443')&&!(scheme==='http'&&port==='80')?':'+port:'';
+  return {origin:scheme+'://'+host+effectivePort,host:host,path:match[3]||'/',query:match[4]||''};
+}
+/** Domain property covers host and subdomains; URL-prefix property covers exact scheme, host, port and literal path/query prefix. */
 function sssP72PropertyScope_(uri){
   const value=String(uri||'').trim();
   if(/^sc-domain:/i.test(value)){
     const host=value.slice(10).toLowerCase().replace(/\.$/,'');
     return /^[a-z0-9.-]+$/.test(host)&&host.indexOf('.')>0?{kind:'domain',host:host}:null;
   }
-  try{
-    const u=new URL(value);
-    if(!/^https?:$/.test(u.protocol)||u.username||u.password||!u.hostname)return null;
-    return {kind:'prefix',origin:u.origin.toLowerCase(),path:u.pathname||'/',query:u.search||''};
-  }catch(e){return null;}
+  const parsed=sssP72ParseUrl_(value);
+  return parsed?{kind:'prefix',origin:parsed.origin,path:parsed.path,query:parsed.query}:null;
 }
 function sssP72WithinScope_(raw,scope){
-  try{
-    const u=new URL(String(raw||'').trim());
-    if(!/^https?:$/.test(u.protocol)||u.username||u.password)return false;
-    const host=u.hostname.toLowerCase().replace(/\.$/,'');
-    if(scope.kind==='domain')return host===scope.host||host.endsWith('.'+scope.host);
-    if(u.origin.toLowerCase()!==scope.origin)return false;
-    // GSC URL-prefix property uses literal prefix matching, including optional query.
-    return (u.pathname+u.search).startsWith(scope.path+scope.query);
-  }catch(e){return false;}
+  const parsed=sssP72ParseUrl_(raw);
+  if(!parsed||!scope)return false;
+  if(scope.kind==='domain')return parsed.host===scope.host||parsed.host.endsWith('.'+scope.host);
+  if(scope.kind!=='prefix'||parsed.origin!==scope.origin)return false;
+  return (parsed.path+parsed.query).startsWith(scope.path+scope.query);
 }
-
 
 /** v0.1.73: Live read-only Manager state view. No persisted Manager ID, no write or auto-exclusion. */
 function sssP73ShowManagerCandidates(){

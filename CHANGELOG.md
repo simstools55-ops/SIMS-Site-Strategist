@@ -1,4 +1,8 @@
-## v0.1.94
+## v0.1.95
+- Fix GSC URL scope checks in Apps Script V8: replace unsupported URL constructor with strict HTTP(S) parser.
+- Preserve SBM read-only setup validation, existing site binding, GSC collection and analysis.
+
+## v0.1.95
 - SBMの別スプレッドシートを開くため、OAuthスコープを spreadsheets.currentonly から spreadsheets に変更。
 - セットアップウィザードとGSC収集・分析ロジックは変更なし。
 - マニフェスト更新と再承認の手順をREADMEに追記。GAS実機試験は未実施。
