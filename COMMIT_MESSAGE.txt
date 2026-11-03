@@ -1,1 +1,1 @@
-fix(strategist): stop progress polling after completion (v0.1.18)
+feat(strategist): automate resumable final period ZIP audit (v0.1.59)

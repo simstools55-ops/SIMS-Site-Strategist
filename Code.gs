@@ -1,5 +1,5 @@
-/** SIMS Site Strategist v0.1.17 | progress refresh feedback. */
-const SSS_VERSION = '0.1.18';
+/** SIMS Site Strategist v0.1.59 | read-only final period audit. */
+const SSS_VERSION = '0.1.59';
 const SSS_PREFIX = 'SSS_';
 const SSS_CONFIG_SHEET = 'SiteConfig';
 const SSS_AUDIT_SHEET = 'AuditLog';
@@ -21,6 +21,75 @@ function onOpen() {
     .addItem('最新Evidenceの品質を検証', 'sssVerifyLatestEvidence')
     .addItem('差分更新の計画を確認（試験）', 'sssPreviewDeltaPlan')
     .addItem('差分データを取得（試験・別ZIP）', 'sssAcquireDeltaEvidence')
+    .addItem('Evidence統合の事前監査（読取専用）', 'sssAuditMergeReadiness')
+    .addItem('日別Evidenceを統合・保存（試験）', 'sssCreateMergedDailyEvidence')
+    .addItem('統合Evidenceの品質検証（読取専用）', 'sssVerifyMergedDailyEvidence')
+    .addItem('分析対象Evidenceを確認（読取専用）', 'sssShowAnalysisEvidence')
+    .addItem('サイト全体の成長診断（読取専用）', 'sssDiagnoseSiteGrowth')
+    .addItem('ページ別Evidenceの構造監査（読取専用）', 'sssAuditPageEvidenceStructure')
+    .addItem('詳細Evidence収集計画を確認（読取専用）', 'sssPreviewDetailedEvidencePlan')
+    .addItem('日付×ページを試験収集（1日・別ZIP）', 'sssCollectDailyPagePilot')
+    .addItem('詳細Evidenceの品質検証（読取専用）', 'sssVerifyDailyPagePilot')
+    .addItem('日付×ページ 7日収集を開始・再開（試験）', 'sssCollectDailyPageSevenDay')
+    .addItem('日付×ページ 7日収集を連続実行（試験）', 'sssCollectDailyPageSevenDayAuto')
+    .addItem('7日Detailed品質監査（読取専用）', 'sssAuditSevenDayDetailed')
+    .addItem('7日Detailedを検証・統合（試験）', 'sssMergeSevenDayDetailed')
+    .addItem('日付×ページの未収集日を確認（読取専用）', 'sssPreviewDailyPageMissing')
+    .addItem('日付×ページの不足分を連続収集（最大7日・試験）', 'sssCollectDailyPageMissing')
+    .addItem('日付×ページ 365日未収集を確認（読取専用）', 'sssPreviewDailyPageMissing365')
+    .addItem('日付×ページ 365日不足分を収集（最大7日）', 'sssCollectDailyPageMissing365')
+    .addItem('詳細Evidence 自動継続収集を開始（14日試験）', 'sssStartAutoDetailedPilot')
+    .addItem('詳細Evidence 365日自動収集を開始', 'sssStartAutoDetailed365')
+    .addItem('詳細Evidence 自動収集の状態確認', 'sssShowAutoDetailedPilotStatus')
+    .addItem('詳細Evidence 自動収集トリガー監査（読取専用）', 'sssAuditAutoDetailedTriggers')
+    .addItem('詳細Evidence 停滞収集を安全に再開', 'sssRecoverAutoDetailedCollection')
+    .addItem('詳細Evidence 自動収集を停止', 'sssStopAutoDetailedPilot')
+    .addItem('365日Detailed品質監査を開始（読取専用）', 'sssStartDetailed365Audit')
+    .addItem('365日Detailed品質監査を続行（最大5ZIP）', 'sssContinueDetailed365Audit')
+    .addItem('365日Detailed品質監査を自動継続', 'sssEnableDetailed365AutoAudit')
+    .addItem('365日Detailed品質監査の自動実行を停止', 'sssStopDetailed365AutoAudit')
+    .addItem('365日Detailed品質監査の自動実行状態', 'sssShowDetailed365AutoAudit')
+    .addItem('365日Detailed品質監査の結果を確認', 'sssShowDetailed365Audit')
+    .addItem('365日Detailed統合事前監査（読取専用）', 'sssPreviewDetailed365Merge')
+    .addItem('365日Detailed分割統合を開始（試験）', 'sssStartDetailed365ChunkMerge')
+    .addItem('365日Detailed分割統合を続行（試験）', 'sssContinueDetailed365ChunkMerge')
+    .addItem('365日Detailed分割統合の状態', 'sssShowDetailed365ChunkMerge')
+    .addItem('365日Detailed分割統合を自動継続', 'sssEnableDetailed365AutoMerge')
+    .addItem('365日Detailed分割統合の自動実行を停止', 'sssStopDetailed365AutoMerge')
+    .addItem('365日Detailed分割統合の自動実行状態', 'sssShowDetailed365AutoMerge')
+    .addItem('365日Detailed統合ZIP監査を開始（読取専用）', 'sssStartDM365OutputAudit')
+    .addItem('365日Detailed統合ZIP監査を続行（読取専用）', 'sssContinueDM365OutputAudit')
+    .addItem('365日Detailed統合ZIP監査の結果', 'sssShowDM365OutputAudit')
+    .addItem('365日Detailed統合ZIP監査を自動継続', 'sssEnableDM365OutputAutoAudit')
+    .addItem('365日Detailed統合ZIP監査の自動実行を停止', 'sssStopDM365OutputAutoAudit')
+    .addItem('365日Detailed統合ZIP監査の自動実行状態', 'sssShowDM365OutputAutoAudit')
+    .addItem('365日Detailed元データ数値照合を開始（読取専用）', 'sssStartDM365SourceReconcile')
+    .addItem('365日Detailed元データ数値照合を続行（読取専用）', 'sssContinueDM365SourceReconcile')
+    .addItem('365日Detailed元データ数値照合の状態', 'sssShowDM365SourceReconcile')
+    .addItem('365日Detailed元データ数値照合を自動継続', 'sssEnableDM365ReconAuto')
+    .addItem('365日Detailed元データ数値照合の自動実行を停止', 'sssStopDM365ReconAuto')
+    .addItem('365日Detailed元データ数値照合の自動実行状態', 'sssShowDM365ReconAuto')
+    .addItem('30・90・365日中間集計を開始（試験）', 'sssPeriod51Start')
+    .addItem('30・90・365日中間集計を続行（試験）', 'sssPeriod51Continue')
+    .addItem('30・90・365日中間集計の状態', 'sssPeriod51Status')
+    .addItem('30・90・365日中間集計を自動継続', 'sssPeriod52StartAuto')
+    .addItem('30・90・365日中間集計の自動実行状態', 'sssPeriod52Status')
+    .addItem('30・90・365日中間集計の自動実行を停止', 'sssPeriod52StopAuto')
+    .addItem('30・90・365日ページ別統合を開始（試験）', 'sssP53Start')
+    .addItem('30・90・365日ページ別統合を続行（試験）', 'sssP53Continue')
+    .addItem('30・90・365日ページ別統合の状態', 'sssP53Status')
+    .addItem('ページ別統合を高速自動継続（試験）', 'sssP55StartAuto')
+    .addItem('ページ別統合の高速自動実行状態', 'sssP55Status')
+    .addItem('ページ別統合の高速自動継続を停止', 'sssP55StopAuto')
+    .addItem('ページ別統合 UIエラーHOLDを復旧', 'sssP56RecoverUiHold')
+    .addItem('期間別最終ZIP品質監査を開始（読取専用）', 'sssP58AuditStart')
+    .addItem('期間別最終ZIP品質監査を続行（最大5ZIP）', 'sssP58AuditContinue')
+    .addItem('期間別最終ZIP品質監査の状態', 'sssP58AuditStatus')
+    .addItem('期間別最終ZIP品質監査を高速自動継続', 'sssP59StartAuto')
+    .addItem('期間別最終ZIP品質監査の高速自動実行状態', 'sssP59Status')
+    .addItem('期間別最終ZIP品質監査の高速自動実行を停止', 'sssP59StopAuto')
+    .addItem('Detailed監査の日付・重複を診断（読取専用）', 'sssDiagnoseDetailedAuditDates')
+    .addItem('Detailed不足日を1日だけ補完（試験）', 'sssRepairOneDetailedMissingDay')
     .addItem('中断した収集を再開', 'sssResumeCollection')
     .addToUi();
 }
@@ -113,7 +182,7 @@ function sssHome(){
   const c=sssConfig_();
   const folderMap=sssDriveFolderMap_();
   const folderLine=folderMap?'<p>保存先：SIMS ＞ '+sssEscape_(folderMap.siteFolderName)+' ＞ Strategist（設定済み）</p>':'<p>保存先：未設定（メニューから準備してください）</p>';
-  const html=HtmlService.createHtmlOutput('<html><head><base target="_top"><style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h2{margin-top:0}.box{background:#f3f5f7;padding:18px;border-radius:10px;line-height:1.9}.muted{color:#666}</style></head><body><h2>SIMS Site Strategist v'+SSS_VERSION+'</h2><div class="box">'+(c.lockedAt?'<b>'+sssEscape_(c.siteName)+'</b><br>対象：'+sssEscape_(c.propertyUri)+'<br>サイト固定：完了':'初回セットアップが必要です。メニューから実行してください。')+'</div>'+folderLine+'<p class="muted">P2D：差分Evidenceの別ZIP取得に対応。統合・基準更新は未実装です。</p></body></html>').setWidth(550).setHeight(330);
+  const html=HtmlService.createHtmlOutput('<html><head><base target="_top"><style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h2{margin-top:0}.box{background:#f3f5f7;padding:18px;border-radius:10px;line-height:1.9}.muted{color:#666}</style></head><body><h2>SIMS Site Strategist v'+SSS_VERSION+'</h2><div class="box">'+(c.lockedAt?'<b>'+sssEscape_(c.siteName)+'</b><br>対象：'+sssEscape_(c.propertyUri)+'<br>サイト固定：完了':'初回セットアップが必要です。メニューから実行してください。')+'</div>'+folderLine+'<p class="muted">日別Evidenceの統合・品質検証に対応。ページ別・クエリ別の統合は未実装です。</p></body></html>').setWidth(550).setHeight(330);
   SpreadsheetApp.getUi().showModalDialog(html,'Site Strategist Home');
 }
 
@@ -1646,17 +1715,25 @@ function sssVerifyLatestEvidence(){
 }
 // Normalize Sheets Date objects and ISO date strings to the same calendar-day key.
 function sssEvidenceDateKey_(value){
+  const tz=Session.getScriptTimeZone()||'Asia/Tokyo';
   if(value instanceof Date){
     if(isNaN(value.getTime()))throw new Error('Evidence台帳の日付が不正です。');
-    return Utilities.formatDate(value,Session.getScriptTimeZone(),'yyyy-MM-dd');
+    return Utilities.formatDate(value,tz,'yyyy-MM-dd');
   }
   const s=String(value==null?'':value).trim();
-  const m=/^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/.exec(s);
-  if(!m)throw new Error('Evidenceの収集日付を解釈できません: '+s);
-  const key=m[1]+'-'+m[2]+'-'+m[3];
-  const d=new Date(key+'T00:00:00Z');
-  if(isNaN(d.getTime())||d.toISOString().slice(0,10)!==key)throw new Error('Evidenceの収集日付が不正です: '+s);
-  return key;
+  let m=/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?:$|[T\s])/.exec(s);
+  if(m){
+    const key=m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+    const d=new Date(key+'T00:00:00Z');
+    if(!isNaN(d.getTime())&&d.toISOString().slice(0,10)===key)return key;
+  }
+  // Sheets display values can contain a Date.toString() representation.
+  // Only accept an explicit timezone-bearing English Date string, not ambiguous locale dates.
+  if(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2} \d{4} \d{2}:\d{2}:\d{2} GMT[+-]\d{4}/.test(s)){
+    const d=new Date(s);
+    if(!isNaN(d.getTime()))return Utilities.formatDate(d,tz,'yyyy-MM-dd');
+  }
+  throw new Error('Evidenceの収集日付を解釈できません: '+s);
 }
 function sssVerifyEvidenceRow_(row){
   const lock=LockService.getDocumentLock();
@@ -1945,4 +2022,1855 @@ function sssShowCollectionProgress(){
   load('initial');window.addEventListener('pagehide',stopPolling);
   </script></body></html>`).setWidth(570).setHeight(540);
   SpreadsheetApp.getUi().showModalDialog(html,'収集進捗');
+}
+
+// P4A: Read-only merge readiness audit. No source ZIP, registry, or Evidence folder writes.
+// This audit intentionally does NOT merge period-level page/query aggregates.
+function sssAuditMergeReadiness(options){
+  const internal=options===true;
+  sssRefreshVersion_();
+  const c=sssConfig_();
+  if(!c.lockedAt)throw new Error('サイトの初回セットアップが必要です。');
+  const sh=sssEvidenceSheet_(),last=sh.getLastRow();
+  if(last<2)throw new Error('EvidenceRegistryが空です。');
+  const entries=sh.getRange(2,1,last-1,12).getValues().map((v,i)=>({v,row:i+2})).filter(x=>
+    String(x.v[1])===c.siteId && String(x.v[2])===c.propertyUri &&
+    ['VERIFIED','VERIFIED_WITH_LIMITATIONS','DELTA_VERIFIED','DELTA_VERIFIED_WITH_LIMITATIONS'].includes(String(x.v[11])));
+  if(!entries.length)throw new Error('検証済みEvidenceがありません。');
+  const byDate={},sources=[],issues=[];
+  entries.sort((a,b)=>sssEvidenceDateKey_(a.v[3]).localeCompare(sssEvidenceDateKey_(b.v[3])) || a.row-b.row);
+  entries.forEach(entry=>{
+    const v=entry.v,id=String(v[7]),file=DriveApp.getFileById(id);
+    if(file.isTrashed()||file.getMimeType()!=='application/zip')throw new Error('ZIPが不正です: 台帳行'+entry.row);
+    if(file.getSize()>90*1024*1024)throw new Error('ZIPが90MBを超えます: 台帳行'+entry.row);
+    const blobs=Utilities.unzip(file.getBlob()),map={};
+    blobs.forEach(b=>{const n=b.getName();if(map[n])throw new Error('ZIP内ファイル名重複: '+n);map[n]=b;});
+    if(!map['manifest.json']||!map['site_daily.csv'])throw new Error('必須ファイル不足: 台帳行'+entry.row);
+    const m=JSON.parse(map['manifest.json'].getDataAsString('UTF-8'));
+    if(m.format!=='SIMS_DOCTOR_SITE_EVIDENCE_PACKAGE_V2'||m.siteId!==c.siteId||!m.site||m.site.searchConsoleProperty!==c.propertyUri)throw new Error('ZIPのサイト情報が一致しません: 台帳行'+entry.row);
+    if(!m.period||sssEvidenceDateKey_(m.period.startDate)!==sssEvidenceDateKey_(v[3])||sssEvidenceDateKey_(m.period.endDate)!==sssEvidenceDateKey_(v[4]))throw new Error('ZIPの期間が台帳と一致しません: 台帳行'+entry.row);
+    const csv=Utilities.parseCsv(map['site_daily.csv'].getDataAsString('UTF-8'));
+    if(!csv.length||csv[0].join('|')!=='date|clicks|impressions|ctr|position')throw new Error('site_daily.csvのヘッダーが不正: 台帳行'+entry.row);
+    const local={};
+    csv.slice(1).forEach(r=>{
+      if(r.length!==5)throw new Error('日別CSV列数が不正: 台帳行'+entry.row);
+      const day=sssEvidenceDateKey_(r[0]);
+      if(day<sssEvidenceDateKey_(v[3])||day>sssEvidenceDateKey_(v[4]))throw new Error('期間外の日付: '+day);
+      if(local[day])throw new Error('同一ZIP内に日付重複: '+day);
+      const clicks=Number(r[1]),impressions=Number(r[2]),ctr=Number(r[3]),position=Number(r[4]);
+      if(![clicks,impressions,ctr,position].every(Number.isFinite)||clicks<0||impressions<0||clicks>impressions||ctr<0||ctr>1||position<0)throw new Error('不正な日別数値: '+day);
+      local[day]=true;
+      // Later evidence replaces an overlapping day; never sum duplicate days.
+      byDate[day]={clicks,impressions,position,source:id};
+    });
+    sources.push({registryRow:entry.row,zipId:id,days:Object.keys(local).length,periodStart:sssEvidenceDateKey_(v[3]),periodEnd:sssEvidenceDateKey_(v[4]),quality:String(v[11])});
+  });
+  const days=Object.keys(byDate).sort();
+  let missing=0;
+  for(let i=1;i<days.length;i++)missing+=Math.round((sssDateUtc_(days[i])-sssDateUtc_(days[i-1]))/86400000)-1;
+  if(missing)issues.push('期間内に未収集の日付が'+missing+'日あります。');
+  if(sources.some(x=>x.quality.indexOf('LIMITATIONS')>=0))issues.push('品質制限付きEvidenceが含まれます。');
+  issues.push('ページ別・クエリ別の期間集計は重複を正確に除外できないため統合対象外です。');
+  const total=days.reduce((a,d)=>{const r=byDate[d];a.clicks+=r.clicks;a.impressions+=r.impressions;a.positionWeighted+=r.position*r.impressions;return a;},{clicks:0,impressions:0,positionWeighted:0});
+  const result={format:'SIMS_S3_MERGE_READINESS_AUDIT_V1',version:SSS_VERSION,siteId:c.siteId,propertyUri:c.propertyUri,generatedAt:new Date().toISOString(),readOnly:true,sourceCount:sources.length,sources,uniqueDays:days.length,firstDate:days[0]||null,lastDate:days[days.length-1]||null,missingDays:missing,siteDailyTotals:{clicks:total.clicks,impressions:total.impressions,ctr:total.impressions?total.clicks/total.impressions:0,position:total.impressions?total.positionWeighted/total.impressions:null},issues,mergeStatus:'NOT_EXECUTED'};
+  const summary='統合事前監査（読取専用）\n検証済みZIP：'+sources.length+'件\n日別データ：'+days.length+'日\n欠落日：'+missing+'日\n期間：'+(result.firstDate||'なし')+' ～ '+(result.lastDate||'なし')+'\n\n注意：実際の統合ZIPはまだ作成しません。元Evidenceは変更していません。\n'+issues.join('\n');
+  if(internal){result.dailyRows=days.map(day=>Object.assign({date:day},byDate[day]));return result;}
+  SpreadsheetApp.getUi().alert(summary);
+  return result;
+}
+
+// P4B: Generate a new immutable daily-only merged ZIP. No registry or source mutations.
+function sssCreateMergedDailyEvidence(){
+  sssRefreshVersion_();
+  const ui=SpreadsheetApp.getUi(),c=sssConfig_(),map=sssDriveFolderMap_();
+  if(!map)throw new Error('先にブログ別保存先を準備してください。');
+  sssDriveVerifyMap_(map);
+  const audit=sssAuditMergeReadiness(true);
+  if(!audit.dailyRows.length)throw new Error('統合可能な日別データがありません。');
+  const warning='日別データ：'+audit.uniqueDays+'日\n欠落日：'+audit.missingDays+'日\n対象期間：'+audit.firstDate+' ～ '+audit.lastDate+'\n\n元ZIPと台帳は変更しません。新しい統合ZIPを作成しますか？';
+  if(ui.alert('日別Evidenceの統合（試験）',warning,ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  const lock=LockService.getDocumentLock();
+  if(!lock.tryLock(30000))throw new Error('他の統合処理が実行中です。');
+  try{
+    // Re-audit under lock to ensure no unverified input is silently included.
+    const a=sssAuditMergeReadiness(true);
+    const head=['date','clicks','impressions','ctr','position'];
+    const csv=[head].concat(a.dailyRows.map(r=>[r.date,r.clicks,r.impressions,r.impressions?r.clicks/r.impressions:0,r.position]));
+    const windows={};
+    [30,90,365].forEach(n=>{
+      const end=sssDateUtc_(a.lastDate),start=new Date(end.getTime()-(n-1)*86400000);
+      const startKey=Utilities.formatDate(start,'UTC','yyyy-MM-dd');
+      const rows=a.dailyRows.filter(r=>r.date>=startKey&&r.date<=a.lastDate);
+      const clicks=rows.reduce((v,r)=>v+r.clicks,0),impressions=rows.reduce((v,r)=>v+r.impressions,0);
+      const weighted=rows.reduce((v,r)=>v+r.position*r.impressions,0);
+      windows[String(n)]={startDate:startKey,endDate:a.lastDate,availableDays:rows.length,expectedDays:n,complete:rows.length===n,clicks,impressions,ctr:impressions?clicks/impressions:0,position:impressions?weighted/impressions:null};
+    });
+    const manifest={format:'SIMS_S3_MERGED_DAILY_V1',version:SSS_VERSION,siteId:c.siteId,propertyUri:c.propertyUri,createdAt:new Date().toISOString(),period:{startDate:a.firstDate,endDate:a.lastDate},sourceZips:a.sources,uniqueDays:a.uniqueDays,missingDays:a.missingDays,issues:a.issues,scope:'site_daily_only',pageQueryAggregatesMerged:false,windows};
+    const files=[Utilities.newBlob(sdscValuesToCsv_(csv),'text/csv','site_daily.csv'),Utilities.newBlob(JSON.stringify(manifest,null,2),'application/json','manifest.json')];
+    const evidence=sssDriveGetFolder_(map.evidenceId);
+    const merged=sssDriveChild_(evidence,'Merged');
+    const filename='SIMS_S3_Merged_Daily_'+Utilities.formatDate(new Date(),'UTC','yyyyMMdd_HHmmss')+'.zip';
+    const zip=Utilities.zip(files,filename);
+    const file=merged.createFile(zip);
+    sssAudit_('MERGED_DAILY_CREATED',c.siteId,'fileId='+file.getId()+'; days='+a.uniqueDays);
+    ui.alert('日別Evidence統合ZIPを作成しました。\nファイル：'+filename+'\n日数：'+a.uniqueDays+'\n欠落日：'+a.missingDays+'\n保存先：Evidence / Merged\n\n元EvidenceとEvidenceRegistryは変更していません。');
+    return {fileId:file.getId(),fileUrl:file.getUrl(),manifest};
+  }finally{lock.releaseLock();}
+}
+
+// P4C: Verify the newest merged daily ZIP without changing any Drive file or registry.
+function sssVerifyMergedDailyEvidence(silent){
+  sssRefreshVersion_();
+  const ui=SpreadsheetApp.getUi(),c=sssConfig_(),map=sssDriveFolderMap_();
+  if(!map)throw new Error('ブログ別保存先が未設定です。');
+  sssDriveVerifyMap_(map);
+  const evidence=sssDriveGetFolder_(map.evidenceId);
+  const folders=evidence.getFoldersByName('Merged');
+  if(!folders.hasNext())throw new Error('Evidence / Merged がありません。先に統合ZIPを作成してください。');
+  const folder=folders.next(),iter=folder.getFiles();
+  let latest=null;
+  while(iter.hasNext()){
+    const f=iter.next();
+    if(!f.isTrashed() && /^SIMS_S3_Merged_Daily_\d{8}_\d{6}\.zip$/.test(f.getName()) && (!latest || f.getLastUpdated().getTime()>latest.getLastUpdated().getTime()))latest=f;
+  }
+  if(!latest)throw new Error('統合ZIPが見つかりません。');
+  if(latest.getSize()>90*1024*1024)throw new Error('ZIPサイズが上限を超えています。');
+  const contents=Utilities.unzip(latest.getBlob()),files={};
+  contents.forEach(b=>{if(files[b.getName()])throw new Error('ZIP内に同名ファイルがあります。');files[b.getName()]=b;});
+  if(!files['site_daily.csv']||!files['manifest.json'])throw new Error('統合ZIPの必須ファイルが不足しています。');
+  const m=JSON.parse(files['manifest.json'].getDataAsString('UTF-8'));
+  if(m.format!=='SIMS_S3_MERGED_DAILY_V1'||m.siteId!==c.siteId||m.propertyUri!==c.propertyUri||m.scope!=='site_daily_only'||m.pageQueryAggregatesMerged!==false)throw new Error('manifestの形式またはサイト識別が一致しません。');
+  const csv=Utilities.parseCsv(files['site_daily.csv'].getDataAsString('UTF-8'));
+  if(!csv.length||csv[0].join('|')!=='date|clicks|impressions|ctr|position')throw new Error('CSVヘッダーが不正です。');
+  const rows=[],seen={};
+  csv.slice(1).forEach((r,i)=>{
+    if(r.length!==5)throw new Error('CSV列数不正: '+(i+2));
+    const date=sssEvidenceDateKey_(r[0]);
+    if(seen[date])throw new Error('日付重複: '+date);
+    seen[date]=true;
+    const clicks=Number(r[1]),impressions=Number(r[2]),ctr=Number(r[3]),position=Number(r[4]);
+    if(![clicks,impressions,ctr,position].every(Number.isFinite)||clicks<0||impressions<0||clicks>impressions||ctr<0||ctr>1||position<0)throw new Error('数値不正: '+date);
+    if(Math.abs(ctr-(impressions?clicks/impressions:0))>1e-9)throw new Error('CTR不整合: '+date);
+    rows.push({date,clicks,impressions,position});
+  });
+  rows.sort((a,b)=>a.date.localeCompare(b.date));
+  const first=rows.length?rows[0].date:null,last=rows.length?rows[rows.length-1].date:null;
+  let missing=0;
+  for(let i=1;i<rows.length;i++)missing+=Math.round((sssDateUtc_(rows[i].date)-sssDateUtc_(rows[i-1].date))/86400000)-1;
+  if(!m.period||first!==m.period.startDate||last!==m.period.endDate||rows.length!==Number(m.uniqueDays)||missing!==Number(m.missingDays))throw new Error('CSVとmanifestの期間・日数が一致しません。');
+  if(!Array.isArray(m.sourceZips)||!m.sourceZips.length||m.sourceZips.some(x=>!x.zipId||!x.registryRow))throw new Error('統合元の追跡情報が不足しています。');
+  const tolerance=(a,b)=>Number.isFinite(Number(a))&&Math.abs(Number(a)-Number(b))<=1e-8*Math.max(1,Math.abs(Number(a)),Math.abs(Number(b)));
+  [30,90,365].forEach(n=>{
+    const w=m.windows&&m.windows[String(n)];if(!w)throw new Error(n+'日集計がありません。');
+    const end=sssDateUtc_(last),start=new Date(end.getTime()-(n-1)*86400000);
+    const startKey=Utilities.formatDate(start,'UTC','yyyy-MM-dd');
+    const part=rows.filter(r=>r.date>=startKey&&r.date<=last);
+    const clicks=part.reduce((a,r)=>a+r.clicks,0),impressions=part.reduce((a,r)=>a+r.impressions,0);
+    const weighted=part.reduce((a,r)=>a+r.position*r.impressions,0);
+    const position=impressions?weighted/impressions:null;
+    if(w.startDate!==startKey||w.endDate!==last||w.availableDays!==part.length||w.expectedDays!==n||w.complete!==(part.length===n)||!tolerance(w.clicks,clicks)||!tolerance(w.impressions,impressions)||!tolerance(w.ctr,impressions?clicks/impressions:0)||(position===null?w.position!==null:!tolerance(w.position,position)))throw new Error(n+'日集計の照合に失敗しました。');
+  });
+  const result={ok:true,readOnly:true,fileId:latest.getId(),fileName:latest.getName(),uniqueDays:rows.length,missingDays:missing,firstDate:first,lastDate:last,sourceCount:m.sourceZips.length,windowsVerified:[30,90,365]};
+  if(silent!==true)ui.alert('統合Evidence品質検証：合格\nファイル：'+result.fileName+'\n日数：'+rows.length+'日\n欠落日：'+missing+'日\n期間：'+first+' ～ '+last+'\n統合元：'+result.sourceCount+'件\n30日・90日・365日集計：照合OK\n\n読取専用：元Evidence・台帳・統合ZIPは変更していません。');
+  return result;
+}
+
+// P4D: Resolve the latest merged ZIP only after the full v0.1.22 integrity audit.
+// This is a read-only selection preview; no persistent pointer or analysis is written.
+function sssShowAnalysisEvidence(){
+  const ui=SpreadsheetApp.getUi();
+  try {
+    const r=sssVerifyMergedDailyEvidence(true);
+    if(!r.ok||r.missingDays!==0)throw new Error('統合Evidenceの品質条件を満たしません。');
+    ui.alert('分析対象Evidence：利用可能（読取専用）\nファイル：'+r.fileName+'\n対象期間：'+r.firstDate+' ～ '+r.lastDate+'\n日別データ：'+r.uniqueDays+'日\n欠落日：'+r.missingDays+'日\n統合元：'+r.sourceCount+'件\n検証済み集計：'+r.windowsVerified.join('・')+'日\n\n注意：現在は日別のサイト全体指標のみ使用可能です。ページ別・クエリ別の診断には使用しません。\n分析対象の固定登録や元Evidenceの変更は行いません。');
+    return r;
+  } catch(e) {
+    ui.alert('分析対象Evidence：利用不可\n'+String(e&&e.message||e)+'\n\n品質検証に失敗したデータは分析に使用しません。');
+    return {ok:false,error:String(e&&e.message||e)};
+  }
+}
+
+// P4E: Read-only site-wide diagnostic. Comparison periods never overlap.
+function sssDiagnoseSiteGrowth(){
+  const ui=SpreadsheetApp.getUi();
+  try {
+    const verified=sssVerifyMergedDailyEvidence(true);
+    if(!verified.ok||verified.missingDays!==0)throw new Error('品質検証済みの連続日別Evidenceが必要です。');
+    const f=DriveApp.getFileById(verified.fileId);
+    const blobs=Utilities.unzip(f.getBlob());
+    const csvBlob=blobs.filter(b=>b.getName()==='site_daily.csv')[0];
+    if(!csvBlob)throw new Error('日別CSVが見つかりません。');
+    const csv=Utilities.parseCsv(csvBlob.getDataAsString('UTF-8'));
+    const rows=csv.slice(1).map(r=>({date:sssEvidenceDateKey_(r[0]),clicks:Number(r[1]),impressions:Number(r[2]),position:Number(r[4])})).sort((a,b)=>a.date.localeCompare(b.date));
+    const aggregate=part=>{
+      const clicks=part.reduce((n,r)=>n+r.clicks,0),impressions=part.reduce((n,r)=>n+r.impressions,0);
+      const weighted=part.reduce((n,r)=>n+r.position*r.impressions,0);
+      return {days:part.length,clicks,impressions,ctr:impressions?clicks/impressions:0,position:impressions?weighted/impressions:null};
+    };
+    const pct=(now,old)=>old===0?(now===0?'0.0%':'比較不可（前期0）'):(100*(now-old)/old).toFixed(1)+'%';
+    const fmt=a=>a.toLocaleString('ja-JP');
+    const sections=[];
+    [30,90].forEach(n=>{
+      if(rows.length<2*n){sections.push(n+'日比較：データ不足（'+(2*n)+'日必要）');return;}
+      const current=aggregate(rows.slice(-n)),previous=aggregate(rows.slice(-2*n,-n));
+      const trend=current.clicks>previous.clicks?'増加':current.clicks<previous.clicks?'減少':'横ばい';
+      sections.push('【直近'+n+'日 対 その前'+n+'日】 '+trend+'\n'+
+        'クリック '+fmt(current.clicks)+' / '+fmt(previous.clicks)+'（'+pct(current.clicks,previous.clicks)+'）\n'+
+        '表示回数 '+fmt(current.impressions)+' / '+fmt(previous.impressions)+'（'+pct(current.impressions,previous.impressions)+'）\n'+
+        'CTR '+(100*current.ctr).toFixed(2)+'% / '+(100*previous.ctr).toFixed(2)+'%\n'+
+        '平均掲載順位 '+(current.position===null?'―':current.position.toFixed(2))+' / '+(previous.position===null?'―':previous.position.toFixed(2)));
+    });
+    const annual=aggregate(rows.slice(-365));
+    sections.push('【直近365日（比較なし）】\nクリック '+fmt(annual.clicks)+'、表示回数 '+fmt(annual.impressions)+'、CTR '+(100*annual.ctr).toFixed(2)+'%、平均掲載順位 '+(annual.position===null?'―':annual.position.toFixed(2)));
+    const message='サイト全体の成長診断（読取専用）\nサイト：'+sssConfig_().siteName+'\n対象：'+verified.firstDate+' ～ '+verified.lastDate+'\n元データ：'+verified.fileName+'\n\n'+sections.join('\n\n')+'\n\n※クリック数の増減を簡易判定しています。季節性や原因・記事別・クエリ別の特定は行いません。\n※GSCで取得済みの最終日までの診断です。元Evidenceは変更しません。';
+    ui.alert(message);
+    return {ok:true,readOnly:true,source:verified.fileName,availableDays:rows.length,diagnostic:'site_daily_only'};
+  }catch(e){ui.alert('サイト全体の成長診断：実行できません\n'+String(e&&e.message||e));return {ok:false,error:String(e&&e.message||e)};}
+}
+
+// P5A: Page-level Evidence structural audit. Does not merge or mutate files/registry.
+function sssAuditPageEvidenceStructure(){
+  const c=sssConfig_();
+  if(!c.lockedAt)throw new Error('サイトの初回セットアップが必要です。');
+  const sh=sssEvidenceSheet_(),last=sh.getLastRow();
+  if(last<2)throw new Error('EvidenceRegistryが空です。');
+  const allowed=['VERIFIED','VERIFIED_WITH_LIMITATIONS','DELTA_VERIFIED','DELTA_VERIFIED_WITH_LIMITATIONS'];
+  const entries=sh.getRange(2,1,last-1,12).getValues().map((v,i)=>({v,row:i+2})).filter(e=>String(e.v[1])===c.siteId&&String(e.v[2])===c.propertyUri&&allowed.includes(String(e.v[11])));
+  if(!entries.length)throw new Error('検証済みEvidenceがありません。');
+  const names=['page_summary.csv','page_weekly.csv','query_summary.csv','page_query_top.csv'];
+  const results=[];let earliest=null,latest=null;
+  entries.sort((a,b)=>sssEvidenceDateKey_(a.v[3]).localeCompare(sssEvidenceDateKey_(b.v[3]))||a.row-b.row);
+  entries.forEach(e=>{
+    const v=e.v,from=sssEvidenceDateKey_(v[3]),to=sssEvidenceDateKey_(v[4]);
+    if(from>to)throw new Error('期間が逆転しています: 台帳行'+e.row);
+    const file=DriveApp.getFileById(String(v[7]));
+    if(file.isTrashed()||file.getMimeType()!=='application/zip'||file.getSize()>90*1024*1024)throw new Error('ZIP形式またはサイズが不正: 台帳行'+e.row);
+    const files={};Utilities.unzip(file.getBlob()).forEach(b=>{if(files[b.getName()])throw new Error('ZIP内重複ファイル: '+b.getName());files[b.getName()]=b;});
+    if(!files['manifest.json'])throw new Error('manifest不足: 台帳行'+e.row);
+    const m=JSON.parse(files['manifest.json'].getDataAsString('UTF-8'));
+    if(m.siteId!==c.siteId||!m.site||m.site.searchConsoleProperty!==c.propertyUri||!m.period||sssEvidenceDateKey_(m.period.startDate)!==from||sssEvidenceDateKey_(m.period.endDate)!==to)throw new Error('サイトまたは期間の不一致: 台帳行'+e.row);
+    const declared={};(m.datasets||[]).forEach(d=>declared[d.file]=d);
+    const detail={registryRow:e.row,start:from,end:to,quality:String(v[11]),datasets:{}};
+    names.forEach(n=>{
+      if(!files[n])throw new Error(n+' がありません: 台帳行'+e.row);
+      const rows=Utilities.parseCsv(files[n].getDataAsString('UTF-8'));
+      if(!rows.length||!rows[0].length)throw new Error(n+' のヘッダーがありません: 台帳行'+e.row);
+      const headers=rows[0].map(x=>String(x).trim());
+      if(new Set(headers).size!==headers.length)throw new Error(n+' のヘッダー重複: 台帳行'+e.row);
+      if(rows.slice(1).some(r=>r.length!==headers.length))throw new Error(n+' の列数不一致: 台帳行'+e.row);
+      const count=rows.length-1;
+      if(declared[n]&&Number(declared[n].rowCount)!==count)throw new Error(n+' のmanifest件数不一致: 台帳行'+e.row);
+      detail.datasets[n]={rows:count,columns:headers};
+    });
+    results.push(detail);earliest=!earliest||from<earliest?from:earliest;latest=!latest||to>latest?to:latest;
+  });
+  const overlaps=[];
+  for(let i=0;i<results.length;i++)for(let j=i+1;j<results.length;j++){
+    const a=results[i],b=results[j],start=a.start>b.start?a.start:b.start,end=a.end<b.end?a.end:b.end;
+    if(start<=end)overlaps.push('台帳'+a.registryRow+'・'+b.registryRow+'：'+start+' ～ '+end);
+  }
+  const headersMismatch=[];
+  names.forEach(n=>{const expected=results[0].datasets[n].columns.join('|');results.slice(1).forEach(r=>{if(r.datasets[n].columns.join('|')!==expected)headersMismatch.push(n+'：台帳'+r.registryRow);});});
+  const lines=['ページ別Evidence構造監査（読取専用）','検証済みZIP：'+results.length+'件','対象期間：'+earliest+' ～ '+latest,'期間重複：'+overlaps.length+'組','ヘッダー不一致：'+headersMismatch.length+'件'];
+  results.forEach(r=>{lines.push('【台帳'+r.registryRow+'】'+r.start+' ～ '+r.end);names.forEach(n=>lines.push('  '+n+'：'+r.datasets[n].rows+'件'));});
+  if(overlaps.length)lines.push('重複期間：\n'+overlaps.join('\n'));
+  if(headersMismatch.length)lines.push('ヘッダー不一致：\n'+headersMismatch.join('\n'));
+  lines.push('注意：期間集計データは重複を正確に除去できないため、単純加算しません。','元Evidence・台帳は変更していません。');
+  SpreadsheetApp.getUi().alert(lines.join('\n'));
+  return {readOnly:true,sourceCount:results.length,periodStart:earliest,periodEnd:latest,overlaps,headersMismatch,results};
+}
+
+// P5B: Plan-only, no GSC API access, no writes to Evidence/Registry.
+// Distinguish analysis needs from API coverage; do not claim exhaustive query retrieval.
+function sssPreviewDetailedEvidencePlan(){
+  const c=sssConfig_();
+  if(!c.lockedAt)throw new Error('初回セットアップが必要です。');
+  const sh=sssEvidenceSheet_(),last=sh.getLastRow();
+  const allowed=['VERIFIED','VERIFIED_WITH_LIMITATIONS','DELTA_VERIFIED','DELTA_VERIFIED_WITH_LIMITATIONS'];
+  const rows=last<2?[]:sh.getRange(2,1,last-1,12).getValues().filter(v=>String(v[1])===c.siteId&&String(v[2])===c.propertyUri&&allowed.includes(String(v[11])));
+  const ranges=rows.map(v=>({start:sssEvidenceDateKey_(v[3]),end:sssEvidenceDateKey_(v[4])})).sort((a,b)=>a.start.localeCompare(b.start));
+  const start=ranges.length?ranges[0].start:'未収集';
+  const end=ranges.length?ranges.reduce((x,r)=>r.end>x?r.end:x,ranges[0].end):'未収集';
+  const lines=[
+    '詳細Evidence収集計画（読取専用）',
+    'サイト：'+c.siteName,
+    '既存の検証済みEvidence：'+rows.length+'件',
+    '既存データ範囲：'+start+' ～ '+end,
+    '',
+    '【成長機会】日付×クエリ／日付×ページ：需要変化と成長記事を検出',
+    '【不調診断】日付×ページ／日付×クエリ：減少の寄与度を確認',
+    '【サイト構造】ページ×クエリ：検索意図の重複候補を抽出',
+    '',
+    '収集単位：日付×ページ、日付×クエリ、日付×ページ×クエリ',
+    '実装時は日単位で分割取得し、途中再開・件数上限・欠落可能性を記録します。',
+    'GSCの行数制限・匿名化クエリ等により完全網羅は保証しません。',
+    '日付×ページ×クエリは件数・処理時間が大きいため段階的に収集します。',
+    '保存は既存Baseline/Delta/Mergedと分離し、元Evidenceは変更しません。',
+    '',
+    'この画面ではGSC APIの呼出し・データ収集・ファイル保存は行いません。'
+  ];
+  SpreadsheetApp.getUi().alert(lines.join('\n'));
+  return {ok:true,readOnly:true,version:SSS_VERSION,sourceCount:rows.length,range:{start,end},plannedDimensions:['date,page','date,query','date,page,query'],collectionExecuted:false};
+}
+
+// v0.1.27: Bounded, explicit one-day pilot. Never changes baseline/delta/merged or registry.
+function sssCollectDailyPagePilot(){
+  const ui=SpreadsheetApp.getUi(),c=sssConfig_();
+  if(!c.lockedAt||!c.propertyUri)throw new Error('サイト固定の初回セットアップが必要です。');
+  const m=sssDriveFolderMap_();if(!m)throw new Error('ブログ別保存先を先に準備してください。');
+  sssDriveVerifyMap_(m);
+  const tz=Session.getScriptTimeZone()||'Asia/Tokyo';
+  const today=Utilities.formatDate(new Date(),tz,'yyyy-MM-dd');
+  const target=Utilities.formatDate(new Date(Date.now()-4*86400000),tz,'yyyy-MM-dd');
+  const ok=ui.alert('詳細Evidence試験収集',
+    'サイト：'+c.siteName+'\n対象日：'+target+'（4日前）\n日付×ページの最大25,000行を取得し、専用ZIPに保存します。\n件数上限時は不完全として記録します。既存Evidence・台帳は変更しません。実行しますか？',ui.ButtonSet.YES_NO);
+  if(ok!==ui.Button.YES)return {ok:false,cancelled:true};
+  const lock=LockService.getDocumentLock();if(!lock.tryLock(30000))throw new Error('他の処理が実行中です。');
+  try{
+    const rows=[],limit=25000,batch=5000;
+    for(let offset=0;offset<limit;offset+=batch){
+      const result=sdscSearchAnalyticsQuery_(c.propertyUri,{
+        startDate:target,endDate:target,type:'web',dataState:'final',
+        dimensions:['date','page'],rowLimit:batch,startRow:offset
+      });
+      const items=result.rows||[];
+      for(const r of items){
+        const keys=r.keys||[];
+        if(keys[0]!==target||!keys[1])throw new Error('API応答の日付またはページが不正です。保存を中止しました。');
+        rows.push([keys[0],keys[1],Number(r.clicks||0),Number(r.impressions||0),Number(r.ctr||0),Number(r.position||0)]);
+      }
+      if(items.length<batch)break;
+    }
+    const capReached=rows.length===limit;
+    const csv=[['date','page','clicks','impressions','ctr','position']].concat(rows)
+      .map(a=>a.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n')+'\r\n';
+    const manifest={schema:'s3.daily_page.pilot.v1',version:SSS_VERSION,siteId:c.siteId,
+      propertyUri:c.propertyUri,siteName:c.siteName,dimension:['date','page'],
+      startDate:target,endDate:target,requestedRowLimit:limit,rows:rows.length,
+      capReached:capReached,completeness:capReached?'LIMIT_REACHED_POSSIBLY_TRUNCATED':'API_RETURNED_LESS_THAN_CAP_NOT_EXHAUSTIVENESS_PROOF',
+      collectedAt:new Date().toISOString(),source:'GSC Search Analytics API',
+      notes:'Anonymized queries, API row limits and GSC reporting limitations may apply.'};
+    const evidence=sssDriveGetFolder_(m.evidenceId);
+    const folder=sssDriveChild_(evidence,'Detailed');
+    const stamp=Utilities.formatDate(new Date(),tz,'yyyyMMdd_HHmmss');
+    const name='SIMS_S3_Daily_Page_Pilot_'+stamp+'.zip';
+    const blob=Utilities.zip([
+      Utilities.newBlob(csv,'text/csv','daily_page.csv'),
+      Utilities.newBlob(JSON.stringify(manifest,null,2),'application/json','manifest.json')],name);
+    const f=folder.createFile(blob);
+    ui.alert('詳細Evidence試験収集が完了しました。\n日付：'+target+'\n行数：'+rows.length+
+      '\n件数上限：'+(capReached?'到達（不完全の可能性）':'未到達')+'\n保存先：Evidence / Detailed\nZIP：'+f.getName()+
+      '\n元Evidence・台帳は変更していません。');
+    return {ok:true,fileId:f.getId(),name:f.getName(),date:target,rows:rows.length,capReached};
+  }finally{lock.releaseLock();}
+}
+
+
+// v0.1.28: Verify latest daily-page pilot ZIP without changing Drive files or Sheets.
+// Passing integrity checks does NOT establish GSC coverage completeness.
+function sssVerifyDailyPagePilot(){
+  const ui=SpreadsheetApp.getUi();
+  try {
+    const c=sssConfig_();
+    if(!c.lockedAt||!c.siteId||!c.propertyUri)throw new Error('サイトの初回セットアップが必要です。');
+    const map=sssDriveFolderMap_();
+    if(!map)throw new Error('ブログ別保存先が未設定です。');
+    sssDriveVerifyMap_(map);
+    const ev=sssDriveGetFolder_(map.evidenceId);
+    const folders=ev.getFoldersByName('Detailed');
+    if(!folders.hasNext())throw new Error('Detailedフォルダーがありません。');
+    const folder=folders.next();
+    if(folders.hasNext())throw new Error('Detailedフォルダーが複数存在します。保存先を確認してください。');
+    const iterator=folder.getFiles();let latest=null;
+    while(iterator.hasNext()){
+      const f=iterator.next();
+      if(f.isTrashed()||!/^SIMS_S3_Daily_Page_Pilot_\d{8}_\d{6}\.zip$/.test(f.getName()))continue;
+      if(!latest||f.getName()>latest.getName())latest=f;
+    }
+    if(!latest)throw new Error('検証対象の試験収集ZIPがありません。');
+    if(latest.getMimeType()!=='application/zip'||latest.getSize()>90*1024*1024)throw new Error('ZIP形式またはサイズが不正です。');
+    const blobs=Utilities.unzip(latest.getBlob()),parts={};
+    blobs.forEach(b=>{const name=b.getName();if(parts[name])throw new Error('ZIP内に重複ファイルがあります: '+name);parts[name]=b;});
+    if(Object.keys(parts).length!==2||!parts['manifest.json']||!parts['daily_page.csv'])throw new Error('ZIPの必須ファイル構成が不正です。');
+    const m=JSON.parse(parts['manifest.json'].getDataAsString('UTF-8'));
+    if(m.schema!=='s3.daily_page.pilot.v1'||m.siteId!==c.siteId||m.propertyUri!==c.propertyUri||m.dimension.join('|')!=='date|page')throw new Error('manifestのサイト識別または収集単位が一致しません。');
+    const day=String(m.startDate||'');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||m.endDate!==day||isNaN(Date.parse(day+'T00:00:00Z')))throw new Error('manifestの対象日が不正です。');
+    const csv=Utilities.parseCsv(parts['daily_page.csv'].getDataAsString('UTF-8'));
+    const expected=['date','page','clicks','impressions','ctr','position'];
+    if(!csv.length||csv[0].join('|')!==expected.join('|'))throw new Error('CSVヘッダーが一致しません。');
+    const data=csv.slice(1).filter(r=>!(r.length===1&&r[0]===''));
+    if(data.length!==Number(m.rows))throw new Error('CSV件数とmanifestの件数が一致しません。');
+    const limit=Number(m.requestedRowLimit);
+    if(!Number.isSafeInteger(limit)||limit<=0||data.length>limit||typeof m.capReached!=='boolean'||m.capReached!==(data.length===limit))throw new Error('取得上限とmanifestの記録が矛盾しています。');
+    const keys=new Set();let clicks=0,impressions=0,errors=[];
+    data.forEach((r,i)=>{
+      const row=i+2;
+      if(r.length!==6){errors.push(row+'行: 列数不一致');return;}
+      const [date,page]=r;
+      if(date!==day){errors.push(row+'行: 日付不一致');return;}
+      if(!/^https?:\/\/[^\s\/]+(?:\/|$)/i.test(page)){errors.push(row+'行: URL不正');return;}
+      const key=date+'\u0000'+page;
+      if(keys.has(key)){errors.push(row+'行: 日付×URL重複');return;}
+      keys.add(key);
+      const values=r.slice(2).map(Number),[cl,imp,ctr,pos]=values;
+      if(r.slice(2).some(v=>String(v).trim()==='')||values.some(v=>!Number.isFinite(v))||!Number.isSafeInteger(cl)||!Number.isSafeInteger(imp)||cl<0||imp<0||cl>imp||ctr<0||ctr>1||pos<0){errors.push(row+'行: 指標の値が不正');return;}
+      if(imp===0&&cl!==0){errors.push(row+'行: 表示回数とクリック数が矛盾');return;}
+      if(Math.abs(ctr-(imp?cl/imp:0))>0.000001){errors.push(row+'行: CTR不一致');return;}
+      if(imp>0&&pos<=0){errors.push(row+'行: 平均掲載順位不正');return;}
+      clicks+=cl;impressions+=imp;
+    });
+    if(errors.length)throw new Error('CSV品質検証NG（'+errors.length+'件）\n'+errors.slice(0,8).join('\n'));
+    const message='詳細Evidence品質検証：整合性合格\nファイル：'+latest.getName()+'\n対象日：'+day+'\n行数：'+data.length+'\n重複・数値異常：0件\nクリック：'+clicks+'／表示回数：'+impressions+'\n取得上限：'+(m.capReached?'到達（欠落の可能性あり）':'未到達')+'\n\n※GSCの網羅性は保証しません。\n読取専用：元Evidence・台帳・ZIPは変更していません。';
+    ui.alert(message);
+    return {ok:true,readOnly:true,integrity:'PASS',coverage:'NOT_GUARANTEED',fileName:latest.getName(),rows:data.length,date:day,capReached:m.capReached};
+  }catch(e){ui.alert('詳細Evidence品質検証：不合格\n'+String(e&&e.message||e));return {ok:false,readOnly:true,error:String(e&&e.message||e)};}
+}
+
+// v0.1.30: Manual 7-day collection and bounded multi-day continuation share one engine.
+function sssCollectDailyPageSevenDay(){return sssCollectDailyPageSevenDayCore_(false);}
+function sssCollectDailyPageSevenDayAuto(){return sssCollectDailyPageSevenDayCore_(true);}
+function sssCollectDailyPageSevenDayCore_(multi){
+  const ui=SpreadsheetApp.getUi(),c=sssConfig_();
+  if(!c.lockedAt||!c.siteId||!c.propertyUri)throw new Error('サイト固定の初回セットアップが必要です。');
+  const map=sssDriveFolderMap_();if(!map)throw new Error('ブログ別保存先が未設定です。');
+  sssDriveVerifyMap_(map);
+  const lock=LockService.getDocumentLock();if(!lock.tryLock(30000))throw new Error('他の処理が実行中です。');
+  const started=Date.now(),budgetMs=240000,maxDays=multi?5:1;
+  try{
+    const props=PropertiesService.getDocumentProperties(),stateKey='SSS_DAILY_PAGE_7DAY_'+c.siteId;
+    let state=null;const saved=props.getProperty(stateKey);
+    if(saved){state=JSON.parse(saved);if(state.siteId!==c.siteId||state.propertyUri!==c.propertyUri)throw new Error('再開状態のサイトが一致しません。');}
+    const tz=Session.getScriptTimeZone()||'Asia/Tokyo';
+    if(!state||state.status==='COMPLETE'){
+      const today=Utilities.formatDate(new Date(),tz,'yyyy-MM-dd'),dates=[];
+      for(let n=10;n>=4;n--)dates.push(Utilities.formatDate(new Date(Date.now()-n*86400000),tz,'yyyy-MM-dd'));
+      state={schema:'s3.daily_page.seven_day.state.v1',siteId:c.siteId,propertyUri:c.propertyUri,dates:dates,done:{},status:'ACTIVE',createdAt:new Date().toISOString(),referenceDay:today};
+    }
+    const ev=sssDriveGetFolder_(map.evidenceId),folder=sssDriveChild_(ev,'Detailed');
+    const pending=state.dates.filter(d=>!state.done[d]);
+    if(!pending.length){state.status='COMPLETE';props.setProperty(stateKey,JSON.stringify(state));ui.alert('7日収集：完了（7/7）');return {ok:true,complete:true};}
+    const msg='サイト：'+c.siteName+'\n対象：'+state.dates[0]+' ～ '+state.dates[6]+'\n完了：'+Object.keys(state.done).length+'/7日\n未収集：'+pending.join(', ')+'\n今回：'+(multi?'最大'+maxDays+'日を連続収集（約4分で安全停止）':'1日分を収集')+'\n元Evidence・台帳は変更しません。続けますか？';
+    if(ui.alert('日付×ページ 7日収集'+(multi?'（連続実行・試験）':'（試験）'),msg,ui.ButtonSet.YES_NO)!==ui.Button.YES)return {ok:false,cancelled:true};
+    let processed=0,stoppedForTime=false,failed='';
+    for(const next of pending){
+      if(processed>=maxDays)break;
+      if(Date.now()-started>budgetMs){stoppedForTime=true;break;}
+      try{
+        const name='SIMS_S3_Daily_Page_7Day_'+c.siteId+'_'+next.replace(/-/g,'')+'.zip';
+        const matches=folder.getFilesByName(name);
+        if(matches.hasNext()){
+          const existing=matches.next();if(matches.hasNext())throw new Error('同名ZIPが複数あります。');
+          const parts=Utilities.unzip(existing.getBlob()),mb=parts.find(b=>b.getName()==='manifest.json');
+          if(!mb)throw new Error('既存ZIPのmanifestがありません。');
+          const m=JSON.parse(mb.getDataAsString('UTF-8'));
+          if(m.siteId!==c.siteId||m.propertyUri!==c.propertyUri||m.startDate!==next||m.endDate!==next||m.schema!=='s3.daily_page.seven_day.v1')throw new Error('同名ZIPの識別情報が一致しません。');
+          state.done[next]={fileId:existing.getId(),rows:m.rows,reused:true,capReached:m.capReached};
+        }else{
+          const rows=[],limit=25000,batch=5000;
+          for(let offset=0;offset<limit;offset+=batch){
+            // A single date is atomic: do not persist partial daily ZIPs.
+            if(Date.now()-started>budgetMs)throw new Error('TIME_BUDGET_REACHED');
+            const result=sdscSearchAnalyticsQuery_(c.propertyUri,{startDate:next,endDate:next,type:'web',dataState:'final',dimensions:['date','page'],rowLimit:batch,startRow:offset});
+            const items=result.rows||[];
+            for(const r of items){const keys=r.keys||[];if(keys[0]!==next||!keys[1])throw new Error('GSC応答の日付またはURLが不正です。');rows.push([keys[0],keys[1],Number(r.clicks||0),Number(r.impressions||0),Number(r.ctr||0),Number(r.position||0)]);}
+            if(items.length<batch)break;
+          }
+          const capReached=rows.length===limit;
+          const csv=[['date','page','clicks','impressions','ctr','position']].concat(rows).map(a=>a.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n')+'\r\n';
+          const manifest={schema:'s3.daily_page.seven_day.v1',version:SSS_VERSION,siteId:c.siteId,propertyUri:c.propertyUri,siteName:c.siteName,dimension:['date','page'],startDate:next,endDate:next,rows:rows.length,requestedRowLimit:limit,capReached:capReached,completeness:capReached?'LIMIT_REACHED_POSSIBLY_TRUNCATED':'NOT_GUARANTEED',collectedAt:new Date().toISOString()};
+          const file=folder.createFile(Utilities.zip([Utilities.newBlob(csv,'text/csv','daily_page.csv'),Utilities.newBlob(JSON.stringify(manifest,null,2),'application/json','manifest.json')],name));
+          state.done[next]={fileId:file.getId(),rows:rows.length,reused:false,capReached:capReached};
+        }
+        processed++;
+        state.status=Object.keys(state.done).length===7?'COMPLETE':'ACTIVE';state.updatedAt=new Date().toISOString();
+        props.setProperty(stateKey,JSON.stringify(state));
+      }catch(e){
+        if(String(e&&e.message||e)==='TIME_BUDGET_REACHED'){stoppedForTime=true;break;}
+        failed=next+'：'+String(e&&e.message||e);break;
+      }
+    }
+    const count=Object.keys(state.done).length,remaining=state.dates.filter(d=>!state.done[d]);
+    const summary='日付×ページ 7日収集：'+(count===7?'完了':'途中保存')+'\n進捗：'+count+'/7日\n今回処理：'+processed+'日\n残り：'+remaining.length+'日'+(remaining.length?'（次：'+remaining[0]+'）':'')+'\n保存先：Evidence / Detailed'+(stoppedForTime?'\n実行時間を考慮して停止しました。':'')+(failed?'\nエラー：'+failed:'')+'\n同じメニューから再開できます。';
+    ui.alert(summary);
+    return {ok:!failed,complete:count===7,done:count,total:7,processed:processed,remaining:remaining.length,stoppedForTime:stoppedForTime,error:failed||null};
+  }finally{lock.releaseLock();}
+}
+
+// v0.1.31: Validate each daily ZIP before combining; never alter source evidence.
+function sssSevenDayInspect_(){
+  const c=sssConfig_();if(!c.lockedAt||!c.siteId||!c.propertyUri)throw new Error('サイト固定が必要です。');
+  const map=sssDriveFolderMap_();if(!map)throw new Error('ブログ別保存先がありません。');
+  sssDriveVerifyMap_(map);
+  const ev=sssDriveGetFolder_(map.evidenceId),folders=ev.getFoldersByName('Detailed');
+  if(!folders.hasNext())throw new Error('Detailedフォルダーがありません。');
+  const folder=folders.next();if(folders.hasNext())throw new Error('Detailedフォルダーが複数あります。');
+  const key='SSS_DAILY_PAGE_7DAY_'+c.siteId,saved=PropertiesService.getDocumentProperties().getProperty(key);
+  if(!saved)throw new Error('7日収集の状態がありません。');
+  const state=JSON.parse(saved);
+  if(state.siteId!==c.siteId||state.propertyUri!==c.propertyUri||!Array.isArray(state.dates)||state.dates.length!==7)throw new Error('収集状態が不正です。');
+  const dates=state.dates,seen=new Set(),all=[],sources=[],issues=[],warnings=[];
+  for(let i=0;i<dates.length;i++){
+    const day=dates[i];if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||seen.has(day))throw new Error('対象日が不正です。');seen.add(day);
+    if(i&&Date.parse(day+'T00:00:00Z')-Date.parse(dates[i-1]+'T00:00:00Z')!==86400000)issues.push('収集対象の日付が連続していません。');
+    const name='SIMS_S3_Daily_Page_7Day_'+c.siteId+'_'+day.replace(/-/g,'')+'.zip';
+    const matches=folder.getFilesByName(name);
+    if(!matches.hasNext()){issues.push(day+': ZIPなし');continue;}
+    const f=matches.next();if(matches.hasNext()){issues.push(day+': 同名ZIP複数');continue;}
+    try{
+      if(f.getSize()>90*1024*1024)throw new Error('ZIPサイズ超過');
+      const blobs=Utilities.unzip(f.getBlob()),parts={};
+      blobs.forEach(b=>{if(parts[b.getName()])throw new Error('ZIP内部ファイル重複');parts[b.getName()]=b;});
+      if(Object.keys(parts).length!==2||!parts['manifest.json']||!parts['daily_page.csv'])throw new Error('ZIP構造不一致');
+      const m=JSON.parse(parts['manifest.json'].getDataAsString('UTF-8'));
+      if(m.schema!=='s3.daily_page.seven_day.v1'||m.siteId!==c.siteId||m.propertyUri!==c.propertyUri||m.startDate!==day||m.endDate!==day||!Array.isArray(m.dimension)||m.dimension.join('|')!=='date|page')throw new Error('manifest識別不一致');
+      const csv=Utilities.parseCsv(parts['daily_page.csv'].getDataAsString('UTF-8'));
+      if(!csv.length||csv[0].join('|')!=='date|page|clicks|impressions|ctr|position')throw new Error('CSVヘッダー不一致');
+      const rows=csv.slice(1).filter(r=>!(r.length===1&&r[0]===''));
+      if(rows.length!==Number(m.rows))throw new Error('manifest件数不一致');
+      const limit=Number(m.requestedRowLimit);
+      if(!Number.isSafeInteger(limit)||limit<=0||rows.length>limit||typeof m.capReached!=='boolean'||m.capReached!==(rows.length===limit))throw new Error('取得上限情報不一致');
+      const urls=new Set();let clicks=0,impressions=0,positionWeighted=0;
+      rows.forEach((r,j)=>{
+        if(r.length!==6||r[0]!==day||!/^https?:\/\/[^\s/]+(?:\/|$)/i.test(r[1]))throw new Error((j+2)+'行: 日付・URL・列数不正');
+        if(urls.has(r[1]))throw new Error((j+2)+'行: URL重複');urls.add(r[1]);
+        if(r.slice(2).some(v=>String(v).trim()===''))throw new Error((j+2)+'行: 数値空欄');
+        const [cl,imp,ctr,pos]=r.slice(2).map(Number);
+        if(![cl,imp,ctr,pos].every(Number.isFinite)||!Number.isSafeInteger(cl)||!Number.isSafeInteger(imp)||cl<0||imp<0||cl>imp||ctr<0||ctr>1||pos<0||(imp>0&&pos<=0)||Math.abs(ctr-(imp?cl/imp:0))>0.000001)throw new Error((j+2)+'行: 数値異常');
+        clicks+=cl;impressions+=imp;positionWeighted+=pos*imp;
+        all.push([day,r[1],cl,imp,ctr,pos]);
+      });
+      sources.push({fileId:f.getId(),name:f.getName(),date:day,rows:rows.length,clicks:clicks,impressions:impressions,capReached:m.capReached});
+      if(m.capReached)warnings.push(day+': 取得上限に到達');
+      if(!state.done||!state.done[day])warnings.push(day+': 進捗台帳に完了記録なし');
+    }catch(e){issues.push(day+': '+String(e&&e.message||e));}
+  }
+  // A prior one-day pilot can coexist, but is not added to the seven-day merge.
+  const iterator=folder.getFiles();let pilots=0;
+  while(iterator.hasNext()){const f=iterator.next();if(!f.isTrashed()&&/^SIMS_S3_Daily_Page_Pilot_\d{8}_\d{6}\.zip$/.test(f.getName()))pilots++;}
+  if(pilots)warnings.push('別の1日試験ZIP '+pilots+'件は統合対象外');
+  return {c,map,dates,all,sources,issues,warnings,pilots,complete:issues.length===0&&sources.length===7};
+}
+function sssAuditSevenDayDetailed(){
+  const ui=SpreadsheetApp.getUi();
+  try{const a=sssSevenDayInspect_();
+    ui.alert('7日Detailed品質監査：'+(a.complete?'合格':'要確認')+'\n検証済み：'+a.sources.length+'/7日\n行数：'+a.all.length+'\n対象：'+a.dates[0]+' ～ '+a.dates[6]+'\n問題：'+a.issues.length+'件\n注意：'+a.warnings.length+'件'+(a.issues.length?'\n'+a.issues.slice(0,5).join('\n'):'')+(a.warnings.length?'\n'+a.warnings.slice(0,5).join('\n'):'')+'\n読取専用：ファイル・台帳は変更していません。');
+    return {ok:a.complete,days:a.sources.length,rows:a.all.length,issues:a.issues,warnings:a.warnings,readOnly:true};
+  }catch(e){ui.alert('7日Detailed品質監査：不合格\n'+String(e.message||e));return {ok:false,error:String(e.message||e)};}
+}
+function sssMergeSevenDayDetailed(){
+  const ui=SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
+  if(!lock.tryLock(30000))throw new Error('他の処理が実行中です。');
+  try{
+    const a=sssSevenDayInspect_();
+    if(!a.complete)throw new Error('品質監査に合格していません。問題：'+a.issues.slice(0,4).join(' / '));
+    const keyset=new Set();let clicks=0,impressions=0,weighted=0;
+    for(const r of a.all){const key=r[0]+'\u0000'+r[1];if(keyset.has(key))throw new Error('日付×URL重複を検出しました。');keyset.add(key);clicks+=r[2];impressions+=r[3];weighted+=r[5]*r[3];}
+    if(ui.alert('7日Detailed統合（試験）','検証済み：7日\n行数：'+a.all.length+'\n対象：'+a.dates[0]+' ～ '+a.dates[6]+'\n新しい統合ZIPを作成します。元データは変更しません。',ui.ButtonSet.YES_NO)!==ui.Button.YES)return {ok:false,cancelled:true};
+    const evidence=sssDriveGetFolder_(a.map.evidenceId),folder=sssDriveChild_(evidence,'DetailedMerged');
+    const manifest={schema:'s3.daily_page.merged.v1',version:SSS_VERSION,siteId:a.c.siteId,propertyUri:a.c.propertyUri,createdAt:new Date().toISOString(),period:{startDate:a.dates[0],endDate:a.dates[6]},days:7,rows:a.all.length,clicks,impressions,ctr:impressions?clicks/impressions:0,position:impressions?weighted/impressions:0,sources:a.sources,warnings:a.warnings,coverage:'NOT_GUARANTEED',scope:'date_page_7day_only',analysisWindows:{days30:'INSUFFICIENT_DATA',days90:'INSUFFICIENT_DATA',days365:'INSUFFICIENT_DATA'}};
+    const csv=[['date','page','clicks','impressions','ctr','position']].concat(a.all).map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n')+'\r\n';
+    const name='SIMS_S3_Detailed_Merged_'+a.c.siteId+'_'+a.dates[0].replace(/-/g,'')+'_'+a.dates[6].replace(/-/g,'')+'_'+Utilities.formatDate(new Date(),Session.getScriptTimeZone()||'Asia/Tokyo','yyyyMMdd_HHmmss')+'.zip';
+    const f=folder.createFile(Utilities.zip([Utilities.newBlob(csv,'text/csv','daily_page.csv'),Utilities.newBlob(JSON.stringify(manifest,null,2),'application/json','manifest.json')],name));
+    ui.alert('7日Detailed統合：完了\n日数：7\n行数：'+a.all.length+'\nクリック：'+clicks+'\n表示回数：'+impressions+'\n保存先：Evidence / DetailedMerged\nZIP：'+f.getName()+'\n元Evidenceは変更していません。');
+    return {ok:true,fileId:f.getId(),fileName:f.getName(),rows:a.all.length,days:7};
+  }catch(e){ui.alert('7日Detailed統合：中止\n'+String(e&&e.message||e));return {ok:false,error:String(e&&e.message||e)};}
+  finally{lock.releaseLock();}
+}
+
+// v0.1.34: A bounded, opt-in pilot. No triggers, deletes, or source modifications.
+function sssDailyPageMissingPlan_(windowDays){
+  windowDays=windowDays||30;
+  if(!Number.isInteger(windowDays)||windowDays<1||windowDays>365)throw new Error('収集対象日数が不正です。');
+  const c=sssConfig_();if(!c.lockedAt||!c.siteId||!c.propertyUri)throw new Error('サイト固定が必要です。');
+  const map=sssDriveFolderMap_();if(!map)throw new Error('ブログ別保存先がありません。');
+  sssDriveVerifyMap_(map);
+  const ev=sssDriveGetFolder_(map.evidenceId),folders=ev.getFoldersByName('Detailed');
+  if(!folders.hasNext())throw new Error('Detailedフォルダーがありません。');
+  const folder=folders.next();if(folders.hasNext())throw new Error('Detailedフォルダーが複数あります。');
+  const tz=Session.getScriptTimeZone()||'Asia/Tokyo';
+  // Date math anchored at local noon avoids DST boundary errors.
+  const today=Utilities.formatDate(new Date(),tz,'yyyy-MM-dd');
+  const base=new Date(today+'T12:00:00+09:00');
+  const dayOffset=n=>Utilities.formatDate(new Date(base.getTime()-n*86400000),tz,'yyyy-MM-dd');
+  const end=dayOffset(4),start=dayOffset(windowDays+3),days=[];
+  for(let n=windowDays+3;n>=4;n--)days.push(dayOffset(n));
+  const known={},issues=[],warnings=[],groups={},files=folder.getFiles();
+  while(files.hasNext()){
+    const f=files.next();if(f.isTrashed()||!/\.zip$/i.test(f.getName()))continue;
+    try{
+      const blobs=Utilities.unzip(f.getBlob());
+      const mb=blobs.filter(b=>b.getName()==='manifest.json');
+      if(mb.length!==1)throw new Error('manifest件数不正');
+      const m=JSON.parse(mb[0].getDataAsString('UTF-8'));
+      if(m.siteId!==c.siteId||m.propertyUri!==c.propertyUri)continue;
+      if(!['s3.daily_page.seven_day.v1','s3.daily_page.pilot.v1','s3.daily_page.missing.v1'].includes(m.schema))continue;
+      const d=m.startDate||m.date;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||m.endDate&&m.endDate!==d)throw new Error('対象日不正');
+      if(!days.includes(d))continue;
+      const cb=blobs.filter(b=>b.getName()==='daily_page.csv');
+      if(cb.length!==1)throw new Error('CSV件数不正');
+      const csvText=cb[0].getDataAsString('UTF-8');
+      const csv=Utilities.parseCsv(csvText);
+      if(!csv.length||csv[0].join('|')!=='date|page|clicks|impressions|ctr|position')throw new Error('CSVヘッダー不正');
+      const rows=csv.slice(1).filter(r=>!(r.length===1&&r[0]===''));
+      if(rows.length!==Number(m.rows))throw new Error('CSV/manifest行数不一致');
+      const limit=Number(m.requestedRowLimit);
+      if(!Number.isSafeInteger(limit)||limit<1||rows.length>limit||typeof m.capReached!=='boolean'||m.capReached!==(rows.length===limit))throw new Error('取得上限情報不正');
+      const keys=new Set();
+      for(const r of rows){
+        if(r.length!==6||r[0]!==d||!/^https?:\/\/[^\s/]+(?:\/|$)/i.test(r[1])||keys.has(r[1]))throw new Error('CSVキー・URL不正');
+        keys.add(r[1]);
+        if(r.slice(2).some(v=>String(v).trim()===''))throw new Error('数値空欄');
+        const [cl,imp,ctr,pos]=r.slice(2).map(Number);
+        if(![cl,imp,ctr,pos].every(Number.isFinite)||!Number.isSafeInteger(cl)||!Number.isSafeInteger(imp)||cl<0||imp<0||cl>imp||ctr<0||ctr>1||pos<0||(imp>0&&pos<=0)||Math.abs(ctr-(imp?cl/imp:0))>0.000001)throw new Error('CSV数値不正');
+      }
+      // Normalize row order; two legitimate collections of the same date can differ.
+      const fingerprint=JSON.stringify(rows.map(r=>r.join('\u0001')).sort());
+      (groups[d]||(groups[d]=[])).push({fileId:f.getId(),name:f.getName(),rows:rows.length,capReached:m.capReached,fingerprint,collectedAt:String(m.collectedAt||''),schema:m.schema});
+    }catch(e){issues.push(f.getName()+': '+String(e&&e.message||e));}
+  }
+  const duplicates=[];
+  for(const d of Object.keys(groups)){
+    const candidates=groups[d];
+    // All candidates were individually validated. Select deterministically; never sum.
+    candidates.sort((a,b)=>Number(a.capReached)-Number(b.capReached)||b.rows-a.rows||b.collectedAt.localeCompare(a.collectedAt)||a.name.localeCompare(b.name));
+    known[d]=candidates[0];
+    if(candidates.length>1){
+      duplicates.push(d);
+      const identical=candidates.every(x=>x.fingerprint===candidates[0].fingerprint);
+      warnings.push(d+': '+candidates.length+'件（'+(identical?'同一内容':'内容差あり')+'）、採用: '+candidates[0].name);
+    }
+  }
+  const missing=days.filter(d=>!known[d]);
+  return {c,folder,days,start,end,missing,known,issues,warnings,duplicates,windowDays};
+}
+function sssPreviewDailyPageMissing(){
+  return sssPreviewDailyPageMissingWindow_(30);
+}
+function sssPreviewDailyPageMissing365(){
+  return sssPreviewDailyPageMissingWindow_(365);
+}
+function sssPreviewDailyPageMissingWindow_(windowDays){
+  const ui=SpreadsheetApp.getUi();try{
+    const p=sssDailyPageMissingPlan_(windowDays);
+    ui.alert('日付×ページ 未収集日確認（読取専用）\n対象：'+p.start+' ～ '+p.end+'（'+windowDays+'日）\n収集済み：'+(windowDays-p.missing.length)+'日\n未収集：'+p.missing.length+'日'+(p.missing.length?'\n次の対象：'+p.missing.slice(0,7).join(', '):'')+'\n同日ZIP重複：'+p.duplicates.length+'日\n読取上の注意：'+p.issues.length+'件\n重複の処理：'+(p.warnings.length?p.warnings.slice(0,2).join(' / '):'なし')+'\n'+(p.issues.length?'停止理由：'+p.issues.slice(0,2).join(' / '):'')+'\n\n対象：直近'+windowDays+'日。既存ZIPは変更しません。');
+    return {ok:true,readOnly:true,missing:p.missing,duplicates:p.duplicates};
+  }catch(e){ui.alert('未収集日確認：中止\n'+String(e.message||e));return {ok:false,error:String(e.message||e)};}
+}
+function sssCollectDailyPageMissing(){
+  return sssCollectDailyPageMissingWindow_(30);
+}
+function sssCollectDailyPageMissing365(){
+  return sssCollectDailyPageMissingWindow_(365);
+}
+function sssCollectDailyPageMissingWindow_(windowDays){
+  const ui=SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
+  if(!lock.tryLock(30000)){ui.alert('別の処理が実行中です。');return {ok:false};}
+  const started=Date.now(),budgetMs=220000,maxDays=7;
+  try{
+    const p=sssDailyPageMissingPlan_(windowDays);
+    if(p.issues.length)throw new Error('Evidence検証エラー（収集停止）：\n'+p.issues.slice(0,4).join('\n')); // Verified duplicates are not an error.
+    if(!p.missing.length){ui.alert('直近'+windowDays+'日：未収集日はありません。');return {ok:true,processed:0};}
+    const batch=p.missing.slice(0,maxDays);
+    if(ui.alert('日付×ページ 不足分収集（試験）','対象：'+p.start+' ～ '+p.end+'（'+windowDays+'日）\n未収集：'+p.missing.length+'日\n今回：最大'+batch.length+'日（'+batch[0]+'から）\n1日25,000行まで。ZIPは別保存し、元データは変更しません。実行しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return {ok:false,cancelled:true};
+    let done=0,failed='',stopped=false;
+    for(const day of batch){
+      if(Date.now()-started>budgetMs){stopped=true;break;}
+      try{
+        const name='SIMS_S3_Daily_Page_Missing_'+p.c.siteId+'_'+day.replace(/-/g,'')+'.zip';
+        if(p.folder.getFilesByName(name).hasNext())throw new Error('同名ZIPが存在します。再取得を停止しました。');
+        const rows=[],limit=25000,step=5000;
+        for(let offset=0;offset<limit;offset+=step){
+          if(Date.now()-started>budgetMs)throw new Error('TIME_BUDGET_REACHED');
+          const result=sdscSearchAnalyticsQuery_(p.c.propertyUri,{startDate:day,endDate:day,type:'web',dataState:'final',dimensions:['date','page'],rowLimit:step,startRow:offset});
+          const items=result.rows||[];
+          for(const r of items){const k=r.keys||[];if(k[0]!==day||!k[1])throw new Error('GSC応答のキーが不正です。');rows.push([k[0],k[1],Number(r.clicks||0),Number(r.impressions||0),Number(r.ctr||0),Number(r.position||0)]);}
+          if(items.length<step)break;
+        }
+        const keys=new Set();for(const r of rows){const key=r[0]+'\u0000'+r[1];if(keys.has(key))throw new Error('日付×URLが重複しています。');keys.add(key);if(r.slice(2).some(x=>!Number.isFinite(x))||r[2]<0||r[3]<0||r[2]>r[3])throw new Error('数値異常があります。');}
+        const csv=[['date','page','clicks','impressions','ctr','position']].concat(rows).map(a=>a.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n')+'\r\n';
+        const manifest={schema:'s3.daily_page.missing.v1',version:SSS_VERSION,siteId:p.c.siteId,propertyUri:p.c.propertyUri,siteName:p.c.siteName,dimension:['date','page'],startDate:day,endDate:day,rows:rows.length,requestedRowLimit:limit,capReached:rows.length===limit,completeness:'NOT_GUARANTEED',collectedAt:new Date().toISOString()};
+        p.folder.createFile(Utilities.zip([Utilities.newBlob(csv,'text/csv','daily_page.csv'),Utilities.newBlob(JSON.stringify(manifest,null,2),'application/json','manifest.json')],name));
+        done++;
+      }catch(e){if(String(e.message||e)==='TIME_BUDGET_REACHED')stopped=true;else failed=day+'：'+String(e.message||e);break;}
+    }
+    ui.alert('不足分収集：'+(failed?'要確認':'処理終了')+'\n今回保存：'+done+'日\n残り見込み：'+(p.missing.length-done)+'日'+(stopped?'\n実行時間を考慮して停止しました。':'')+(failed?'\nエラー：'+failed:'')+'\n重複ZIP：'+p.duplicates.length+'日（正本選択済み）\n同じメニューから再開できます。\n元Evidenceは変更していません。');
+    return {ok:!failed,processed:done,remaining:p.missing.length-done,error:failed||null};
+  }catch(e){ui.alert('不足分収集：中止\n'+String(e.message||e));return {ok:false,error:String(e.message||e)};}
+  finally{lock.releaseLock();}
+}
+
+
+// v0.1.35: explicit opt-in, at most 14 newly collected dates per pilot.
+// No recurring schedule. Only own continuation triggers may be deleted.
+const SSS_AUTO_KEY_ = 'SSS_AUTO_DETAILED_PILOT_V1';
+const SSS_AUTO_HANDLER_ = 'sssAutoDetailedPilotTick';
+const SSS_AUTO_MAX_ATTEMPTS_ = 500; // Hard safety cap, never an infinite background loop.
+function sssAutoState_(){
+  const raw=sssProperties_().getProperty(SSS_AUTO_KEY_);
+  if(!raw)return null;
+  const state=JSON.parse(raw);
+  if(state.siteId!==sssConfig_().siteId)throw new Error('サイト識別子が一致しません。');
+  return state;
+}
+function sssAutoSave_(state){sssProperties_().setProperty(SSS_AUTO_KEY_,JSON.stringify(state));}
+function sssAutoClearTriggers_(){
+  for(const t of ScriptApp.getProjectTriggers())if(t.getHandlerFunction()===SSS_AUTO_HANDLER_)ScriptApp.deleteTrigger(t);
+}
+// v0.1.37: durable repeating continuation trigger. A forced timeout must not
+// consume the only future execution. Only the dedicated handler is managed.
+function sssAutoSchedule_(){
+  const own=ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()===SSS_AUTO_HANDLER_);
+  if(own.length===1)return;
+  if(own.length>1)throw new Error('専用トリガーが複数あります。安全のため停止しました。');
+  ScriptApp.newTrigger(SSS_AUTO_HANDLER_).timeBased().everyMinutes(5).create();
+}
+function sssAutoStopInternal_(reason){
+  const s=sssAutoState_();
+  if(s){s.status=reason;s.updatedAt=new Date().toISOString();sssAutoSave_(s);}
+  sssAutoClearTriggers_();
+  return s;
+}
+function sssStartAutoDetailedPilot(){
+  const ui=SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
+  if(!lock.tryLock(1000)){if(!silent)ui.alert('他の処理が実行中です。');return false;}
+  try{
+    const old=sssAutoState_();
+    if(old&&old.status==='RUNNING'){ui.alert('自動収集が既に実行中です。状態確認メニューをご利用ください。');return;}
+    const p=sssDailyPageMissingPlan_(365);
+    if(p.issues.length)throw new Error('Evidenceの読取異常があるため開始できません：'+p.issues.slice(0,2).join(' / '));
+    if(!p.missing.length){ui.alert('未収集日はありません。');return;}
+    const count=Math.min(14,p.missing.length);
+    if(ui.alert('詳細Evidence 自動継続収集（限定試験）','未収集：'+p.missing.length+'日\n今回の新規収集上限：'+count+'日\n最初の対象：'+p.missing[0]+'\n一時トリガーを作成し、終了時に削除します。GSC APIへのアクセスと新規ZIP保存を実行します。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+    const state={siteId:p.c.siteId,status:'RUNNING',startedAt:new Date().toISOString(),updatedAt:new Date().toISOString(),targetDays:p.missing.slice(0,count),completed:[],errors:[],attempts:0};
+    sssAutoSave_(state);
+    sssAutoSchedule_();
+    ui.alert('自動継続収集を予約しました。\n対象：'+count+'日\n約1分後から開始します。\n「詳細Evidence 自動収集の状態確認」で進捗を確認できます。');
+  }catch(e){ui.alert('自動収集を開始できません：'+String(e.message||e));}
+  finally{lock.releaseLock();}
+}
+function sssAutoDetailedPilotTick(){
+  const lock=LockService.getDocumentLock();
+  if(!lock.tryLock(1000))return;
+  try{
+    const s=sssAutoState_();
+    if(!s||s.status!=='RUNNING'){sssAutoClearTriggers_();return;}
+    s.attempts++;
+    if(s.attempts>SSS_AUTO_MAX_ATTEMPTS_)throw new Error('再開回数が安全上限を超えました。');
+    const p=sssDailyPageMissingPlan_(365);
+    if(p.issues.length)throw new Error('既存Evidenceの読取異常：'+p.issues.slice(0,2).join(' / '));
+    const started=Date.now(),budget=110000;
+    let processedThisTick=0;
+    for(const day of s.targetDays){
+      if(s.completed.includes(day))continue;
+      if(Date.now()-started>budget||processedThisTick>=4)break;
+      // A previously written, verified ZIP counts as done (e.g. after interruption).
+      if(p.known[day]){s.completed.push(day);s.updatedAt=new Date().toISOString();sssAutoSave_(s);continue;}
+      const name='SIMS_S3_Daily_Page_Missing_'+p.c.siteId+'_'+day.replace(/-/g,'')+'.zip';
+      if(p.folder.getFilesByName(name).hasNext())throw new Error(day+': 同名ZIPが存在します。品質を確認してください。');
+      const rows=[],limit=25000,step=5000;
+      for(let offset=0;offset<limit;offset+=step){
+        if(Date.now()-started>budget){s.updatedAt=new Date().toISOString();sssAutoSave_(s);return;}
+        const response=sdscSearchAnalyticsQuery_(p.c.propertyUri,{startDate:day,endDate:day,type:'web',dataState:'final',dimensions:['date','page'],rowLimit:step,startRow:offset});
+        const items=response.rows||[];
+        for(const r of items){const k=r.keys||[];if(k[0]!==day||!k[1])throw new Error(day+': GSCキー不正');rows.push([k[0],k[1],Number(r.clicks||0),Number(r.impressions||0),Number(r.ctr||0),Number(r.position||0)]);}
+        if(items.length<step)break;
+      }
+      const keys=new Set();
+      for(const r of rows){if(keys.has(r[1]))throw new Error(day+': URL重複');keys.add(r[1]);if(r.slice(2).some(v=>!Number.isFinite(v))||r[2]<0||r[3]<0||r[2]>r[3]||Math.abs(r[4]-(r[3]?r[2]/r[3]:0))>0.000001)throw new Error(day+': 数値異常');}
+      const csv=[['date','page','clicks','impressions','ctr','position']].concat(rows).map(a=>a.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n')+'\r\n';
+      const manifest={schema:'s3.daily_page.missing.v1',version:SSS_VERSION,siteId:p.c.siteId,propertyUri:p.c.propertyUri,siteName:p.c.siteName,dimension:['date','page'],startDate:day,endDate:day,rows:rows.length,requestedRowLimit:limit,capReached:rows.length===limit,completeness:'NOT_GUARANTEED',collectedAt:new Date().toISOString(),collectionMode:'auto_pilot'};
+      p.folder.createFile(Utilities.zip([Utilities.newBlob(csv,'text/csv','daily_page.csv'),Utilities.newBlob(JSON.stringify(manifest,null,2),'application/json','manifest.json')],name));
+      s.completed.push(day);processedThisTick++;s.updatedAt=new Date().toISOString();sssAutoSave_(s);
+    }
+    if(s.completed.length>=s.targetDays.length){s.status='COMPLETED';s.updatedAt=new Date().toISOString();sssAutoSave_(s);sssAutoClearTriggers_();}
+    else sssAutoSchedule_();
+  }catch(e){
+    const s=sssAutoState_();if(s){s.status='ERROR';s.updatedAt=new Date().toISOString();s.errors.push(String(e&&e.message||e));sssAutoSave_(s);}
+    sssAutoClearTriggers_();
+    console.error('S3 auto detailed pilot stopped: '+String(e&&e.stack||e));
+  }finally{lock.releaseLock();}
+}
+function sssShowAutoDetailedPilotStatus(){
+  const ui=SpreadsheetApp.getUi();try{
+    const s=sssAutoState_();if(!s){ui.alert('自動収集の実行履歴はありません。');return;}
+    ui.alert('詳細Evidence 自動収集\n状態：'+s.status+'\n進捗：'+s.completed.length+'/'+s.targetDays.length+'日\n残り：'+(s.targetDays.length-s.completed.length)+'日\n最終更新：'+s.updatedAt+(s.errors.length?'\nエラー：'+s.errors.slice(-1)[0]:'')+'\n専用トリガー：'+sssAutoTriggerCount_()+'件'+(s.status==='COMPLETED'&&sssAutoTriggerCount_()?'\n警告：完了後のトリガー残留':'')+'\n※元Evidenceは変更しません。');
+  }catch(e){ui.alert('状態確認エラー：'+String(e.message||e));}
+}
+function sssStopAutoDetailedPilot(){
+  const ui=SpreadsheetApp.getUi();
+  if(ui.alert('自動収集を停止','一時トリガーを削除して自動収集を停止します。保存済みZIPは残します。',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  const lock=LockService.getDocumentLock();if(!lock.tryLock(30000)){ui.alert('収集処理が実行中です。完了後に再度停止してください。');return;}
+  try{sssAutoStopInternal_('STOPPED');ui.alert('自動収集を停止しました。保存済みEvidenceは保持しています。');}finally{lock.releaseLock();}
+}
+
+
+// v0.1.37: read-only trigger audit. Does not delete unrelated triggers.
+function sssAutoTriggerCount_(){
+  return ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()===SSS_AUTO_HANDLER_).length;
+}
+function sssAuditAutoDetailedTriggers(){
+  const ui=SpreadsheetApp.getUi();
+  try{
+    const s=sssAutoState_(),count=sssAutoTriggerCount_();
+    const status=s?s.status:'履歴なし';
+    const issue=(status==='COMPLETED'||status==='STOPPED'||status==='ERROR')&&count>0;
+    ui.alert('詳細Evidence 自動収集トリガー監査（読取専用）\n状態：'+status+'\n専用トリガー：'+count+'件\n判定：'+(issue?'要確認（終了後に残留）':count>1?'要確認（複数登録）':'正常')+'\n他のトリガーには触れません。');
+    return {ok:!issue&&count<=1,triggerCount:count,status};
+  }catch(e){ui.alert('トリガー監査エラー：'+String(e.message||e));return {ok:false};}
+}
+// Opt-in full-window collection. The same verified ZIP reader is used on each continuation.
+// For safety, start only after the previous pilot is no longer running.
+function sssStartAutoDetailed365(){
+  const ui=SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
+  if(!lock.tryLock(1000)){if(!silent)ui.alert('他の処理が実行中です。');return false;}
+  try{
+    const old=sssAutoState_();
+    if(old&&old.status==='RUNNING')throw new Error('自動収集が既に進行中です。');
+    const p=sssDailyPageMissingPlan_(365);
+    if(p.issues.length)throw new Error('Evidence読取異常：'+p.issues.slice(0,3).join(' / '));
+    if(!p.missing.length){ui.alert('未収集日はありません。');return;}
+    if(sssAutoTriggerCount_())throw new Error('以前の専用トリガーが残っています。トリガー監査で確認してください。');
+    const days=p.missing.slice();
+    if(ui.alert('詳細Evidence 365日自動収集','対象：'+p.start+' ～ '+p.end+'\n未収集：'+days.length+'日\n収集済み：'+(365-days.length)+'日\n一時トリガーで分割実行します。GSC APIへのアクセスと新規ZIP保存を行います。途中停止はメニューから可能です。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+    const now=new Date().toISOString();
+    const state={siteId:p.c.siteId,status:'RUNNING',mode:'365',startedAt:now,updatedAt:now,targetDays:days,completed:[],errors:[],attempts:0};
+    sssAutoSave_(state);
+    try{sssAutoSchedule_();}catch(e){state.status='ERROR';state.updatedAt=new Date().toISOString();state.errors.push('トリガー予約失敗：'+String(e));sssAutoSave_(state);throw e;}
+    ui.alert('365日自動収集を予約しました。\n今回の未収集：'+days.length+'日\n状態確認メニューで進捗を確認できます。');
+  }catch(e){ui.alert('365日自動収集を開始できません：'+String(e.message||e));}
+  finally{lock.releaseLock();}
+}
+
+// v0.1.37: opt-in recovery of a stalled 365-day job, preserving its targetDays.
+// Reconciles each day with verified ZIPs inside sssAutoDetailedPilotTick.
+function sssRecoverAutoDetailedCollection(){
+  // Recovery must remain O(1): do NOT scan/decompress 365 days of Drive ZIPs here.
+  const ui=SpreadsheetApp.getUi();
+  try{
+    const state=sssAutoState_();
+    if(!state||state.mode!=='365'||state.status!=='RUNNING')throw new Error('再開対象の365日収集がありません。');
+    const elapsed=Date.now()-Date.parse(state.updatedAt);
+    if(!Number.isFinite(elapsed)||elapsed<15*60000)throw new Error('最終更新から15分経過していません。');
+    const count=sssAutoTriggerCount_();
+    if(count>1)throw new Error('専用トリガーが複数あります。');
+    const recorded=state.completed.length,remaining=state.targetDays.length-recorded;
+    if(ui.alert('停滞した自動収集を再開',
+      '記録済み：'+recorded+'/'+state.targetDays.length+'日\n残り（暫定）：'+remaining+'日\n専用トリガー：'+count+'件\n'+
+      '※この画面ではEvidence全件を走査しません。再開後の収集処理で保存済みZIPを検証してスキップします。\n'+
+      '専用トリガーを再設定しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+    const lock=LockService.getDocumentLock();
+    if(!lock.tryLock(1000))throw new Error('別の収集処理が実行中です。');
+    try{
+      // Re-read after confirmation to avoid reviving a completed or stopped job.
+      const current=sssAutoState_();
+      if(!current||current.status!=='RUNNING'||current.mode!=='365')throw new Error('状態が変更されました。');
+      if(sssAutoTriggerCount_()>1)throw new Error('専用トリガーが複数あります。');
+      sssAutoClearTriggers_();
+      sssAutoSchedule_();
+      current.updatedAt=new Date().toISOString();current.recoveredAt=current.updatedAt;
+      sssAutoSave_(current);
+    }finally{lock.releaseLock();}
+    ui.alert('再開を予約しました。進捗は収集処理が実行された後に更新されます。');
+  }catch(e){ui.alert('再開を中止しました：'+String(e.message||e));}
+}
+
+
+// v0.1.39: bounded, resumable audit. Source ZIPs and EvidenceRegistry are NEVER modified.
+// Audit records are stored only in a dedicated spreadsheet tab, not in Evidence.
+const SSS_D365_KEY_='SSS_DETAILED_365_AUDIT_V1';
+const SSS_D365_SHEET_='DetailedAudit';
+function sssD365Sheet_(){
+  const ss=sssSpreadsheet_();let sh=ss.getSheetByName(SSS_D365_SHEET_);
+  if(!sh)sh=ss.insertSheet(SSS_D365_SHEET_);
+  if(sh.getLastRow()===0)sh.appendRow(['Date','File ID','ZIP','Status','Rows','Cap reached','Fingerprint','Note']);
+  return sh;
+}
+function sssD365State_(){const raw=sssProperties_().getProperty(SSS_D365_KEY_);return raw?JSON.parse(raw):null;}
+function sssD365Save_(s){sssProperties_().setProperty(SSS_D365_KEY_,JSON.stringify(s));}
+function sssD365Folder_(){
+  const c=sssConfig_();if(!c.lockedAt||!c.siteId||!c.propertyUri)throw new Error('サイト固定が必要です。');
+  const map=sssDriveFolderMap_();sssDriveVerifyMap_(map);
+  const dirs=sssDriveGetFolder_(map.evidenceId).getFoldersByName('Detailed');
+  if(!dirs.hasNext())throw new Error('Detailedフォルダーがありません。');
+  const dir=dirs.next();if(dirs.hasNext())throw new Error('Detailedフォルダーが複数あります。');
+  return {c,dir};
+}
+function sssStartDetailed365Audit(){
+  const ui=SpreadsheetApp.getUi();
+  try{
+    const old=sssD365State_();
+    if(old&&old.status==='RUNNING'){ui.alert('監査は実行中です。「続行」または「自動継続」を選択してください。');return;}
+    if(ui.alert('365日Detailed品質監査','既存Evidenceを変更せず、ZIPを最大5件ずつ検証します。監査記録用のDetailedAuditシートは初期化します。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+    sssD365DeleteTriggers_();
+    const x=sssD365Folder_(),sh=sssD365Sheet_();
+    if(sh.getLastRow()>1)sh.getRange(2,1,sh.getLastRow()-1,8).clearContent();
+    const tz=Session.getScriptTimeZone()||'Asia/Tokyo';
+    const today=Utilities.formatDate(new Date(),tz,'yyyy-MM-dd');
+    const base=new Date(today+'T12:00:00+09:00');
+    const day=n=>Utilities.formatDate(new Date(base.getTime()-n*86400000),tz,'yyyy-MM-dd');
+    const state={siteId:x.c.siteId,propertyUri:x.c.propertyUri,status:'RUNNING',start:day(368),end:day(4),checked:0,valid:0,invalid:0,warnings:0,startedAt:new Date().toISOString(),token:null};
+    sssD365Save_(state);ui.alert('監査を開始しました。次に「365日Detailed品質監査を続行」を選択してください。');
+  }catch(e){ui.alert('監査開始エラー：'+String(e.message||e));}
+}
+function sssD365InspectFile_(file,c,start,end){
+  const name=file.getName();
+  if(file.isTrashed()||!/\.zip$/i.test(name))return null;
+  let day='',rows=0,cap='',fingerprint='',note='',status='OK';
+  try{
+    if(file.getSize()>90*1024*1024)throw new Error('ZIPサイズ上限超過');
+    const blobs=Utilities.unzip(file.getBlob());const parts={};
+    blobs.forEach(b=>{if(parts[b.getName()])throw new Error('ZIP内部重複');parts[b.getName()]=b;});
+    if(Object.keys(parts).length!==2||!parts['manifest.json']||!parts['daily_page.csv'])throw new Error('ZIP構造不正');
+    const m=JSON.parse(parts['manifest.json'].getDataAsString('UTF-8'));
+    if(m.siteId!==c.siteId||m.propertyUri!==c.propertyUri)return null;
+    if(!['s3.daily_page.seven_day.v1','s3.daily_page.pilot.v1','s3.daily_page.missing.v1'].includes(m.schema))return null;
+    day=m.startDate||m.date;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||m.endDate&&m.endDate!==day)throw new Error('日付不整合');
+    if(day<start||day>end)return null;
+    const csv=Utilities.parseCsv(parts['daily_page.csv'].getDataAsString('UTF-8'));
+    if(!csv.length||csv[0].join('|')!=='date|page|clicks|impressions|ctr|position')throw new Error('CSVヘッダー不正');
+    const data=csv.slice(1).filter(r=>!(r.length===1&&r[0]===''));rows=data.length;
+    const limit=Number(m.requestedRowLimit);
+    if(rows!==Number(m.rows)||!Number.isSafeInteger(limit)||limit<1||rows>limit||typeof m.capReached!=='boolean'||m.capReached!==(rows===limit))throw new Error('件数・取得上限不整合');
+    const keys=new Set();const canonical=[];
+    for(const r of data){
+      if(r.length!==6||r[0]!==day||!/^https?:\/\/[^\s/]+(?:\/|$)/i.test(r[1])||keys.has(r[1]))throw new Error('日付・URL・重複不正');
+      keys.add(r[1]);if(r.slice(2).some(v=>String(v).trim()===''))throw new Error('数値空欄');
+      const [cl,imp,ctr,pos]=r.slice(2).map(Number);
+      if(![cl,imp,ctr,pos].every(Number.isFinite)||!Number.isSafeInteger(cl)||!Number.isSafeInteger(imp)||cl<0||imp<0||cl>imp||ctr<0||ctr>1||pos<0||(imp>0&&pos<=0)||Math.abs(ctr-(imp?cl/imp:0))>0.000001)throw new Error('数値不正');
+      canonical.push(r.join('\u0001'));
+    }
+    canonical.sort();
+    const digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,canonical.join('\n'));
+    fingerprint=Utilities.base64EncodeWebSafe(digest).replace(/=+$/,'');
+    cap=m.capReached?'YES':'NO';if(m.capReached){status='WARNING';note='取得上限到達。網羅性は保証できません。';}
+  }catch(e){status='ERROR';note=String(e.message||e).slice(0,300);}
+  return [day,file.getId(),name,status,rows,cap,fingerprint,note];
+}
+// Dedicated audit triggers only. Other product triggers are never touched.
+const SSS_D365_AUTO_HANDLER_='sssD365AutoTick';
+function sssD365Triggers_(){return ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()===SSS_D365_AUTO_HANDLER_);}
+function sssD365DeleteTriggers_(){sssD365Triggers_().forEach(t=>ScriptApp.deleteTrigger(t));}
+function sssD365EnsureTrigger_(){
+  const ts=sssD365Triggers_();
+  if(!ts.length)ScriptApp.newTrigger(SSS_D365_AUTO_HANDLER_).timeBased().everyMinutes(5).create();
+  else ts.slice(1).forEach(t=>ScriptApp.deleteTrigger(t));
+}
+function sssD365Batch_(isAuto){
+  const lock=LockService.getDocumentLock();
+  if(!lock.tryLock(isAuto?100:1000))return {busy:true};
+  try{
+    const s=sssD365State_();if(!s||s.status!=='RUNNING')return {inactive:true};
+    const x=sssD365Folder_();if(s.siteId!==x.c.siteId||s.propertyUri!==x.c.propertyUri)throw new Error('サイト識別不一致');
+    const it=s.token?DriveApp.continueFileIterator(s.token):x.dir.getFiles();
+    const batch=[];const started=Date.now();let count=0;
+    // Keep each tick short; a single very large ZIP may still exceed this budget.
+    while(it.hasNext()&&count<3&&Date.now()-started<65000){
+      const file=it.next();count++;
+      const record=sssD365InspectFile_(file,x.c,s.start,s.end);
+      if(record){batch.push(record);s.checked++;if(record[3]==='ERROR')s.invalid++;else{s.valid++;if(record[3]==='WARNING')s.warnings++;}}
+    }
+    if(batch.length){const sh=sssD365Sheet_();sh.getRange(sh.getLastRow()+1,1,batch.length,8).setValues(batch);}
+    s.token=it.hasNext()?it.getContinuationToken():null;
+    if(!s.token){s.status='SCANNED';s.auto=false;sssD365DeleteTriggers_();}
+    s.updatedAt=new Date().toISOString();s.lastError='';sssD365Save_(s);
+    return {count:count,state:s};
+  }finally{lock.releaseLock();}
+}
+function sssContinueDetailed365Audit(){
+  const ui=SpreadsheetApp.getUi();
+  try{
+    const result=sssD365Batch_(false);
+    if(result.busy){ui.alert('別の監査処理が実行中です。');return;}
+    if(result.inactive){ui.alert('実行中の監査がありません。');return;}
+    const s=result.state;
+    ui.alert('Detailed監査：'+s.status+'\n今回走査：'+result.count+' ZIP\n対象ZIP：'+s.checked+'件\n正常・注意：'+s.valid+'件\n不正：'+s.invalid+'件\n取得上限注意：'+s.warnings+'件\n'+(s.token?'監査を続行できます。':'走査完了。「結果を確認」を実行してください。'));
+  }catch(e){ui.alert('監査エラー：'+String(e.message||e));}
+}
+function sssEnableDetailed365AutoAudit(){
+  const ui=SpreadsheetApp.getUi();
+  try{
+    const s=sssD365State_();if(!s||s.status!=='RUNNING')throw new Error('先に監査を開始してください。');
+    if(ui.alert('365日Detailed自動監査','5分ごとの専用トリガーで未検査ZIPを分割監査します。元Evidenceは変更しません。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+    sssD365EnsureTrigger_();s.auto=true;s.lastError='';sssD365Save_(s);
+    ui.alert('自動監査を予約しました。進捗は「自動実行状態」で確認できます。');
+  }catch(e){ui.alert('自動監査開始エラー：'+String(e.message||e));}
+}
+function sssD365AutoTick(){
+  const s=sssD365State_();
+  if(!s||s.status!=='RUNNING'||!s.auto){sssD365DeleteTriggers_();return;}
+  try{sssD365Batch_(true);}
+  catch(e){
+    // Do not destroy the checkpoint. Stop automatic retries for investigation.
+    const x=sssD365State_();if(x){x.auto=false;x.lastError=String(e.message||e).slice(0,500);x.updatedAt=new Date().toISOString();sssD365Save_(x);}
+    sssD365DeleteTriggers_();throw e;
+  }
+}
+function sssStopDetailed365AutoAudit(){
+  const ui=SpreadsheetApp.getUi();
+  if(ui.alert('自動監査を停止','監査結果とチェックポイントを保持して専用トリガーだけ停止しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  const lock=LockService.getDocumentLock();if(!lock.tryLock(1000)){ui.alert('監査処理中です。しばらくして再試行してください。');return;}
+  try{const s=sssD365State_();if(s){s.auto=false;sssD365Save_(s);}sssD365DeleteTriggers_();ui.alert('自動監査を停止しました。記録は保持されています。');}
+  finally{lock.releaseLock();}
+}
+function sssShowDetailed365AutoAudit(){
+  const ui=SpreadsheetApp.getUi(),s=sssD365State_();
+  if(!s){ui.alert('監査は未開始です。');return;}
+  ui.alert('365日Detailed自動監査\n状態：'+s.status+'\n自動実行：'+(s.auto?'ON':'OFF')+'\n検証済みZIP：'+s.checked+'件\n不正：'+s.invalid+'件\n取得上限注意：'+s.warnings+'件\n専用トリガー：'+sssD365Triggers_().length+'件\n最終更新：'+(s.updatedAt||'-')+'\nエラー：'+(s.lastError||'なし'));
+}
+function sssShowDetailed365Audit(){
+  const ui=SpreadsheetApp.getUi();try{
+    const s=sssD365State_();if(!s)throw new Error('監査が未開始です。');
+    if(s.status!=='SCANNED'){ui.alert('監査進行中：'+s.checked+'件検証済み。続行メニューをご利用ください。');return;}
+    const sh=sssD365Sheet_(),rows=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,8).getValues():[];
+    const byDay={},issues=[];rows.forEach(r=>{if(r[3]==='ERROR'){issues.push(r[2]+': '+r[7]);return;}if(r[0]){(byDay[r[0]]||(byDay[r[0]]=[])).push(r);}});
+    let unique=0,duplicates=0,conflicts=0,caps=0;
+    Object.keys(byDay).forEach(d=>{unique++;const arr=byDay[d];if(arr.length>1){duplicates++;if(new Set(arr.map(r=>r[6])).size>1)conflicts++;}if(arr.some(r=>r[5]==='YES'))caps++;});
+    const missing=365-unique;
+    const result=issues.length||missing||conflicts?'要確認':'構造検証合格（網羅性は保証しません）';
+    ui.alert('365日Detailed品質監査：'+result+'\n対象：'+s.start+' ～ '+s.end+'\n有効日数：'+unique+'/365日\n未確認日：'+missing+'日\n同日ZIP重複：'+duplicates+'日（内容差あり：'+conflicts+'日）\n取得上限到達日：'+caps+'日\n不正ZIP：'+issues.length+'件\n'+issues.slice(0,3).join('\n')+'\n元Evidence・台帳は変更していません。');
+  }catch(e){ui.alert('監査結果確認エラー：'+String(e.message||e));}
+}
+
+
+// v0.1.42: Merge preflight uses only persisted audit metadata. No ZIP extraction,
+// Drive writes, EvidenceRegistry changes, or analysis-data generation.
+function sssDetailed365MergePlan_(state,records){
+  if(!state||state.status!=='SCANNED')throw new Error('365日Detailed品質監査が完了していません。');
+  if(state.auto)throw new Error('自動監査が実行中です。');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(state.start)||!/^\d{4}-\d{2}-\d{2}$/.test(state.end)||state.start>state.end)throw new Error('監査期間が不正です。');
+  const begin=Date.parse(state.start+'T00:00:00Z'),finish=Date.parse(state.end+'T00:00:00Z');
+  const days=Math.round((finish-begin)/86400000)+1;
+  if(days!==365)throw new Error('監査対象期間が365日ではありません（'+days+'日）。');
+  const byDay=new Map(),errors=[],unknown=[];
+  records.forEach((r,i)=>{
+    const rawDay=r[0];
+    // Sheets converts ISO date strings to Date objects when read with getValues().
+    // Normalize in the spreadsheet timezone before validating the YYYY-MM-DD key.
+    const day=rawDay instanceof Date && !Number.isNaN(rawDay.getTime())
+      ? Utilities.formatDate(rawDay,sssSpreadsheet_().getSpreadsheetTimeZone()||'Asia/Tokyo','yyyy-MM-dd')
+      : String(rawDay||'').trim();
+    const id=String(r[1]||'').trim(),zip=String(r[2]||'').trim();
+    const status=String(r[3]||'').trim(),rows=Number(r[4]),cap=String(r[5]||'').trim(),fingerprint=String(r[6]||'').trim();
+    if(status==='ERROR'){errors.push(zip||('行'+(i+2)));return;}
+    if(!['OK','WARNING'].includes(status)||!/^\d{4}-\d{2}-\d{2}$/.test(day)||day<state.start||day>state.end||!id||!zip||!Number.isSafeInteger(rows)||rows<0||!['YES','NO'].includes(cap)||!fingerprint){unknown.push('行'+(i+2));return;}
+    if(!byDay.has(day))byDay.set(day,[]);
+    byDay.get(day).push({day,id,zip,status,rows,cap,fingerprint});
+  });
+  const selected=[],missing=[],conflicts=[],duplicates=[],capped=[];
+  for(let t=begin;t<=finish;t+=86400000){
+    const day=new Date(t).toISOString().slice(0,10),arr=byDay.get(day)||[];
+    if(!arr.length){missing.push(day);continue;}
+    if(arr.length>1)duplicates.push(day);
+    const fps=new Set(arr.map(x=>x.fingerprint));
+    if(fps.size>1){conflicts.push(day);continue;}
+    // Same-content duplicates: choose deterministically, never silently choose conflicting content.
+    arr.sort((a,b)=>a.id.localeCompare(b.id));
+    selected.push(arr[0]);
+    if(arr.some(x=>x.cap==='YES'))capped.push(day);
+  }
+  const auditCount=Number(state.checked);
+  const recordCount=records.length;
+  const countMismatch=!Number.isSafeInteger(auditCount)||auditCount!==recordCount;
+  const blocked=!!(missing.length||conflicts.length||errors.length||unknown.length||countMismatch||capped.length);
+  return {status:blocked?'HOLD':'READY',start:state.start,end:state.end,selected:selected.length,missing,conflicts,duplicates,capped,errors,unknown,auditCount,recordCount,countMismatch,selectedFiles:selected};
+}
+function sssPreviewDetailed365Merge(){
+  const ui=SpreadsheetApp.getUi();
+  try{
+    const s=sssD365State_();
+    if(!s||s.status!=='SCANNED')throw new Error('先に365日Detailed品質監査を完了してください。');
+    const c=sssConfig_();
+    if(!c.lockedAt||s.siteId!==c.siteId||s.propertyUri!==c.propertyUri)throw new Error('監査対象サイトと現在の固定サイトが一致しません。');
+    const sh=sssSpreadsheet_().getSheetByName(SSS_D365_SHEET_);
+    if(!sh)throw new Error('DetailedAuditシートがありません。');
+    const last=sh.getLastRow();
+    const records=last>1?sh.getRange(2,1,last-1,8).getValues():[];
+    const p=sssDetailed365MergePlan_(s,records);
+    const examples=a=>a.slice(0,3).join(', ')+(a.length>3?' ほか'+(a.length-3)+'件':'');
+    ui.alert('365日Detailed統合事前監査（読取専用）\n'+
+      '判定：'+p.status+'\n'+
+      '期間：'+p.start+' ～ '+p.end+'\n'+
+      '正本候補：'+p.selected+'/365日\n'+
+      '未確認日：'+p.missing.length+'日'+(p.missing.length?' ('+examples(p.missing)+')':'')+'\n'+
+      '同日重複：'+p.duplicates.length+'日\n'+
+      '内容不一致：'+p.conflicts.length+'日'+(p.conflicts.length?' ('+examples(p.conflicts)+')':'')+'\n'+
+      '取得上限：'+p.capped.length+'日\n'+
+      '不正ZIP：'+p.errors.length+'件\n'+
+      '監査記録不整合：'+(p.unknown.length+(p.countMismatch?1:0))+'件\n'+
+      '監査済みZIP / 記録行：'+p.auditCount+' / '+p.recordCount+'\n\n'+
+      (p.status==='READY'?'統合準備判定：READY（統合ZIPは未生成）':'統合準備判定：HOLD（問題を解決するまで統合しません）')+'\n'+
+      '元Evidence・監査シート・台帳は変更していません。');
+  }catch(e){ui.alert('統合事前監査エラー：'+String(e.message||e));}
+}
+
+// v0.1.43: Metadata-only diagnostic. Never changes source ZIP, registry, audit rows, or triggers.
+function sssDiagnoseDetailedAuditDates(){
+  const ui=SpreadsheetApp.getUi();
+  try{
+    const state=sssD365State_();
+    if(!state||state.status!=='SCANNED')throw new Error('完了した品質監査が必要です。');
+    const cfg=sssConfig_();
+    if(state.siteId!==cfg.siteId||state.propertyUri!==cfg.propertyUri)throw new Error('サイトIDまたはGSCプロパティが一致しません。');
+    const sheet=sssSpreadsheet_().getSheetByName(SSS_D365_SHEET_);
+    if(!sheet)throw new Error('DetailedAuditがありません。');
+    const n=sheet.getLastRow();
+    const rows=n>1?sheet.getRange(2,1,n-1,8).getValues():[];
+    const tz=sssSpreadsheet_().getSpreadsheetTimeZone()||'Asia/Tokyo';
+    const byDay=new Map(),invalid=[];
+    rows.forEach((r,i)=>{
+      const d=r[0] instanceof Date && !isNaN(r[0].getTime())?Utilities.formatDate(r[0],tz,'yyyy-MM-dd'):String(r[0]||'').trim();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){invalid.push(i+2);return;}
+      if(!byDay.has(d))byDay.set(d,[]);
+      byDay.get(d).push({id:String(r[1]||''),zip:String(r[2]||''),status:String(r[3]||''),fp:String(r[6]||'')});
+    });
+    const dates=Array.from(byDay.keys()).sort();
+    const expected=[];
+    for(let t=Date.parse(state.start+'T00:00:00Z'),end=Date.parse(state.end+'T00:00:00Z');t<=end;t+=86400000)expected.push(new Date(t).toISOString().slice(0,10));
+    const missing=expected.filter(d=>!byDay.has(d));
+    const outside=dates.filter(d=>d<state.start||d>state.end);
+    const duplicate=dates.filter(d=>byDay.get(d).length>1);
+    const dupDetails=duplicate.slice(0,3).map(d=>d+' ('+byDay.get(d).length+'件、指紋'+new Set(byDay.get(d).map(x=>x.fp)).size+'種類)');
+    const preview=a=>a.slice(0,4).join(', ')+(a.length>4?' ほか'+(a.length-4)+'件':'');
+    ui.alert('Detailed監査の日付・重複診断（読取専用）\n'+
+      '監査対象：'+state.start+' ～ '+state.end+'\n'+
+      '監査行：'+rows.length+'件 / 異なる日付：'+dates.length+'日\n'+
+      '記録の最古：'+(dates[0]||'-')+' / 最新：'+(dates[dates.length-1]||'-')+'\n'+
+      '対象期間内の不足：'+missing.length+'日 '+preview(missing)+'\n'+
+      '対象期間外：'+outside.length+'日 '+preview(outside)+'\n'+
+      '同日重複：'+duplicate.length+'日 '+dupDetails.join('、')+'\n'+
+      '日付不正：'+invalid.length+'行\n\n'+
+      'この診断ではGSC API呼出し・ZIP展開・書込みを行いません。\n'+
+      '不足日がGSCで取得可能か、重複ZIPが同一内容かは別途確認が必要です。');
+  }catch(e){ui.alert('日付・重複診断エラー：'+String(e&&e.message||e));}
+}
+
+
+// v0.1.45: Single-day repair, fail-closed. Never deletes or overwrites source Evidence.
+function sssRepairOneDetailedMissingDay(){
+  const ui=SpreadsheetApp.getUi();
+  try{
+    const state=sssD365State_(),c=sssConfig_();
+    if(!state||state.status!=='SCANNED'||state.auto)throw new Error('品質監査の完了が必要です。');
+    if(state.siteId!==c.siteId||state.propertyUri!==c.propertyUri||!c.lockedAt)throw new Error('サイト固定情報が一致しません。');
+    const sh=sssSpreadsheet_().getSheetByName(SSS_D365_SHEET_);
+    if(!sh)throw new Error('DetailedAuditがありません。');
+    const records=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,8).getValues():[];
+    const plan=sssDetailed365MergePlan_(state,records);
+    if(plan.missing.length!==1||plan.errors.length||plan.unknown.length||plan.conflicts.length||plan.countMismatch||plan.capped.length)
+      throw new Error('安全な1日補完の条件を満たしません。事前監査を確認してください。');
+    const day=plan.missing[0];
+    if(day!=='2026-10-28')throw new Error('今回の試験対象日ではありません: '+day);
+    const now=Utilities.formatDate(new Date(),Session.getScriptTimeZone()||'Asia/Tokyo','yyyy-MM-dd');
+    if(day>=now)throw new Error('対象日が未来または当日です。');
+    if(ui.alert('Detailed不足日を1日だけ補完（試験）',
+      '対象：'+day+'\nGSCの確定データを最大25,000行取得します。\nZIPは新規保存し、品質検査合格時のみ監査記録を1行追加します。\n既存ZIPは変更しません。実行しますか？',
+      ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+    const lock=LockService.getDocumentLock();
+    if(!lock.tryLock(1000))throw new Error('他の処理が実行中です。');
+    try{
+      // Re-check persisted audit under lock; never duplicate a repaired date.
+      const fresh=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,8).getValues():[];
+      const check=sssDetailed365MergePlan_(sssD365State_(),fresh);
+      if(check.missing.length!==1||check.missing[0]!==day)throw new Error('監査状態が変わりました。再確認してください。');
+      const limit=25000,batchSize=5000,rows=[];
+      for(let offset=0;offset<limit;offset+=batchSize){
+        const response=sdscSearchAnalyticsQuery_(c.propertyUri,{startDate:day,endDate:day,type:'web',dataState:'final',dimensions:['date','page'],rowLimit:batchSize,startRow:offset});
+        const items=response.rows||[];
+        for(const r of items){
+          if(!r.keys||r.keys[0]!==day||!r.keys[1])throw new Error('APIの日付・URLが一致しません。');
+          rows.push([r.keys[0],r.keys[1],Number(r.clicks||0),Number(r.impressions||0),Number(r.ctr||0),Number(r.position||0)]);
+        }
+        if(items.length<batchSize)break;
+      }
+      if(!rows.length)throw new Error('API応答が0件です。確定状況を確認し、空ZIPは作成しません。');
+      const csv=[['date','page','clicks','impressions','ctr','position']].concat(rows)
+        .map(a=>a.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n')+'\r\n';
+      const manifest={schema:'s3.daily_page.missing.v1',version:SSS_VERSION,siteId:c.siteId,propertyUri:c.propertyUri,siteName:c.siteName,dimension:['date','page'],startDate:day,endDate:day,rows:rows.length,requestedRowLimit:limit,capReached:rows.length===limit,completeness:'NOT_GUARANTEED',collectedAt:new Date().toISOString(),collectionMode:'single_day_repair'};
+      const folder=sssD365Folder_().dir;
+      const name='SIMS_S3_Daily_Page_Repair_'+day.replace(/-/g,'')+'_'+Utilities.formatDate(new Date(),'Asia/Tokyo','yyyyMMdd_HHmmss')+'.zip';
+      const file=folder.createFile(Utilities.zip([Utilities.newBlob(csv,'text/csv','daily_page.csv'),Utilities.newBlob(JSON.stringify(manifest),'application/json','manifest.json')],name));
+      const record=sssD365InspectFile_(file,c,state.start,state.end);
+      if(!record||record[3]!=='OK')throw new Error('ZIPを保存しましたが品質監査が合格しませんでした。監査記録は追加していません。ZIP：'+name+' / '+(record?record[7]||record[3]:'対象外'));
+      // Audit append is idempotency-checked; state counters updated only after append.
+      const current=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,8).getValues():[];
+      const latest=sssDetailed365MergePlan_(sssD365State_(),current);
+      if(latest.missing.length!==1||latest.missing[0]!==day)throw new Error('補完中に監査記録が変更されました。ZIPは保存済みです。再収集せず監査を確認してください。');
+      sh.appendRow(record);
+      const next=sssD365State_();next.checked=Number(next.checked)+1;next.valid=Number(next.valid)+1;next.updatedAt=new Date().toISOString();sssD365Save_(next);
+      ui.alert('1日補完：品質監査合格\n対象：'+day+'\n行数：'+rows.length+'\nZIP：'+name+'\n監査記録：1行追加\n既存Evidenceは変更していません。\n次に統合事前監査を実行してください。');
+    }finally{lock.releaseLock();}
+  }catch(e){ui.alert('1日補完を停止しました：'+String(e&&e.message||e));}
+}
+
+
+// v0.1.45: bounded, checkpointed 365-day Detailed merge into independently
+// verifiable chunk ZIPs. Does not mutate source Evidence or audit rows.
+const SSS_DM365_KEY_='SSS_DETAILED_365_CHUNK_MERGE_V1';
+function sssDM365State_(){const x=sssProperties_().getProperty(SSS_DM365_KEY_);return x?JSON.parse(x):null;}
+function sssDM365Save_(s){sssProperties_().setProperty(SSS_DM365_KEY_,JSON.stringify(s));}
+function sssDM365Plan_(){
+ const s=sssD365State_(),c=sssConfig_();
+ if(!s||s.siteId!==c.siteId||s.propertyUri!==c.propertyUri||!c.lockedAt)throw new Error('サイト固定・監査状態が一致しません。');
+ const sh=sssSpreadsheet_().getSheetByName(SSS_D365_SHEET_);
+ if(!sh)throw new Error('DetailedAuditがありません。');
+ const rec=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,8).getValues():[];
+ const p=sssDetailed365MergePlan_(s,rec);
+ if(p.status!=='READY'||p.selectedFiles.length!==365)throw new Error('統合事前監査がREADYではありません。');
+ return {p,c};
+}
+function sssDM365Folder_(){const map=sssDriveFolderMap_();sssDriveVerifyMap_(map);return sssDriveChild_(sssDriveGetFolder_(map.evidenceId),'DetailedMerged');}
+function sssDM365Find_(folder,name){const it=folder.getFilesByName(name);const found=[];while(it.hasNext()){const f=it.next();if(!f.isTrashed())found.push(f);}if(found.length>1)throw new Error('同名出力ZIPが複数あります: '+name);return found[0]||null;}
+function sssDM365ReadChunk_(f,expected){
+ const blobs=Utilities.unzip(f.getBlob()),parts={};blobs.forEach(b=>{if(parts[b.getName()])throw new Error('ZIP内部ファイル重複');parts[b.getName()]=b;});
+ if(!parts['manifest.json']||!parts['daily_page.csv']||Object.keys(parts).length!==2)throw new Error('出力ZIP構造不正');
+ const m=JSON.parse(parts['manifest.json'].getDataAsString('UTF-8'));
+ if(m.schema!=='s3.daily_page.chunk365.v1'||m.batch!==expected.batch||m.siteId!==expected.siteId||m.sourceSignature!==expected.signature)throw new Error('出力ZIP識別不一致');
+ const rows=Utilities.parseCsv(parts['daily_page.csv'].getDataAsString('UTF-8'));
+ if(rows[0].join('|')!=='date|page|clicks|impressions|ctr|position'||rows.length-1!==m.rows)throw new Error('出力CSV不一致');
+ return m;
+}
+function sssDM365Signature_(files){const raw=files.map(f=>[f.day,f.id,f.fingerprint].join('|')).join('\n');return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,raw)).replace(/=+$/,'');}
+function sssStartDetailed365ChunkMerge(){
+ const ui=SpreadsheetApp.getUi();try{
+  const {p,c}=sssDM365Plan_(),old=sssDM365State_();
+  if(old&&old.status==='RUNNING')throw new Error('既に分割統合中です。「続行」を使用してください。');
+  if(ui.alert('365日Detailed分割統合（試験）','READY：365日。5日ずつZIPに保存し、最後に索引ZIPを作成します。単一の巨大ZIPは作成しません。既存Evidenceは変更しません。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  const files=p.selectedFiles.slice().sort((a,b)=>a.day.localeCompare(b.day)),signature=sssDM365Signature_(files);
+  const run='DM365_'+c.siteId+'_'+signature.slice(0,16);
+  sssDM365Save_({status:'RUNNING',siteId:c.siteId,propertyUri:c.propertyUri,start:p.start,end:p.end,signature,run,next:0,parts:[],updatedAt:new Date().toISOString(),error:''});
+  ui.alert('分割統合を開始しました。次に「分割統合を続行」を実行してください。1回につき最大5日処理します。');
+ }catch(e){ui.alert('分割統合開始エラー：'+String(e.message||e));}
+}
+function sssContinueDetailed365ChunkMerge(silent){
+ const ui=silent?null:SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
+ if(!lock.tryLock(1000)){if(ui)ui.alert('別の処理が実行中です。');return;}
+ try{
+  const s=sssDM365State_();if(!s||s.status!=='RUNNING')throw new Error('実行中の分割統合がありません。');
+  const {p,c}=sssDM365Plan_(),files=p.selectedFiles.slice().sort((a,b)=>a.day.localeCompare(b.day)),signature=sssDM365Signature_(files);
+  if(c.siteId!==s.siteId||c.propertyUri!==s.propertyUri||signature!==s.signature||s.start!==p.start||s.end!==p.end)throw new Error('監査正本が変更されました。統合を停止します。');
+  const folder=sssDM365Folder_(),batch=Math.floor(s.next/5),slice=files.slice(s.next,s.next+5);
+  if(!slice.length)throw new Error('進捗不整合です。');
+  const name=s.run+'_part_'+String(batch+1).padStart(3,'0')+'.zip';
+  let f=sssDM365Find_(folder,name),manifest;
+  if(f){manifest=sssDM365ReadChunk_(f,{batch,siteId:c.siteId,signature});}
+  else{
+   const all=[],sources=[],keys=new Set();let clicks=0,impressions=0,weighted=0;
+   for(const item of slice){
+    const source=DriveApp.getFileById(item.id);
+    if(source.isTrashed()||source.getName()!==item.zip)throw new Error('元ZIPが変更・削除されました: '+item.day);
+    const audit=sssD365InspectFile_(source,c,s.start,s.end);
+    if(!audit||audit[3]!=='OK'||audit[0]!==item.day||audit[6]!==item.fingerprint)throw new Error('元ZIPの再検証失敗: '+item.day);
+    const bs=Utilities.unzip(source.getBlob()),csvBlob=bs.filter(b=>b.getName()==='daily_page.csv')[0];
+    if(!csvBlob)throw new Error('CSVがありません: '+item.day);
+    const rows=Utilities.parseCsv(csvBlob.getDataAsString('UTF-8')).slice(1);
+    for(const r of rows){if(r.length===1&&r[0]==='')continue;
+     const key=r[0]+'\u0000'+r[1];if(keys.has(key))throw new Error('日付×URL重複');keys.add(key);
+     const cl=Number(r[2]),imp=Number(r[3]),pos=Number(r[5]);clicks+=cl;impressions+=imp;weighted+=pos*imp;all.push(r);
+    }
+    sources.push({date:item.day,fileId:item.id,fingerprint:item.fingerprint,rows:audit[4]});
+   }
+   manifest={schema:'s3.daily_page.chunk365.v1',version:SSS_VERSION,siteId:c.siteId,propertyUri:c.propertyUri,sourceSignature:signature,batch,period:{startDate:slice[0].day,endDate:slice[slice.length-1].day},days:slice.length,rows:all.length,clicks,impressions,ctr:impressions?clicks/impressions:0,position:impressions?weighted/impressions:0,sources,coverage:'NOT_GUARANTEED',createdAt:new Date().toISOString()};
+   const csv=[['date','page','clicks','impressions','ctr','position']].concat(all).map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n')+'\r\n';
+   f=folder.createFile(Utilities.zip([Utilities.newBlob(csv,'text/csv','daily_page.csv'),Utilities.newBlob(JSON.stringify(manifest),'application/json','manifest.json')],name));
+   sssDM365ReadChunk_(f,{batch,siteId:c.siteId,signature});
+  }
+  s.parts.push({batch,fileId:f.getId(),name,days:manifest.days,rows:manifest.rows,clicks:manifest.clicks,impressions:manifest.impressions,weighted:manifest.position*manifest.impressions});
+  s.next+=slice.length;s.updatedAt=new Date().toISOString();sssDM365Save_(s);
+  if(s.next===365){
+   const summary={schema:'s3.daily_page.chunk365.index.v1',version:SSS_VERSION,siteId:c.siteId,propertyUri:c.propertyUri,sourceSignature:signature,start:s.start,end:s.end,days:365,parts:s.parts,rows:s.parts.reduce((a,x)=>a+x.rows,0),clicks:s.parts.reduce((a,x)=>a+x.clicks,0),impressions:s.parts.reduce((a,x)=>a+x.impressions,0),coverage:'NOT_GUARANTEED',createdAt:new Date().toISOString()};
+   const indexName=s.run+'_INDEX.zip';let index=sssDM365Find_(folder,indexName);
+   if(!index)index=folder.createFile(Utilities.zip([Utilities.newBlob(JSON.stringify(summary,null,2),'application/json','index.json')],indexName));
+   s.status='COMPLETED';s.indexId=index.getId();s.indexName=indexName;s.updatedAt=new Date().toISOString();sssDM365Save_(s);
+  }
+  if(s.status==='COMPLETED')sssDM365RemoveAutoTriggers_();
+  if(ui)ui.alert('365日Detailed分割統合：'+s.status+'\n進捗：'+s.next+'/365日\n分割ZIP：'+s.parts.length+'件\n保存先：Evidence / DetailedMerged\n'+(s.status==='COMPLETED'?'索引ZIP：'+s.indexName:'続行メニューから再開できます。')+'\n元Evidenceは変更していません。');
+ }catch(e){const s=sssDM365State_();if(s){s.error=String(e.message||e).slice(0,400);if(silent){s.status='ERROR';sssDM365RemoveAutoTriggers_();}sssDM365Save_(s);}if(ui)ui.alert('分割統合を停止：'+String(e.message||e));else console.error('Detailed merge stopped: '+String(e.stack||e));}
+ finally{lock.releaseLock();}
+}
+function sssShowDetailed365ChunkMerge(){const s=sssDM365State_();SpreadsheetApp.getUi().alert(s?'365日Detailed分割統合\n状態：'+s.status+'\n進捗：'+s.next+'/365日\n分割ZIP：'+s.parts.length+'件\n索引：'+(s.indexName||'未生成')+'\nエラー：'+(s.error||'なし'):'分割統合は未開始です。');}
+
+// v0.1.46: Dedicated auto-continuation for Detailed chunk merge.
+const SSS_DM365_AUTO_HANDLER_='sssDM365AutoTick';
+function sssDM365AutoTriggers_(){return ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()===SSS_DM365_AUTO_HANDLER_);}
+function sssDM365RemoveAutoTriggers_(){sssDM365AutoTriggers_().forEach(t=>ScriptApp.deleteTrigger(t));}
+function sssEnableDetailed365AutoMerge(){
+ const ui=SpreadsheetApp.getUi();try{
+  const s=sssDM365State_();if(!s||s.status!=='RUNNING'||s.next>=365)throw new Error('継続可能な分割統合がありません。');
+  const {p,c}=sssDM365Plan_();const signature=sssDM365Signature_(p.selectedFiles.slice().sort((a,b)=>a.day.localeCompare(b.day)));
+  if(signature!==s.signature||c.siteId!==s.siteId||c.propertyUri!==s.propertyUri)throw new Error('監査正本またはサイト固定情報が変更されました。');
+  if(ui.alert('365日Detailed分割統合の自動継続','現在 '+s.next+'/365日、分割ZIP '+s.parts.length+'件です。専用トリガーで約5分ごとに最大5日ずつ統合します。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  sssDM365RemoveAutoTriggers_();
+  ScriptApp.newTrigger(SSS_DM365_AUTO_HANDLER_).timeBased().everyMinutes(5).create();
+  s.error='';sssDM365Save_(s);
+  ui.alert('自動継続を設定しました。既存の進捗 '+s.next+'/365日から続行します。');
+ }catch(e){ui.alert('自動継続設定エラー：'+String(e.message||e));}
+}
+function sssDM365AutoTick(){
+ const s=sssDM365State_();
+ if(!s||s.status!=='RUNNING'){sssDM365RemoveAutoTriggers_();return;}
+ sssContinueDetailed365ChunkMerge(true);
+}
+function sssStopDetailed365AutoMerge(){
+ const ui=SpreadsheetApp.getUi();if(ui.alert('自動継続を停止','専用トリガーだけを削除します。統合済みZIPと進捗は保持します。停止しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+ sssDM365RemoveAutoTriggers_();ui.alert('専用トリガーを停止しました。統合進捗は保持されています。');
+}
+function sssShowDetailed365AutoMerge(){
+ const s=sssDM365State_(),n=sssDM365AutoTriggers_().length;
+ SpreadsheetApp.getUi().alert('365日Detailed分割統合 自動実行\n状態：'+(s?s.status:'未開始')+'\n進捗：'+(s?s.next:0)+'/365日\n分割ZIP：'+(s?s.parts.length:0)+'件\n専用トリガー：'+n+'件\nエラー：'+(s&&s.error?s.error:'なし'));
+}
+
+
+// v0.1.47: Read-only verification of completed chunk ZIPs and index.
+// Checkpoint is stored in script properties; source and output Drive files are never edited.
+const SSS_DM365_AUDIT_KEY_='SSS_DM365_OUTPUT_AUDIT_V1';
+function sssDM365AuditState_(){const x=sssProperties_().getProperty(SSS_DM365_AUDIT_KEY_);return x?JSON.parse(x):null;}
+function sssDM365AuditSave_(s){sssProperties_().setProperty(SSS_DM365_AUDIT_KEY_,JSON.stringify(s));}
+function sssDM365AuditIndex_(merge){
+ if(!merge||merge.status!=='COMPLETED'||merge.next!==365||merge.parts.length!==73||!merge.indexId)throw new Error('365日統合の完了状態が不正です。');
+ const folder=sssDM365Folder_(),index=DriveApp.getFileById(merge.indexId);
+ if(index.isTrashed()||index.getName()!==merge.indexName||!sssDM365Find_(folder,merge.indexName)||sssDM365Find_(folder,merge.indexName).getId()!==index.getId())throw new Error('索引ZIPの保存先または識別が不正です。');
+ const blobs=Utilities.unzip(index.getBlob());if(blobs.length!==1||blobs[0].getName()!=='index.json')throw new Error('索引ZIP構造不正');
+ const idx=JSON.parse(blobs[0].getDataAsString('UTF-8'));
+ if(idx.schema!=='s3.daily_page.chunk365.index.v1'||idx.siteId!==merge.siteId||idx.propertyUri!==merge.propertyUri||idx.sourceSignature!==merge.signature||idx.days!==365||idx.start!==merge.start||idx.end!==merge.end||!Array.isArray(idx.parts)||idx.parts.length!==73)throw new Error('索引ZIPの識別情報不一致');
+ if(JSON.stringify(idx.parts)!==JSON.stringify(merge.parts))throw new Error('索引とチェックポイントの分割ZIP一覧が一致しません。');
+ return idx;
+}
+function sssStartDM365OutputAudit(){
+ const ui=SpreadsheetApp.getUi();try{
+  const m=sssDM365State_(),idx=sssDM365AuditIndex_(m);
+  if(ui.alert('365日Detailed統合ZIP監査','73件の分割ZIPを1件ずつ検証します。元Evidence・統合ZIPは変更しません。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  sssDM365AuditSave_({status:'RUNNING',signature:m.signature,indexId:m.indexId,siteId:m.siteId,next:0,days:0,rows:0,clicks:0,impressions:0,issues:[],updatedAt:new Date().toISOString()});
+  ui.alert('監査を開始しました。「監査を続行」で1件ずつ検証します。');
+ }catch(e){ui.alert('監査開始エラー：'+String(e.message||e));}
+}
+function sssContinueDM365OutputAudit(silent){
+ silent=(silent===true);const ui=silent?null:SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();if(!lock.tryLock(1000)){if(ui)ui.alert('他の処理が実行中です。');return;}
+ try{
+  const a=sssDM365AuditState_(),m=sssDM365State_();if(!a||a.status!=='RUNNING')throw new Error('監査が実行中ではありません。');
+  const idx=sssDM365AuditIndex_(m);if(a.signature!==m.signature||a.indexId!==m.indexId||a.siteId!==m.siteId)throw new Error('統合結果が監査開始時から変更されています。');
+  const part=idx.parts[a.next];if(!part)throw new Error('監査進捗不正');
+  const folder=sssDM365Folder_(),f=DriveApp.getFileById(part.fileId);
+  if(f.isTrashed()||f.getName()!==part.name||!sssDM365Find_(folder,part.name)||sssDM365Find_(folder,part.name).getId()!==f.getId())throw new Error('分割ZIPの保存先または識別不正: '+part.name);
+  const blobs=Utilities.unzip(f.getBlob()),map={};for(const b of blobs){if(map[b.getName()])throw new Error('ZIP内重複');map[b.getName()]=b;}
+  if(blobs.length!==2||!map['manifest.json']||!map['daily_page.csv'])throw new Error('ZIP構造不正');
+  const mf=JSON.parse(map['manifest.json'].getDataAsString('UTF-8'));
+  if(mf.schema!=='s3.daily_page.chunk365.v1'||mf.batch!==a.next||mf.siteId!==m.siteId||mf.propertyUri!==m.propertyUri||mf.sourceSignature!==m.signature||mf.days!==part.days||mf.rows!==part.rows||mf.clicks!==part.clicks||mf.impressions!==part.impressions||!Array.isArray(mf.sources)||mf.sources.length!==part.days)throw new Error('manifest・索引の整合性不正');
+  const csv=Utilities.parseCsv(map['daily_page.csv'].getDataAsString('UTF-8'));
+  if(csv[0].join('|')!=='date|page|clicks|impressions|ctr|position'||csv.length-1!==mf.rows)throw new Error('CSVヘッダー・行数不一致');
+  const dates=new Set(),keys=new Set();let clicks=0,impressions=0;
+  for(let i=1;i<csv.length;i++){
+   const r=csv[i];if(r.length!==6||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(r[0])||!r[1])throw new Error('CSV行形式不正: '+i);
+   const key=r[0]+'\u0000'+r[1];if(keys.has(key))throw new Error('日付×URL重複: '+i);keys.add(key);dates.add(r[0]);
+   const c=Number(r[2]),im=Number(r[3]),ctr=Number(r[4]),pos=Number(r[5]);
+   if(![c,im,ctr,pos].every(Number.isFinite)||c<0||im<0||c>im||ctr<0||ctr>1||pos<0)throw new Error('CSV数値不正: '+i);
+   clicks+=c;impressions+=im;
+  }
+  const expected=mf.sources.map(x=>x.date);
+  if(new Set(expected).size!==part.days||dates.size!==part.days||expected.some(d=>!dates.has(d)))throw new Error('収録日付不一致');
+  if(clicks!==mf.clicks||impressions!==mf.impressions)throw new Error('CSV数値合計不一致');
+  if(a.next===0&&mf.period.startDate!==m.start)throw new Error('開始日不一致');
+  if(a.next===72&&mf.period.endDate!==m.end)throw new Error('終了日不一致');
+  a.next++;a.days+=mf.days;a.rows+=mf.rows;a.clicks+=clicks;a.impressions+=impressions;a.updatedAt=new Date().toISOString();
+  if(a.next===73){
+   if(a.days!==365||a.rows!==idx.rows||a.clicks!==idx.clicks||a.impressions!==idx.impressions)throw new Error('全体集計が索引と一致しません。');
+   a.status='PASSED';
+  }
+  sssDM365AuditSave_(a);
+  if(a.status==='PASSED')sssDM365AuditRemoveAutoTriggers_();
+  if(ui)ui.alert('統合ZIP品質監査：'+a.status+'\n検証：'+a.next+'/73件\n日数：'+a.days+'/365日\n行数：'+a.rows+'\nクリック：'+a.clicks+'\n表示回数：'+a.impressions+'\n元Evidence・ZIPは変更していません。');
+ }catch(e){const a=sssDM365AuditState_();if(a){a.status='HOLD';a.issues.push(String(e.message||e).slice(0,300));a.updatedAt=new Date().toISOString();sssDM365AuditSave_(a);}if(silent)sssDM365AuditRemoveAutoTriggers_();if(ui)ui.alert('統合ZIP監査を保留：'+String(e.message||e));else console.error('Detailed output audit HOLD: '+String(e.stack||e));}
+ finally{lock.releaseLock();}
+}
+function sssShowDM365OutputAudit(){const a=sssDM365AuditState_();SpreadsheetApp.getUi().alert(a?'365日Detailed統合ZIP監査\n状態：'+a.status+'\n検証：'+a.next+'/73件\n日数：'+a.days+'/365日\n行数：'+a.rows+'\nエラー：'+(a.issues.join(' / ')||'なし'):'統合ZIP監査は未開始です。');}
+
+
+// v0.1.49: Dedicated time-based continuation for output ZIP audit.
+const SSS_DM365_AUDIT_AUTO_HANDLER_='sssDM365OutputAuditAutoTick';
+function sssDM365AuditAutoTriggers_(){return ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()===SSS_DM365_AUDIT_AUTO_HANDLER_);}
+function sssDM365AuditRemoveAutoTriggers_(){sssDM365AuditAutoTriggers_().forEach(t=>ScriptApp.deleteTrigger(t));}
+function sssEnableDM365OutputAutoAudit(){
+ const ui=SpreadsheetApp.getUi();try{
+  const a=sssDM365AuditState_(),m=sssDM365State_();
+  if(!a||a.status!=='RUNNING'||a.next<1||a.next>=73)throw new Error('途中から継続可能な品質監査がありません。');
+  sssDM365AuditIndex_(m);
+  if(a.signature!==m.signature||a.indexId!==m.indexId||a.siteId!==m.siteId)throw new Error('監査開始時から統合結果が変更されています。');
+  if(ui.alert('365日Detailed統合ZIP監査の自動継続','検証済み '+a.next+'/73件から、専用トリガーで約5分ごとに1件ずつ検証します。既存の監査進捗は保持します。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  sssDM365AuditRemoveAutoTriggers_();
+  ScriptApp.newTrigger(SSS_DM365_AUDIT_AUTO_HANDLER_).timeBased().everyMinutes(5).create();
+  ui.alert('自動監査を設定しました。進捗 '+a.next+'/73件から継続します。');
+ }catch(e){ui.alert('自動監査設定エラー：'+String(e.message||e));}
+}
+function sssDM365OutputAuditAutoTick(){
+ const a=sssDM365AuditState_();
+ if(!a||a.status!=='RUNNING'){sssDM365AuditRemoveAutoTriggers_();return;}
+ sssContinueDM365OutputAudit(true);
+}
+function sssStopDM365OutputAutoAudit(){
+ const ui=SpreadsheetApp.getUi();if(ui.alert('自動品質監査を停止','品質監査専用トリガーだけを削除します。検証済み進捗は保持します。停止しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+ sssDM365AuditRemoveAutoTriggers_();ui.alert('専用トリガーを停止しました。品質監査の進捗は保持されています。');
+}
+function sssShowDM365OutputAutoAudit(){
+ const a=sssDM365AuditState_(),n=sssDM365AuditAutoTriggers_().length;
+ SpreadsheetApp.getUi().alert('365日Detailed統合ZIP監査 自動実行\n状態：'+(a?a.status:'未開始')+'\n検証：'+(a?a.next:0)+'/73件\n日数：'+(a?a.days:0)+'/365日\n専用トリガー：'+n+'件\nエラー：'+(a&&a.issues&&a.issues.length?a.issues.join(' / '):'なし'));
+}
+
+
+// v0.1.49: Read-only per-day numeric reconciliation of canonical source ZIPs
+// against the 73 output chunks. One chunk (up to five days) per invocation.
+// This validates daily rows/clicks/impressions; it is NOT a row-by-row equality proof.
+const SSS_DM365_RECON_KEY_='SSS_DM365_SOURCE_RECON_V1';
+function sssDM365ReconState_(){const x=sssProperties_().getProperty(SSS_DM365_RECON_KEY_);return x?JSON.parse(x):null;}
+function sssDM365ReconSave_(s){sssProperties_().setProperty(SSS_DM365_RECON_KEY_,JSON.stringify(s));}
+function sssStartDM365SourceReconcile(){
+ const ui=SpreadsheetApp.getUi();try{
+  const m=sssDM365State_(),a=sssDM365AuditState_();
+  if(!m||m.status!=='COMPLETED'||!a||a.status!=='PASSED'||a.next!==73)throw new Error('統合ZIP品質監査がPASSEDではありません。');
+  const idx=sssDM365AuditIndex_(m),plan=sssDM365Plan_().p;
+  const files=plan.selectedFiles.slice().sort((x,y)=>x.day.localeCompare(y.day));
+  if(sssDM365Signature_(files)!==m.signature||idx.parts.length!==73)throw new Error('元Evidenceの正本選択が統合時から変わりました。');
+  const old=sssDM365ReconState_();
+  if(old&&old.status==='RUNNING')throw new Error('照合中です。「続行」を選択してください。');
+  if(ui.alert('365日Detailed元データ数値照合','365日分の正本ZIPと統合ZIPを5日単位で読み取り専用照合します。元Evidenceと統合ZIPは変更しません。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  sssDM365ReconSave_({status:'RUNNING',signature:m.signature,indexId:m.indexId,siteId:m.siteId,next:0,days:0,rows:0,clicks:0,impressions:0,issues:[],updatedAt:new Date().toISOString()});
+  ui.alert('照合を開始しました。「元データ数値照合を続行」で最初の5日を確認してください。');
+ }catch(e){ui.alert('照合開始エラー：'+String(e.message||e));}
+}
+function sssDM365ReconCsvTotals_(blob,expectedDay){
+ const rows=Utilities.parseCsv(blob.getDataAsString('UTF-8'));
+ if(!rows.length||rows[0].join('|')!=='date|page|clicks|impressions|ctr|position')throw new Error('CSVヘッダー不一致: '+expectedDay);
+ let count=0,clicks=0,impressions=0;const keys=new Set();
+ for(let i=1;i<rows.length;i++){
+  const r=rows[i];if(r.length===1&&r[0]==='')continue;
+  if(r.length!==6||r[0]!==expectedDay||!r[1])throw new Error('CSV日付・列数不一致: '+expectedDay+' 行'+i);
+  if(keys.has(r[1]))throw new Error('同日ページ重複: '+expectedDay);keys.add(r[1]);
+  const c=Number(r[2]),im=Number(r[3]);
+  if(!Number.isSafeInteger(c)||!Number.isSafeInteger(im)||c<0||im<0||c>im)throw new Error('クリック・表示回数不正: '+expectedDay);
+  count++;clicks+=c;impressions+=im;
+ }
+ return {rows:count,clicks,impressions};
+}
+function sssContinueDM365SourceReconcile(silent){
+ const ui=silent?null:SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
+ if(!lock.tryLock(1000)){if(ui)ui.alert('他の処理が実行中です。');return;}
+ try{
+  const s=sssDM365ReconState_(),m=sssDM365State_(),a=sssDM365AuditState_();
+  if(!s||s.status!=='RUNNING')throw new Error('実行中の数値照合がありません。');
+  if(!m||m.status!=='COMPLETED'||!a||a.status!=='PASSED'||s.signature!==m.signature||s.indexId!==m.indexId||s.siteId!==m.siteId)throw new Error('統合・監査状態が変わりました。');
+  const idx=sssDM365AuditIndex_(m),p=sssDM365Plan_().p;
+  const selected=p.selectedFiles.slice().sort((x,y)=>x.day.localeCompare(y.day));
+  if(sssDM365Signature_(selected)!==m.signature)throw new Error('正本選択が変更されています。');
+  const part=idx.parts[s.next];if(!part||s.next>=73)throw new Error('照合進捗不正');
+  const output=DriveApp.getFileById(part.fileId);
+  if(output.isTrashed()||output.getName()!==part.name)throw new Error('統合ZIPが変更されています。');
+  const b=Utilities.unzip(output.getBlob()),csv=b.filter(x=>x.getName()==='daily_page.csv');
+  if(b.length!==2||csv.length!==1)throw new Error('統合ZIP構造不正');
+  const merged=Utilities.parseCsv(csv[0].getDataAsString('UTF-8'));
+  if(!merged.length||merged[0].join('|')!=='date|page|clicks|impressions|ctr|position')throw new Error('統合CSVヘッダー不正');
+  const outputDays={};for(let i=1;i<merged.length;i++){
+   const r=merged[i];if(r.length===1&&r[0]==='')continue;
+   if(r.length!==6||!r[0]||!r[1])throw new Error('統合CSV行不正');
+   const d=outputDays[r[0]]||(outputDays[r[0]]={rows:0,clicks:0,impressions:0,keys:new Set()});
+   if(d.keys.has(r[1]))throw new Error('統合CSV重複: '+r[0]);d.keys.add(r[1]);
+   const c=Number(r[2]),im=Number(r[3]);if(!Number.isSafeInteger(c)||!Number.isSafeInteger(im)||c<0||im<0||c>im)throw new Error('統合CSV数値不正');
+   d.rows++;d.clicks+=c;d.impressions+=im;
+  }
+  const slice=selected.slice(s.next*5,s.next*5+part.days);
+  if(slice.length!==part.days||Object.keys(outputDays).length!==slice.length)throw new Error('統合日数不一致');
+  let totalRows=0,totalClicks=0,totalImpressions=0;
+  for(const item of slice){
+   const source=DriveApp.getFileById(item.id);
+   if(source.isTrashed()||source.getName()!==item.zip)throw new Error('元ZIPが変更されています: '+item.day);
+   const checked=sssD365InspectFile_(source,sssConfig_(),m.start,m.end);
+   if(!checked||checked[3]!=='OK'||checked[0]!==item.day||checked[6]!==item.fingerprint)throw new Error('元ZIPのFingerprint検証失敗: '+item.day);
+   const bs=Utilities.unzip(source.getBlob()),sourceCsv=bs.filter(x=>x.getName()==='daily_page.csv');
+   if(sourceCsv.length!==1)throw new Error('元ZIPにCSVがありません: '+item.day);
+   const orig=sssDM365ReconCsvTotals_(sourceCsv[0],item.day),dst=outputDays[item.day];
+   if(!dst||orig.rows!==dst.rows||orig.clicks!==dst.clicks||orig.impressions!==dst.impressions)throw new Error('日別数値不一致: '+item.day+' 元='+JSON.stringify(orig)+' 統合='+JSON.stringify(dst||null));
+   totalRows+=orig.rows;totalClicks+=orig.clicks;totalImpressions+=orig.impressions;
+  }
+  if(totalRows!==part.rows||totalClicks!==part.clicks||totalImpressions!==part.impressions)throw new Error('分割ZIP索引との数値不一致');
+  s.next++;s.days+=slice.length;s.rows+=totalRows;s.clicks+=totalClicks;s.impressions+=totalImpressions;s.updatedAt=new Date().toISOString();
+  if(s.next===73){if(s.days!==365||s.rows!==idx.rows||s.clicks!==idx.clicks||s.impressions!==idx.impressions)throw new Error('全体索引との数値不一致');s.status='PASSED';}
+  sssDM365ReconSave_(s);
+  if(s.status==='PASSED')sssDM365ReconRemoveAutoTriggers_();
+  if(ui)ui.alert('元データ数値照合：'+s.status+'\n検証：'+s.next+'/73件\n日数：'+s.days+'/365日\n行数：'+s.rows+'\nクリック：'+s.clicks+'\n表示回数：'+s.impressions+'\n元Evidence・統合ZIPは変更していません。');
+ }catch(e){const s=sssDM365ReconState_();if(s){s.status='HOLD';s.issues.push(String(e.message||e).slice(0,500));s.updatedAt=new Date().toISOString();sssDM365ReconSave_(s);}if(silent)sssDM365ReconRemoveAutoTriggers_();if(ui)ui.alert('元データ数値照合 HOLD：'+String(e.message||e));else console.error('Source reconciliation HOLD: '+String(e.stack||e));}
+ finally{lock.releaseLock();}
+}
+function sssShowDM365SourceReconcile(){
+ const s=sssDM365ReconState_();SpreadsheetApp.getUi().alert(s?'365日Detailed元データ数値照合\n状態：'+s.status+'\n検証：'+s.next+'/73件\n日数：'+s.days+'/365日\nエラー：'+(s.issues.join(' / ')||'なし'):'数値照合は未開始です。');
+}
+
+// v0.1.50: Resume existing reconciliation from checkpoint with a dedicated trigger.
+const SSS_DM365_RECON_AUTO_HANDLER_='sssDM365ReconAutoTick';
+function sssDM365ReconAutoTriggers_(){return ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()===SSS_DM365_RECON_AUTO_HANDLER_);}
+function sssDM365ReconRemoveAutoTriggers_(){sssDM365ReconAutoTriggers_().forEach(t=>ScriptApp.deleteTrigger(t));}
+function sssEnableDM365ReconAuto(){
+ const ui=SpreadsheetApp.getUi();try{
+  const s=sssDM365ReconState_(),m=sssDM365State_(),a=sssDM365AuditState_();
+  if(!s||s.status!=='RUNNING'||s.next<1||s.next>=73)throw new Error('継続可能な数値照合がありません。開始メニューを再実行しないでください。');
+  if(!m||m.status!=='COMPLETED'||!a||a.status!=='PASSED'||s.signature!==m.signature||s.indexId!==m.indexId||s.siteId!==m.siteId)throw new Error('統合・監査状態が変わりました。');
+  if(ui.alert('365日Detailed元データ数値照合を自動継続','検証済み '+s.next+'/73件から、約5分ごとに最大1件ずつ照合します。進捗を初期化しません。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  sssDM365ReconRemoveAutoTriggers_();
+  ScriptApp.newTrigger(SSS_DM365_RECON_AUTO_HANDLER_).timeBased().everyMinutes(5).create();
+  ui.alert('自動数値照合を設定しました。'+s.next+'/73件から再開します。');
+ }catch(e){ui.alert('自動照合設定エラー：'+String(e.message||e));}
+}
+function sssDM365ReconAutoTick(){
+ const s=sssDM365ReconState_();
+ if(!s||s.status!=='RUNNING'){sssDM365ReconRemoveAutoTriggers_();return;}
+ sssContinueDM365SourceReconcile(true);
+}
+function sssStopDM365ReconAuto(){
+ const ui=SpreadsheetApp.getUi();
+ if(ui.alert('自動数値照合を停止','数値照合専用トリガーのみ削除します。照合済み進捗は保持します。停止しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+ sssDM365ReconRemoveAutoTriggers_();ui.alert('自動照合を停止しました。進捗は保持しています。');
+}
+function sssShowDM365ReconAuto(){
+ const s=sssDM365ReconState_(),n=sssDM365ReconAutoTriggers_().length;
+ SpreadsheetApp.getUi().alert('365日Detailed元データ数値照合 自動実行\n状態：'+(s?s.status:'未開始')+'\n検証：'+(s?s.next:0)+'/73件\n日数：'+(s?s.days:0)+'/365日\n専用トリガー：'+n+'件\nエラー：'+(s&&s.issues&&s.issues.length?s.issues.join(' / '):'なし'));
+}
+
+
+// v0.1.51: Bounded period aggregation, one verified merged chunk per invocation.
+// Intermediate page totals are saved separately; final cross-chunk reduction is NOT yet implemented.
+const SSS_PERIOD51_KEY_='SSS_PERIOD_051_V1';
+function sssPeriod51State_(){const v=sssProperties_().getProperty(SSS_PERIOD51_KEY_);return v?JSON.parse(v):null;}
+function sssPeriod51Save_(s){sssProperties_().setProperty(SSS_PERIOD51_KEY_,JSON.stringify(s));}
+function sssPeriod51Folder_(){return sssDriveChild_(sssDM365Folder_(),'PeriodAnalysis');}
+function sssPeriod51Start(){
+ const ui=SpreadsheetApp.getUi();try{
+  const m=sssDM365State_(),a=sssDM365AuditState_(),r=sssDM365ReconState_();
+  if(!m||m.status!=='COMPLETED'||!a||a.status!=='PASSED'||!r||r.status!=='PASSED'||r.next!==73||r.signature!==m.signature||r.indexId!==m.indexId)throw new Error('365日統合・監査・元データ照合がすべてPASSEDである必要があります。');
+  sssDM365AuditIndex_(m);
+  const old=sssPeriod51State_();if(old&&old.status==='RUNNING')throw new Error('集計が進行中です。続行を使用してください。');
+  if(ui.alert('30・90・365日集計（第1段階）','73件のZIPを1件ずつ読み、期間別・ページ別の中間集計ZIPを別保存します。元データは変更しません。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  sssPeriod51Save_({status:'RUNNING',signature:m.signature,indexId:m.indexId,siteId:m.siteId,next:0,parts:[],totals:{'30':{rows:0,clicks:0,impressions:0,weighted:0},'90':{rows:0,clicks:0,impressions:0,weighted:0},'365':{rows:0,clicks:0,impressions:0,weighted:0}},updatedAt:new Date().toISOString(),error:''});
+  ui.alert('期間別集計を開始しました。続行メニューで最初の分割ZIPを処理してください。');
+ }catch(e){ui.alert('期間別集計開始エラー：'+String(e.message||e));}
+}
+function sssPeriod51Continue(){return sssPeriod52Continue_(false);}
+function sssPeriod52Continue_(automatic){
+ const ui=automatic?null:SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();if(!lock.tryLock(1000)){if(!automatic)ui.alert('他の処理が実行中です。');return;}
+ try{
+  const s=sssPeriod51State_(),m=sssDM365State_(),r=sssDM365ReconState_();
+  if(!s||s.status!=='RUNNING'||!m||m.status!=='COMPLETED'||!r||r.status!=='PASSED'||s.signature!==m.signature||s.indexId!==m.indexId||s.siteId!==m.siteId)throw new Error('集計状態または検証済み元データが変わりました。');
+  const idx=sssDM365AuditIndex_(m),part=idx.parts[s.next];if(!part)throw new Error('分割ZIPの進捗が不正です。');
+  const source=DriveApp.getFileById(part.fileId);if(source.isTrashed()||source.getName()!==part.name)throw new Error('統合ZIPが見つかりません。');
+  const blobs=Utilities.unzip(source.getBlob()),csv=blobs.filter(b=>b.getName()==='daily_page.csv');if(blobs.length!==2||csv.length!==1)throw new Error('統合ZIP構造が不正です。');
+  const rows=Utilities.parseCsv(csv[0].getDataAsString('UTF-8'));
+  if(!rows.length||rows[0].join('|')!=='date|page|clicks|impressions|ctr|position')throw new Error('CSVヘッダー不一致');
+  const end=new Date(m.end+'T00:00:00Z');if(isNaN(end.getTime()))throw new Error('終了日が不正です。');
+  const windows=[30,90,365].map(days=>({days,start:new Date(end.getTime()-(days-1)*86400000).toISOString().slice(0,10)}));
+  const pages={},totals={};windows.forEach(w=>{pages[w.days]=new Map();totals[w.days]={rows:0,clicks:0,impressions:0,weighted:0};});
+  for(let i=1;i<rows.length;i++){
+   const x=rows[i];if(x.length===1&&x[0]==='')continue;
+   if(x.length!==6||!/^\d{4}-\d{2}-\d{2}$/.test(x[0])||!x[1])throw new Error('CSV行不正: '+i);
+   const clicks=Number(x[2]),im=Number(x[3]),pos=Number(x[5]);if(!Number.isSafeInteger(clicks)||!Number.isSafeInteger(im)||clicks<0||im<clicks||!Number.isFinite(pos)||pos<0)throw new Error('数値不正: '+i);
+   for(const w of windows){if(x[0]<w.start||x[0]>m.end)continue;
+    const t=totals[w.days];t.rows++;t.clicks+=clicks;t.impressions+=im;t.weighted+=pos*im;
+    const map=pages[w.days],v=map.get(x[1])||{rows:0,clicks:0,impressions:0,weighted:0};v.rows++;v.clicks+=clicks;v.impressions+=im;v.weighted+=pos*im;map.set(x[1],v);
+   }
+  }
+  const folder=sssPeriod51Folder_(),name='S3_Period51_'+s.signature.slice(0,12)+'_part_'+String(s.next+1).padStart(3,'0')+'.zip';
+  if(sssDM365Find_(folder,name))throw new Error('同名の中間ZIPが既にあります。重複作成防止のため停止します: '+name);
+  const files=[];for(const w of windows){const data=[['page','rows','clicks','impressions','position_weighted_sum']];
+   [...pages[w.days].entries()].sort((a,b)=>a[0].localeCompare(b[0])).forEach(([page,v])=>data.push([page,v.rows,v.clicks,v.impressions,v.weighted]));
+   files.push(Utilities.newBlob(data.map(row=>row.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\r\n')+'\r\n','text/csv','pages_'+w.days+'.csv'));
+  }
+  const manifest={schema:'s3.period51.partial.v1',siteId:s.siteId,sourceSignature:s.signature,batch:s.next,sourceFileId:part.fileId,periodEnd:m.end,totals,scope:'PARTIAL_NOT_FINAL',createdAt:new Date().toISOString()};
+  files.push(Utilities.newBlob(JSON.stringify(manifest),'application/json','manifest.json'));
+  const created=folder.createFile(Utilities.zip(files,name));
+  s.parts.push({batch:s.next,fileId:created.getId(),name});
+  windows.forEach(w=>{const t=s.totals[w.days],v=totals[w.days];t.rows+=v.rows;t.clicks+=v.clicks;t.impressions+=v.impressions;t.weighted+=v.weighted;});
+  s.next++;s.updatedAt=new Date().toISOString();if(s.next===73)s.status='PARTIALS_COMPLETED';sssPeriod51Save_(s);
+  if(s.status==='PARTIALS_COMPLETED')sssPeriod52RemoveTriggers_();
+  if(!automatic)ui.alert('期間別中間集計：'+s.status+'\n処理済み：'+s.next+'/73件\n中間ZIP：'+s.parts.length+'件\n保存先：Evidence / DetailedMerged / PeriodAnalysis\n※ページ別の全期間統合は次工程です。');
+ }catch(e){const s=sssPeriod51State_();if(s){s.status='HOLD';s.error=String(e.message||e).slice(0,400);sssPeriod51Save_(s);}sssPeriod52RemoveTriggers_();if(!automatic)ui.alert('期間別集計 HOLD：'+String(e.message||e));else console.error('期間別集計 HOLD：'+String(e.stack||e));}
+ finally{lock.releaseLock();}
+}
+function sssPeriod51Status(){const s=sssPeriod51State_();SpreadsheetApp.getUi().alert(s?'期間別集計（第1段階）\n状態：'+s.status+'\n進捗：'+s.next+'/73件\n中間ZIP：'+s.parts.length+'件\nエラー：'+(s.error||'なし'):'期間別集計は未開始です。');}
+
+// v0.1.52: only the dedicated period-partial trigger is managed.
+function sssPeriod52Triggers_(){return ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='sssPeriod52Tick');}
+function sssPeriod52RemoveTriggers_(){sssPeriod52Triggers_().forEach(t=>ScriptApp.deleteTrigger(t));}
+function sssPeriod52StartAuto(){
+ const ui=SpreadsheetApp.getUi();try{
+  const s=sssPeriod51State_(),m=sssDM365State_(),r=sssDM365ReconState_();
+  if(!s||s.status!=='RUNNING'||s.next<1||s.next>=73||s.parts.length!==s.next)throw new Error('1/73件以降のRUNNING状態が必要です。開始メニューは再実行しないでください。');
+  if(!m||m.status!=='COMPLETED'||!r||r.status!=='PASSED'||s.signature!==m.signature||s.indexId!==m.indexId||s.siteId!==m.siteId)throw new Error('検証済みEvidenceの識別情報が一致しません。');
+  if(ui.alert('中間集計を自動継続','既存の'+s.next+'/73件から約5分間隔で再開します。元Evidenceと統合ZIPは変更しません。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  const old=sssPeriod52Triggers_();if(old.length>1)throw new Error('専用トリガーが重複しています。監査してから再開してください。');
+  if(!old.length)ScriptApp.newTrigger('sssPeriod52Tick').timeBased().everyMinutes(5).create();
+  ui.alert('中間集計の自動継続を設定しました。進捗：'+s.next+'/73件、専用トリガー：'+sssPeriod52Triggers_().length+'件');
+ }catch(e){ui.alert('自動継続設定エラー：'+String(e.message||e));}
+}
+function sssPeriod52Tick(){
+ const s=sssPeriod51State_();if(!s||s.status!=='RUNNING'){sssPeriod52RemoveTriggers_();return;}
+ sssPeriod52Continue_(true);
+}
+function sssPeriod52Status(){
+ const s=sssPeriod51State_();SpreadsheetApp.getUi().alert('期間別中間集計 自動実行\n状態：'+(s?s.status:'未開始')+'\n進捗：'+(s?s.next:0)+'/73件\n中間ZIP：'+(s?s.parts.length:0)+'件\n専用トリガー：'+sssPeriod52Triggers_().length+'件\nエラー：'+(s&&s.error?s.error:'なし'));
+}
+function sssPeriod52StopAuto(){
+ const ui=SpreadsheetApp.getUi();if(ui.alert('自動継続を停止','専用トリガーのみ削除し、進捗を保持します。停止しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+ sssPeriod52RemoveTriggers_();ui.alert('自動継続を停止しました。中間ZIPと進捗は保持しています。');
+}
+
+
+// v0.1.54: hierarchical bounded reduction; no source ZIP is changed.
+// Each invocation reduces up to four input ZIPs to one output ZIP.
+const SSS_P53_KEY_='SSS_PERIOD_053_V1';
+function sssP53Get_(){const x=sssProperties_().getProperty(SSS_P53_KEY_);return x?JSON.parse(x):null;}
+function sssP53Put_(x){sssProperties_().setProperty(SSS_P53_KEY_,JSON.stringify(x));}
+function sssP53Folder_(){return sssDriveChild_(sssPeriod51Folder_(),'FinalReduction');}
+function sssP53Start(){
+ const ui=SpreadsheetApp.getUi();try{
+  const p=sssPeriod51State_(),m=sssDM365State_(),r=sssDM365ReconState_();
+  if(!p||p.status!=='PARTIALS_COMPLETED'||p.next!==73||p.parts.length!==73||!m||m.status!=='COMPLETED'||!r||r.status!=='PASSED'||p.signature!==m.signature||p.indexId!==m.indexId)throw new Error('73件の中間集計と元データ照合の完了が必要です。');
+  const old=sssP53Get_();if(old&&old.status==='RUNNING')throw new Error('統合が進行中です。続行を使用してください。');
+  if(ui.alert('ページ別最終統合（試験）','73件の中間ZIPを4件以下ずつ階層的に集約します。元データ・中間ZIPは変更しません。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  sssP53Put_({status:'RUNNING',signature:p.signature,siteId:p.siteId,indexId:p.indexId,round:0,next:0,inputs:p.parts.map(z=>({id:z.fileId,name:z.name})),outputs:[],totalMs:0,steps:0,error:'',lastTiming:null,updatedAt:new Date().toISOString()});
+  ui.alert('統合を開始しました。続行メニューを実行してください。');
+ }catch(e){ui.alert('統合開始エラー：'+String(e.message||e));}
+}
+function sssP53Read_(ref,signature,siteId){
+ const file=DriveApp.getFileById(ref.id);if(file.isTrashed()||file.getName()!==ref.name)throw new Error('入力ZIP不一致: '+ref.name);
+ const blobs=Utilities.unzip(file.getBlob()),by={};blobs.forEach(b=>{if(by[b.getName()])throw new Error('ZIP内ファイル重複');by[b.getName()]=b;});
+ if(blobs.length!==4||!by['manifest.json'])throw new Error('ZIP構造不正: '+ref.name);
+ const mf=JSON.parse(by['manifest.json'].getDataAsString('UTF-8'));
+ if(mf.siteId!==siteId||mf.sourceSignature!==signature||!['s3.period51.partial.v1','s3.period53.reduced.v1'].includes(mf.schema))throw new Error('manifest不一致: '+ref.name);
+ const maps={},totals={};
+ for(const d of [30,90,365]){
+  const blob=by['pages_'+d+'.csv'];if(!blob)throw new Error('CSV欠落');
+  const rows=Utilities.parseCsv(blob.getDataAsString('UTF-8'));
+  if(!rows.length||rows[0].join('|')!=='page|rows|clicks|impressions|position_weighted_sum')throw new Error('CSVヘッダー不正');
+  const map=new Map(),sum={rows:0,clicks:0,impressions:0,weighted:0};
+  for(let i=1;i<rows.length;i++){
+   const x=rows[i];if(x.length===1&&x[0]==='')continue;
+   if(x.length!==5||!x[0]||map.has(x[0]))throw new Error('ページ重複・CSV行不正');
+   const n=x.slice(1).map(Number);if(!n.every(Number.isFinite)||n.slice(0,3).some(v=>!Number.isSafeInteger(v)||v<0)||n[2]<n[1]||n[3]<0)throw new Error('数値不正');
+   const v={rows:n[0],clicks:n[1],impressions:n[2],weighted:n[3]};map.set(x[0],v);
+   for(const k of ['rows','clicks','impressions','weighted'])sum[k]+=v[k];
+  }
+  const expected=mf.totals&&mf.totals[String(d)];
+  if(!expected||['rows','clicks','impressions'].some(k=>sum[k]!==expected[k])||Math.abs(sum.weighted-expected.weighted)>Math.max(0.001,Math.abs(expected.weighted)*1e-10))throw new Error('manifest集計値不一致: '+ref.name+' '+d);
+  maps[d]=map;totals[d]=sum;
+ }
+ return {maps,totals};
+}
+function sssP53Continue(){sssP53Continue_(false);}
+function sssP53Continue_(silent){
+ const ui=silent?null:SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();if(!lock.tryLock(1000)){if(!silent)ui.alert('他の処理が実行中です。');return false;}
+ let s;try{
+  s=sssP53Get_();const p=sssPeriod51State_(),m=sssDM365State_(),r=sssDM365ReconState_();
+  if(!s||s.status!=='RUNNING'||!p||p.status!=='PARTIALS_COMPLETED'||!m||m.status!=='COMPLETED'||!r||r.status!=='PASSED'||s.signature!==p.signature||s.indexId!==p.indexId)throw new Error('照合済みデータまたは統合状態が変わりました。');
+  const start=Date.now(),readStart=Date.now(),batch=s.inputs.slice(s.next,s.next+4);if(!batch.length)throw new Error('入力位置が不正です。');
+  const maps={30:new Map(),90:new Map(),365:new Map()},totals={};for(const d of [30,90,365])totals[d]={rows:0,clicks:0,impressions:0,weighted:0};
+  for(const ref of batch){const data=sssP53Read_(ref,s.signature,s.siteId);for(const d of [30,90,365]){
+   for(const [page,v] of data.maps[d]){const map=maps[d],a=map.get(page)||{rows:0,clicks:0,impressions:0,weighted:0};for(const k of ['rows','clicks','impressions','weighted'])a[k]+=v[k];map.set(page,a);}
+   for(const k of ['rows','clicks','impressions','weighted'])totals[d][k]+=data.totals[d][k];
+  }}
+  const readMs=Date.now()-readStart,encodeStart=Date.now(),blobs=[];
+  for(const d of [30,90,365]){const lines=[['page','rows','clicks','impressions','position_weighted_sum']];
+   [...maps[d]].sort((a,b)=>a[0].localeCompare(b[0])).forEach(([page,v])=>lines.push([page,v.rows,v.clicks,v.impressions,v.weighted]));
+   blobs.push(Utilities.newBlob(lines.map(row=>row.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\r\n')+'\r\n','text/csv','pages_'+d+'.csv'));
+  }
+  const mf={schema:'s3.period53.reduced.v1',version:SSS_VERSION,siteId:s.siteId,sourceSignature:s.signature,round:s.round,batch:s.next,inputs:batch,totals,createdAt:new Date().toISOString()};
+  blobs.push(Utilities.newBlob(JSON.stringify(mf),'application/json','manifest.json'));
+  const encodeMs=Date.now()-encodeStart,saveStart=Date.now(),folder=sssP53Folder_();
+  const name='S3_Period53_'+s.signature.slice(0,12)+'_r'+s.round+'_b'+String(s.next).padStart(3,'0')+'.zip';
+  if(sssDM365Find_(folder,name))throw new Error('同名ZIPがあります。重複作成を防ぐため停止: '+name);
+  const file=folder.createFile(Utilities.zip(blobs,name));const saveMs=Date.now()-saveStart;
+  s.outputs.push({id:file.getId(),name});s.next+=batch.length;s.steps++;s.totalMs+=Date.now()-start;
+  s.lastTiming={inputs:batch.length,readMs,encodeMs,saveMs,totalMs:Date.now()-start};
+  if(s.next===s.inputs.length){if(s.outputs.length===1){
+   const result=sssP53Read_(s.outputs[0],s.signature,s.siteId);
+   for(const d of [30,90,365])for(const k of ['rows','clicks','impressions'])if(result.totals[d][k]!==p.totals[String(d)][k])throw new Error('最終合計不一致: '+d+' '+k);
+   s.status='COMPLETED';s.final=s.outputs[0];
+  }else{s.inputs=s.outputs;s.outputs=[];s.next=0;s.round++;}}
+  s.updatedAt=new Date().toISOString();sssP53Put_(s);
+  if(!silent)ui.alert('ページ別統合：'+s.status+'\n段階：'+s.round+'\n進捗：'+s.next+'/'+s.inputs.length+'件\n最終ZIP：'+(s.final?s.final.name:'未生成')+'\n今回：'+s.lastTiming.totalMs+'ms（読込 '+readMs+' / CSV '+encodeMs+' / 保存 '+saveMs+'）\n※元Evidence・中間ZIPは変更しません。');
+  return true;
+ }catch(e){if(s){s.status='HOLD';s.error=String(e.message||e).slice(0,500);sssP53Put_(s);}sssP55RemoveTriggers_();if(!silent)ui.alert('ページ別統合 HOLD：'+String(e.message||e));return false;}
+ finally{lock.releaseLock();}
+}
+function sssP53Status(){const s=sssP53Get_();SpreadsheetApp.getUi().alert(!s?'未開始':'ページ別統合\n状態：'+s.status+'\n段階：'+s.round+'\n進捗：'+s.next+'/'+s.inputs.length+'件\n総実行時間：'+(s.totalMs/1000).toFixed(1)+'秒\n直近処理時間：'+JSON.stringify(s.lastTiming)+'\n最終ZIP：'+(s.final?s.final.name:'未生成')+'\nエラー：'+(s.error||'なし'));}
+
+
+// v0.1.57: time-budgeted automatic continuation. One minute timer is a wake-up,
+// not a five-minute wait per input. Never resets the existing P53 checkpoint.
+const SSS_P55_MAX_RUN_MS_=210000;
+const SSS_P55_MAX_STEPS_=24;
+function sssP55Triggers_(){return ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='sssP55Tick');}
+function sssP55RemoveTriggers_(){sssP55Triggers_().forEach(t=>ScriptApp.deleteTrigger(t));}
+function sssP55StartAuto(){
+ const ui=SpreadsheetApp.getUi();try{
+  const s=sssP53Get_();if(!s||s.status!=='RUNNING'||s.steps<1)throw new Error('最初の手動統合を完了したRUNNING状態が必要です。');
+  const triggers=sssP55Triggers_();if(triggers.length>1)throw new Error('専用トリガーが重複しています。');
+  if(ui.alert('ページ別統合を高速自動継続','現在の進捗を保持し、1回の起動で安全な時間内に複数バッチを処理します。専用トリガーは約1分間隔です。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  if(!triggers.length)ScriptApp.newTrigger('sssP55Tick').timeBased().everyMinutes(1).create();
+  ui.alert('自動継続を設定しました。進捗は既存のチェックポイントから再開します。');
+ }catch(e){ui.alert('自動継続設定エラー：'+String(e.message||e));}
+}
+function sssP55Tick(){
+ const begin=Date.now();let steps=0;
+ try{
+  while(steps<SSS_P55_MAX_STEPS_){
+   const s=sssP53Get_();if(!s||s.status!=='RUNNING'){sssP55RemoveTriggers_();return;}
+   // Stop before another batch when time is insufficient; do not start
+   // a potentially expensive batch near the Apps Script execution limit.
+   const last=s.lastTiming&&s.lastTiming.totalMs||15000;
+   if(Date.now()-begin+Math.max(30000,last*2)>SSS_P55_MAX_RUN_MS_)break;
+   if(!sssP53Continue_(true)){const now=sssP53Get_();if(now&&now.status==='HOLD')sssP55RemoveTriggers_();return;}
+   steps++;
+  }
+  const s=sssP53Get_();if(!s||s.status!=='RUNNING')sssP55RemoveTriggers_();
+ }catch(e){const s=sssP53Get_();if(s){s.status='HOLD';s.error='自動実行: '+String(e.message||e).slice(0,450);sssP53Put_(s);}sssP55RemoveTriggers_();throw e;}
+}
+// v0.1.57: recover only the verified background-UI failure, preserving all progress.
+function sssP56RecoverUiHold(){
+ const ui=SpreadsheetApp.getUi();
+ const lock=LockService.getDocumentLock();
+ if(!lock.tryLock(5000)){ui.alert('他の処理が実行中です。後ほど再試行してください。');return;}
+ try{
+  const s=sssP53Get_();
+  if(!s||s.status!=='HOLD'||!/^自動実行: Cannot call SpreadsheetApp\.getUi\(\) from this context\.?$/.test(String(s.error||''))){
+   ui.alert('対象外の状態またはエラーです。既存状態を変更しません。');return;
+  }
+  if(s.round!==0||s.next!==4||s.steps!==1||!Array.isArray(s.outputs)||s.outputs.length!==1){
+   ui.alert('進捗が想定と異なるため復旧を中止しました。');return;
+  }
+  const p=sssPeriod51State_(),m=sssDM365State_(),r=sssDM365ReconState_();
+  if(!p||p.status!=='PARTIALS_COMPLETED'||!m||m.status!=='COMPLETED'||!r||r.status!=='PASSED'||s.signature!==p.signature||s.indexId!==p.indexId){
+   ui.alert('データ整合条件が一致しないため復旧を中止しました。');return;
+  }
+  // Verify the already-written output before resuming; never overwrite a ZIP.
+  sssP53Read_(s.outputs[0],s.signature,s.siteId);
+  if(ui.alert('UI呼び出しエラーから復旧','4/73件のチェックポイントを維持してRUNNINGに戻します。再開後は「ページ別統合を高速自動継続（試験）」を実行してください。',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  s.status='RUNNING';s.error='';s.updatedAt=new Date().toISOString();sssP53Put_(s);
+  ui.alert('復旧しました。進捗：4/73件。高速自動継続を開始してください。');
+ }catch(e){ui.alert('復旧中止：'+String(e.message||e));}
+ finally{lock.releaseLock();}
+}
+function sssP55Status(){const s=sssP53Get_();SpreadsheetApp.getUi().alert('高速自動ページ別統合\n状態：'+(s?s.status:'未開始')+'\n段階：'+(s?s.round:'-')+'\n進捗：'+(s?s.next+'/'+s.inputs.length:'-')+'\n累計処理：'+(s?s.steps:0)+'バッチ\n専用トリガー：'+sssP55Triggers_().length+'件\n最終ZIP：'+(s&&s.final?s.final.name:'未生成')+'\nエラー：'+(s&&s.error?s.error:'なし'));}
+function sssP55StopAuto(){const ui=SpreadsheetApp.getUi();if(ui.alert('高速自動継続を停止','専用トリガーのみ削除します。処理済みZIPとチェックポイントは維持します。',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;sssP55RemoveTriggers_();ui.alert('専用トリガーを停止しました。進捗は保持されています。');}
+
+
+// v0.1.59: read-only final period audit; no GSC calls, ZIP writes, or sheet writes.
+// Scans all 73 original partial ZIPs independently, then compares to the final ZIP.
+const SSS_P58_KEY_='SSS_PERIOD_058_AUDIT_V1';
+function sssP58Get_(){const v=sssProperties_().getProperty(SSS_P58_KEY_);return v?JSON.parse(v):null;}
+function sssP58Put_(s){sssProperties_().setProperty(SSS_P58_KEY_,JSON.stringify(s));}
+function sssP58Blank_(){return {rows:0,clicks:0,impressions:0,weighted:0};}
+function sssP58Compare_(a,b,where){
+ for(const k of ['rows','clicks','impressions'])if(a[k]!==b[k])throw new Error(where+' '+k+' 不一致: '+a[k]+' / '+b[k]);
+ if(Math.abs(a.weighted-b.weighted)>Math.max(0.01,Math.abs(b.weighted)*1e-9))throw new Error(where+' 掲載順位加重合計不一致');
+}
+function sssP58Prereq_(){
+ const s=sssP53Get_(),p=sssPeriod51State_(),m=sssDM365State_(),r=sssDM365ReconState_();
+ if(!s||s.status!=='COMPLETED'||!s.final||!p||p.status!=='PARTIALS_COMPLETED'||!Array.isArray(p.parts)||p.parts.length!==73||!m||m.status!=='COMPLETED'||!r||r.status!=='PASSED'||s.signature!==p.signature||s.signature!==m.signature||s.indexId!==p.indexId||s.indexId!==m.indexId||s.siteId!==p.siteId)throw new Error('照合済み73件・最終統合の完了条件が一致しません。');
+ return {s,p};
+}
+function sssP58AuditStart(){
+ const ui=SpreadsheetApp.getUi();try{
+  const {s,p}=sssP58Prereq_();
+  const existing=sssP58Get_();if(existing&&existing.status==='RUNNING')throw new Error('監査が進行中です。続行メニューを使用してください。');
+  // Verify the final ZIP independently before opening an audit checkpoint.
+  const final=sssP53Read_(s.final,s.signature,s.siteId);
+  for(const d of [30,90,365])sssP58Compare_(final.totals[d],p.totals[String(d)],'最終ZIP vs 中間集計 '+d+'日');
+  if(ui.alert('期間別最終ZIP品質監査','73件の中間ZIPを読取専用で再検証し、最終ZIPと集計値を照合します。最大5件ずつ実行します。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  const sums={};for(const d of [30,90,365])sums[d]=sssP58Blank_();
+  sssP58Put_({status:'RUNNING',signature:s.signature,siteId:s.siteId,indexId:s.indexId,finalId:s.final.id,next:0,total:73,sums,error:'',updatedAt:new Date().toISOString()});
+  ui.alert('監査を開始しました。最終ZIPの構造と集計値は一次検査合格です。続行してください。');
+ }catch(e){ui.alert('監査開始中止：'+String(e.message||e));}
+}
+function sssP58AuditContinue(){
+ const ui=SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
+ if(!lock.tryLock(1000)){ui.alert('他の処理が実行中です。');return;}
+ let a;
+ try{
+  a=sssP58Get_();const {s,p}=sssP58Prereq_();
+  if(!a||a.status!=='RUNNING'||a.signature!==s.signature||a.indexId!==s.indexId||a.finalId!==s.final.id)throw new Error('監査チェックポイントが不一致です。');
+  const stop=Math.min(a.next+5,p.parts.length);
+  for(let i=a.next;i<stop;i++){
+   const part=p.parts[i];const ref={id:part.fileId,name:part.name};
+   const data=sssP53Read_(ref,s.signature,s.siteId);
+   for(const d of [30,90,365])for(const k of ['rows','clicks','impressions','weighted'])a.sums[d][k]+=data.totals[d][k];
+   a.next=i+1;
+  }
+  if(a.next===p.parts.length){
+   const final=sssP53Read_(s.final,s.signature,s.siteId);
+   for(const d of [30,90,365]){
+    sssP58Compare_(a.sums[d],p.totals[String(d)],'73件中間ZIP vs 集計記録 '+d+'日');
+    sssP58Compare_(a.sums[d],final.totals[d],'73件中間ZIP vs 最終ZIP '+d+'日');
+   }
+   a.status='PASSED';
+  }
+  a.updatedAt=new Date().toISOString();sssP58Put_(a);
+  ui.alert('期間別最終ZIP監査：'+a.status+'\n進捗：'+a.next+'/73件\n最終ZIP：'+s.final.name+'\nエラー：なし\n※元Evidence・中間ZIP・最終ZIPは変更していません。');
+ }catch(e){if(a&&a.status==='RUNNING'){a.status='HOLD';a.error=String(e.message||e).slice(0,450);a.updatedAt=new Date().toISOString();sssP58Put_(a);}ui.alert('監査停止：'+String(e.message||e));}
+ finally{lock.releaseLock();}
+}
+function sssP58AuditStatus(){const a=sssP58Get_();SpreadsheetApp.getUi().alert(!a?'期間別最終ZIP監査：未開始':'期間別最終ZIP監査\n状態：'+a.status+'\n進捗：'+a.next+'/'+a.total+'件\nエラー：'+(a.error||'なし')+'\n※読取専用監査です。');}
+
+
+// v0.1.59: UI-free, time-budgeted continuation of the v0.1.59 read-only audit.
+// All checkpoints are committed after each ZIP. No source or merged ZIP writes.
+const SSS_P59_BUDGET_MS_=180000;
+const SSS_P59_MAX_FILES_=24;
+function sssP59Triggers_(){return ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='sssP59Tick');}
+function sssP59RemoveTriggers_(){sssP59Triggers_().forEach(t=>ScriptApp.deleteTrigger(t));}
+function sssP59Tick(){
+ const lock=LockService.getDocumentLock();
+ if(!lock.tryLock(1000))return;
+ let a=null;
+ try{
+  a=sssP58Get_();
+  if(!a||a.status!=='RUNNING'){sssP59RemoveTriggers_();return;}
+  const {s,p}=sssP58Prereq_();
+  if(a.signature!==s.signature||a.siteId!==s.siteId||a.indexId!==s.indexId||a.finalId!==s.final.id||a.total!==73||p.parts.length!==73||a.next<0||a.next>73)throw new Error('監査チェックポイントと元データが一致しません。');
+  const start=Date.now();let count=0;
+  while(a.next<73&&count<SSS_P59_MAX_FILES_&&Date.now()-start<SSS_P59_BUDGET_MS_){
+   const part=p.parts[a.next];
+   const data=sssP53Read_({id:part.fileId,name:part.name},s.signature,s.siteId);
+   for(const d of [30,90,365])for(const k of ['rows','clicks','impressions','weighted'])a.sums[d][k]+=data.totals[d][k];
+   a.next++;count++;a.updatedAt=new Date().toISOString();sssP58Put_(a);
+  }
+  if(a.next===73){
+   const final=sssP53Read_(s.final,s.signature,s.siteId);
+   for(const d of [30,90,365]){
+    sssP58Compare_(a.sums[d],p.totals[String(d)],'73件中間ZIP vs 集計記録 '+d+'日');
+    sssP58Compare_(a.sums[d],final.totals[d],'73件中間ZIP vs 最終ZIP '+d+'日');
+   }
+   a.status='PASSED';a.updatedAt=new Date().toISOString();sssP58Put_(a);
+   sssP59RemoveTriggers_();
+  }
+ }catch(e){
+  a=sssP58Get_();
+  if(a&&a.status==='RUNNING'){a.status='HOLD';a.error='自動監査: '+String(e.message||e).slice(0,420);a.updatedAt=new Date().toISOString();sssP58Put_(a);}
+  sssP59RemoveTriggers_();
+  console.error('sssP59Tick: '+String(e&&e.stack||e));
+ }finally{lock.releaseLock();}
+}
+function sssP59StartAuto(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const a=sssP58Get_(),pr=sssP58Prereq_();
+  if(!a||a.status!=='RUNNING'||a.next<0||a.next>=73||a.total!==73||a.signature!==pr.s.signature||a.finalId!==pr.s.final.id)throw new Error('RUNNINGの監査チェックポイントが見つからないか不整合です。');
+  if(sssP59Triggers_().length>1)throw new Error('専用トリガーが重複しています。');
+  if(ui.alert('期間別最終ZIP品質監査を高速自動継続','現在の'+a.next+'/73件から再開します。既存ZIPは変更しません。開始しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+  if(!sssP59Triggers_().length)ScriptApp.newTrigger('sssP59Tick').timeBased().everyMinutes(1).create();
+  ui.alert('高速自動監査を予約しました。進捗：'+a.next+'/73件。状態メニューで確認できます。');
+ }catch(e){ui.alert('高速自動監査を開始できません：'+String(e.message||e));}
+}
+function sssP59Status(){
+ const a=sssP58Get_();SpreadsheetApp.getUi().alert('期間別最終ZIP高速自動監査\n状態：'+(a?a.status:'未開始')+'\n進捗：'+(a?a.next+'/'+a.total:'-')+'件\n専用トリガー：'+sssP59Triggers_().length+'件\nエラー：'+(a&&a.error?a.error:'なし')+'\n元Evidence・中間ZIP・最終ZIPは変更しません。');
+}
+function sssP59StopAuto(){
+ const ui=SpreadsheetApp.getUi();if(ui.alert('高速自動監査を停止','専用トリガーを削除します。監査進捗と既存ZIPは保持します。',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+ sssP59RemoveTriggers_();ui.alert('専用トリガーを停止しました。チェックポイントは保持されています。');
 }
