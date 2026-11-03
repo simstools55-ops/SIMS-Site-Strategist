@@ -1,3 +1,91 @@
+## v0.1.90
+- 開発中データの移行方針を廃止し、新規収集へ変更。
+- ブログ名フォルダー保存方式を維持し、移行関連メニューを非表示。
+- 既存保存先bindingは自動変更せず、新規開発用シートでの再収集を案内。
+- 収集・統合・分析ロジックは変更なし。
+
+## v0.1.88
+- 読取専用のステージング全件照合を追加。移行元・移行先の全階層で不足、余剰、重複、サイズ・SHA-256不一致を検出。
+- 10MiB超・20,000項目超はHOLD。保存先切替は未実装。GAS実機未検証。
+
+## v0.1.87
+- ステージングコピー試作に移行元の同名ファイル・同名フォルダー検査を追加。
+- 移行先のファイル／フォルダー名衝突時はコピー・フォルダー生成前に停止。
+- GAS実機未検証。
+
+## v0.1.85
+- ブログ名フォルダー移行計画の読取専用プレビューを追加。
+- 対象ファイル・階層・サイズを計測し、移行先Strategistの衝突を停止条件に設定。
+- 実際のコピー、保存先切替、削除は行わない。
+
+## v0.1.84
+- Manager v9.2.4 の SIMS/ブログ名/Manager/Backups 構造を読取専用で確認。
+- Manager固有bindingをS3が取得できない制約を明示。移行はHOLD。
+
+## v0.1.82
+- Manager照合画面の予備PASSを移行許可と誤解しない文言に修正。
+- S3保存先フォルダー名の記録との不一致をHOLD扱いにする。
+- Manager全件監査上限超過時は移行HOLDを明示。
+- データ移動・書込なし。GAS実機試験未実施。
+
+## v0.1.79
+- Manager記事管理の全URL（最大10,000件）をGSCプロパティ範囲と照合する読取専用事前監査を追加。
+- ブログ名フォルダー、Manager/Strategistフォルダーの重複を確認。
+- URL一致は所有権の証明ではないため、移行は必ずHOLD。
+- Manager ID保存、Evidenceコピー・移動、設定変更は実施しない。
+
+## v0.1.78
+- Consolidated migration overview into one read-only menu.
+- Kept existing audit functions in source for compatibility; no data migration.
+- Site identity and content verification remain HOLD.
+
+## v0.1.76
+- Added read-only risk review for blog-name folder alignment.
+- Never treats a matching name or Manager folder as proof of ownership.
+- No migration writes or bindings changed.
+
+## v0.1.74
+- Add read-only recursive Drive folder inventory and relative-path collision preflight.
+- No migration or Manager mutation. GAS live test pending.
+
+## v0.1.73
+- Fix: Manager照合監査の保存済み候補キーを preview から top に修正。
+- Add: Managerの最新状態を読取専用で表示する候補プレビュー。
+- Safety: 未照合・重複・不明状態は保留、Manager IDを保存しない。
+
+## v0.1.71
+- Manager候補照合に最新監査PASSEDの整合ゲートを追加。
+- URLの安全な照合と形式不明URLの停止条件を強化。
+- 読取専用・Manager ID非保存を維持。
+
+## v0.1.68
+- 読取専用の保存先移行前監査を追加。目標フォルダー重複、現在の保存先、直下ファイル数を表示。
+- 既存データの移動・削除・フォルダー作成・プロパティ変更なし。
+- Managerのサイト識別との自動照合および移行実行は未実装。
+
+## v0.1.66
+- Add read-only impact triage for persisted top strategy candidates.
+- Explicitly disclose limited candidate scope and unavailable Manager state.
+
+## v0.1.66 (2026-11-03)
+- Add read-only exploratory strategy priorities from persisted audited site diagnosis.
+- Validate counts and data integrity; no source writes or automatic changes.
+- Add matching menu callback and preserve all earlier features.
+
+## v0.1.64
+- Add audit-gated, read-only site-wide trend summary from existing strategy totals.
+- Preserve all diagnostic calculations and stored Evidence.
+- GAS device test pending.
+
+## v0.1.63
+- 診断結果の小数表示と欠損値の扱いを修正。前60日の30日換算値と実測CTR・順位を明確に区別。診断は調査候補である旨を表示。元Evidence・ZIP・判定ロジックは変更なし。
+
+## v0.1.60
+- PASSED済み最終ZIPを使用した30日対直前60日の探索的ページ診断。
+- HIGH / MEDIUM / GROWTH / WATCH分類、上位40件のチェックポイント保存。
+- 既存Evidence・ZIPを変更しない。
+- GAS実機未検証。
+
 ## v0.1.59
 - 期間別最終ZIP品質監査を既存の5/73件から高速自動継続する専用トリガーを追加。
 - 各ZIP処理後のチェックポイント保存、HOLD停止、PASSED後のトリガー削除。
@@ -246,3 +334,50 @@ hangelog
 - Add read-only 365-day Detailed merge preflight from persisted DetailedAudit metadata.
 - Verify coverage, same-day fingerprints, duplicate candidates, caps, errors and checkpoint/row counts.
 - Hold on missing, conflicting, capped or inconsistent records; do not modify Evidence or audit results.
+
+## v0.1.61
+- Limit stored site strategy preview to 8,500 characters and 12 top candidates to avoid Apps Script per-property quota errors.
+- Keep full population counts and totals; source ZIPs remain read-only.
+
+## v0.1.63
+- 診断結果の日本語表示と比較数値・確認方針を追加（表示のみ）。
+- 既存の診断データを再利用し、ZIPの再読込・書込を行わない。
+
+## v0.1.67
+- New Strategist folder setup uses blog name without SiteID suffix.
+- Added read-only migration preview; existing bindings are not rewritten.
+- Manager integration remains pending verified site ownership.
+
+## v0.1.69
+- Manager記事管理の読取専用事前確認を追加。明示入力したSpreadsheet IDは保存しない。
+- 必須列、最大200行のURLホストを確認。サイト一致を断定せず、別ドメインは停止表示。
+- ファイル移行、Manager書込、状態同期は未実装。GAS実機未試験。
+
+## v0.1.72
+- Manager候補照合時にGSC URL-prefixのパス・スキーム・ポートを含めてスコープを検査。
+- sc-domainはドメインとサブドメインを許可。S3候補の範囲外も停止。
+- 読取専用・実機未検証。
+
+## v0.1.75
+- Add conservative, read-only migration readiness display; explicitly HOLD pending authenticated site identity, collision checks and rollback verification.
+
+## v0.1.80
+- Manager記事URLの正規化後の重複を検出し、予備監査をHOLDにする。
+- 旧Evidence移行実行メニューを一時非表示にして誤操作を防止（既存関数・データは維持）。
+- 実移行・Manager書込なし。GAS実機未検証。
+
+## v0.1.81
+- Managerサイト照合で記事URL空欄を移行前HOLD要因として明示。
+- URL・フォルダー構造の予備PASSを移行承認と誤認しない表示に変更。
+- Evidence・Manager・保存先の書き込みなし。GAS実機未検証。
+
+## v0.1.83
+- Manager Settingsのサイト設定値を読取専用で予備照合。サイト所有権の認証や移行許可とは区別。
+
+## v0.1.86
+- メニュー非公開のステージングコピー試作。1回1ファイル、SHA-256照合、状態ID拘束。切替・削除なし。実機未検証。
+
+## v0.1.90
+- 新規セットアップのブログ名を保存先に使用。既存Managerフォルダーを共用する場合はManagerスプレッドシートのBlogName、SearchConsoleProperty、BlogUrl範囲を読取照合し、不一致時は停止。
+- 同名フォルダー重複、既存Strategist、Manager不在の既存ブログフォルダーは安全停止。移行処理は実行しない。
+- 既存の収集・分析処理は変更しない。GAS実機未検証。

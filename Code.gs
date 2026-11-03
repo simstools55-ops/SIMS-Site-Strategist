@@ -1,5 +1,5 @@
-/** SIMS Site Strategist v0.1.59 | read-only final period audit. */
-const SSS_VERSION = '0.1.59';
+/** SIMS Site Strategist v0.1.90 | use blog-name folders for new development data; preserve analytics. */
+const SSS_VERSION = '0.1.90';
 const SSS_PREFIX = 'SSS_';
 const SSS_CONFIG_SHEET = 'SiteConfig';
 const SSS_AUDIT_SHEET = 'AuditLog';
@@ -10,8 +10,12 @@ function onOpen() {
     .addItem('初回セットアップ', 'sssSetup')
     .addItem('登録サイトを確認', 'sssShowSite')
     .addItem('ブログ別保存先を準備・確認', 'sssSetupDriveFolders')
+    .addItem('Managerサイト設定を照合（読取専用）', 'sssP83CompareManagerSiteSettings')
+    .addItem('Manager保存先の構造を照合（読取専用）', 'sssP84CheckManagerFolderStructure')
+    .addItem('Manager記事情報の連携前確認（読取専用）', 'sssP69ManagerPreview')
+    .addItem('Managerと戦略候補の照合監査（読取専用）', 'sssP70AuditManagerMatches')
+    .addItem('Manager対応状況つき戦略候補を確認（読取専用）', 'sssP73ShowManagerCandidates')
     .addItem('Googleドライブの保存先を開く', 'sssOpenDriveFolder')
-    .addItem('既存Evidenceの移行を確認・実行', 'sssMigrateEvidence')
     .addSeparator()
     .addItem('GSCデータを収集（180日）', 'sssCollect180')
     .addItem('GSCデータを収集（365日・試験）', 'sssCollect365')
@@ -88,6 +92,11 @@ function onOpen() {
     .addItem('期間別最終ZIP品質監査を高速自動継続', 'sssP59StartAuto')
     .addItem('期間別最終ZIP品質監査の高速自動実行状態', 'sssP59Status')
     .addItem('期間別最終ZIP品質監査の高速自動実行を停止', 'sssP59StopAuto')
+    .addItem('サイト戦略診断を生成（読取専用・試験）', 'sssP60BuildStrategy')
+    .addItem('サイト戦略診断の結果を確認', 'sssP60ShowStrategy')
+    .addItem('サイト全体の傾向サマリーを確認（読取専用）', 'sssP64ShowSiteSummary')
+    .addItem('サイト戦略の優先施策を確認（読取専用）', 'sssP65ShowPriorities')
+    .addItem('戦略候補の影響度を確認（読取専用）', 'sssP66ShowImpact')
     .addItem('Detailed監査の日付・重複を診断（読取専用）', 'sssDiagnoseDetailedAuditDates')
     .addItem('Detailed不足日を1日だけ補完（試験）', 'sssRepairOneDetailedMissingDay')
     .addItem('中断した収集を再開', 'sssResumeCollection')
@@ -220,29 +229,74 @@ function sssDriveVerifyMap_(m){
   for(const key of ['reportsId','exportId'])if(!childOf(sssDriveGetFolder_(m[key]),strategist))throw new Error('Strategist保存先の階層が変更されています。');
   return m;
 }
+/** Check the user-specified Manager sheet before reusing its existing blog folder.
+ * This is a consistency check, not a cryptographic ownership proof.
+ */
+function sssCheckManagerIdentityForSetup_(spreadsheetId,c){
+  const id=String(spreadsheetId||'').trim();
+  if(!/^[A-Za-z0-9_-]{25,120}$/.test(id))throw new Error('ManagerスプレッドシートIDの形式が正しくありません。');
+  const book=SpreadsheetApp.openById(id), sh=book.getSheetByName('Settings');
+  if(!sh)throw new Error('指定したManagerにSettingsシートがありません。');
+  const n=sh.getLastRow();
+  if(n<2||n>5000)throw new Error('Manager Settingsの行数が想定範囲外です。');
+  const values=sh.getRange(1,1,n,Math.min(sh.getLastColumn(),4)).getDisplayValues(), settings={};
+  for(const row of values){const key=String(row[0]||'').trim();if(key&&!(key in settings))settings[key]=String(row[1]||'').trim();}
+  if(!settings.BlogName||settings.BlogName!==c.siteName)throw new Error('Managerのブログ名とS3の登録名が一致しません。');
+  if(!settings.SearchConsoleProperty||sssCanonicalProperty_(settings.SearchConsoleProperty)!==sssCanonicalProperty_(c.propertyUri))throw new Error('ManagerとS3のGSCプロパティが一致しません。');
+  if(!settings.BlogUrl)throw new Error('ManagerのBlogUrlが未設定です。');
+  const scope=sssP72PropertyScope_(c.propertyUri);
+  if(!scope||!sssP72WithinScope_(settings.BlogUrl,scope))throw new Error('ManagerのブログURLがS3のGSC対象範囲外です。');
+  return {blogName:settings.BlogName,blogUrl:settings.BlogUrl,managerSpreadsheetId:id};
+}
 function sssSetupDriveFolders(){
   const c=sssConfig_(),ui=SpreadsheetApp.getUi();
   if(!c.lockedAt)throw new Error('先にサイトの初回セットアップを完了してください。');
   const existing=sssDriveFolderMap_();
-  if(existing){sssDriveVerifyMap_(existing);ui.alert('保存先は設定済みです。\nSIMS ＞ '+existing.siteFolderName+' ＞ Strategist\n'+sssDriveGetFolder_(existing.strategistId).getUrl());return;}
+  if(existing){sssDriveVerifyMap_(existing);ui.alert('保存先は設定済みです。\nSIMS ＞ '+existing.siteFolderName+' ＞ Strategist\n'+sssDriveGetFolder_(existing.strategistId).getUrl()+'\n※既存の保存先は自動変更しません。新規収集には新しい開発用シートを使用してください。');return;}
   const run=sdscGetRun_();
   if(run&&['RUNNING','PAUSED_AUTO_RESUME','ERROR'].includes(run.status))throw new Error('収集が未完了です。完了後に保存先を設定してください。');
   if(ui.alert('ブログ別保存先を作成','マイドライブ直下のSIMSフォルダー内に「'+c.siteName+'」の専用保存先を作成します。既存ZIPは移動しません。\n続行しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
   const lock=LockService.getDocumentLock();if(!lock.tryLock(30000))throw new Error('別の設定処理が実行中です。');
   try{
     const old=sssDriveFolderMap_();if(old){sssDriveVerifyMap_(old);return;}
-    const root=sssDriveChild_(DriveApp.getRootFolder(),'SIMS');
-    // Site name is human-readable, immutable ID suffix disambiguates same-name blogs.
-    const safeName=c.siteName.replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
-    const folderName=safeName+' ['+c.siteId.slice(0,10)+']';
-    const site=sssDriveChild_(root,folderName),strat=sssDriveChild_(site,'Strategist');
+    // Do not create folders until the existing blog folder has been checked.
+    const safeName=c.siteName.replace(/[\\/:*?"<>|]/g,'-').trim().slice(0,75);
+    if(!safeName||safeName==='.'||safeName==='..')throw new Error('ブログ名から安全な保存先名を生成できません。');
+    const rootParent=DriveApp.getRootFolder();
+    const rootMatches=rootParent.getFoldersByName('SIMS');
+    let root=null;
+    if(rootMatches.hasNext()){root=rootMatches.next();if(rootMatches.hasNext())throw new Error('マイドライブ直下にSIMSフォルダーが複数あります。');}
+    let site=null,managerInfo=null;
+    if(root){
+      const matches=root.getFoldersByName(safeName);
+      if(matches.hasNext()){site=matches.next();if(matches.hasNext())throw new Error('同名のブログフォルダーが複数あります。');}
+    }
+    if(site){
+      const managers=site.getFoldersByName('Manager');
+      if(managers.hasNext()){
+        managers.next();if(managers.hasNext())throw new Error('Managerフォルダーが複数あります。');
+        const answer=ui.prompt('既存SBMブログの照合','「'+safeName+'」にはManagerフォルダーがあります。対象SBMのスプレッドシートIDを入力してください。設定値を照合し、不一致なら停止します。',ui.ButtonSet.OK_CANCEL);
+        if(answer.getSelectedButton()!==ui.Button.OK)return;
+        managerInfo=sssCheckManagerIdentityForSetup_(answer.getResponseText(),c);
+        if(ui.alert('既存ブログフォルダーを共用','Manager設定のブログ名・GSCプロパティ・URL範囲に矛盾はありません。\nブログURL：'+managerInfo.blogUrl+'\n\nこのフォルダーにS3用Strategistを作成しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+      }else{
+        // Without Manager metadata, a pre-existing folder cannot be safely adopted.
+        throw new Error('同名ブログフォルダーはありますが、Managerフォルダーがありません。自動的に共用せず停止しました。');
+      }
+      const existingStrategist=site.getFoldersByName('Strategist');
+      if(existingStrategist.hasNext())throw new Error('既存Strategistフォルダーがあります。上書き・自動共用を行いません。');
+    }
+    if(!root)root=rootParent.createFolder('SIMS');
+    if(!site)site=root.createFolder(safeName);
+    const folderName=safeName;
+    const strat=sssDriveChild_(site,'Strategist');
     const ev=sssDriveChild_(strat,'Evidence');
     const baseline=sssDriveChild_(ev,'Baseline'),delta=sssDriveChild_(ev,'Delta'),archive=sssDriveChild_(ev,'Archive');
     const reports=sssDriveChild_(strat,'Reports'),exp=sssDriveChild_(strat,'Export');
     const map={siteId:c.siteId,propertyUri:c.propertyUri,siteFolderName:folderName,rootId:root.getId(),siteIdFolder:site.getId(),strategistId:strat.getId(),evidenceId:ev.getId(),baselineId:baseline.getId(),deltaId:delta.getId(),archiveId:archive.getId(),reportsId:reports.getId(),exportId:exp.getId()};
     sssDriveVerifyMap_(map);
     sssProperties_().setProperty(SSS_DRIVE_PROP,JSON.stringify(map));
-    sssAudit_('DRIVE_FOLDERS_CONFIGURED',c.siteId,'strategistFolderId='+strat.getId());
+    sssAudit_('DRIVE_FOLDERS_CONFIGURED',c.siteId,'strategistFolderId='+strat.getId()+'; managerChecked='+(!!managerInfo));
     ui.alert('保存先を準備しました。\nSIMS ＞ '+folderName+' ＞ Strategist\n既存ZIPは移動していません。');
   }finally{lock.releaseLock();}
 }
@@ -3873,4 +3927,990 @@ function sssP59Status(){
 function sssP59StopAuto(){
  const ui=SpreadsheetApp.getUi();if(ui.alert('高速自動監査を停止','専用トリガーを削除します。監査進捗と既存ZIPは保持します。',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
  sssP59RemoveTriggers_();ui.alert('専用トリガーを停止しました。チェックポイントは保持されています。');
+}
+
+
+// v0.1.61: bound strategy preview storage to Apps Script property quota.
+// v0.1.61: read-only site strategy diagnostic from audited period aggregates.
+// No GSC API calls, ZIP writes, source mutation or UI use in background functions.
+const SSS_P60_KEY_='SSS_PERIOD_060_STRATEGY_V1';
+const SSS_P61_PROPERTY_LIMIT_=8500; // below the Apps Script 9KB per-value quota
+function sssP60Get_(){const x=sssProperties_().getProperty(SSS_P60_KEY_);return x?JSON.parse(x):null;}
+function sssP60Put_(x){
+ // DocumentProperties has a 9KB per-value limit. Persist a bounded preview only.
+ const data=JSON.parse(JSON.stringify(x));
+ let payload=JSON.stringify(data);
+ while(payload.length>SSS_P61_PROPERTY_LIMIT_ && data.top.length){
+  data.top.pop();payload=JSON.stringify(data);
+ }
+ if(payload.length>SSS_P61_PROPERTY_LIMIT_)throw new Error('診断結果の保存サイズが上限を超えました。');
+ sssProperties_().setProperty(SSS_P60_KEY_,payload);
+ return data.top.length;
+}
+function sssP60Rate_(a,b){return b>0?a/b:null;}
+function sssP60Metrics_(v){return {clicks:v.clicks,impressions:v.impressions,ctr:sssP60Rate_(v.clicks,v.impressions),position:sssP60Rate_(v.weighted,v.impressions)};}
+function sssP60Diagnostic_(current,baseline){
+ const c=sssP60Metrics_(current),b=sssP60Metrics_(baseline);
+ const clickRate=b.clicks>0?c.clicks/(b.clicks/2):null; // 30d vs prior 60d normalized to 30d
+ const impressionRate=b.impressions>0?c.impressions/(b.impressions/2):null;
+ const positionDelta=c.position!==null&&b.position!==null?c.position-b.position:null;
+ const ctrDelta=c.ctr!==null&&b.ctr!==null?c.ctr-b.ctr:null;
+ const eligible=c.impressions>=100&&b.impressions>=200;
+ const flags=[];
+ if(eligible){
+  if(clickRate!==null&&clickRate<=0.7)flags.push('CLICK_DECLINE');
+  if(impressionRate!==null&&impressionRate<=0.7)flags.push('IMPRESSION_DECLINE');
+  if(positionDelta!==null&&positionDelta>=3)flags.push('RANK_DECLINE');
+  if(impressionRate!==null&&impressionRate>=1.3&&clickRate!==null&&clickRate>=1.2)flags.push('GROWTH');
+  if(c.position!==null&&c.position>=3&&c.position<=15&&c.impressions>=300&&c.ctr<0.025)flags.push('CTR_OPPORTUNITY');
+ }
+ const priority=flags.includes('CLICK_DECLINE')||flags.includes('RANK_DECLINE')?'HIGH':flags.includes('IMPRESSION_DECLINE')||flags.includes('CTR_OPPORTUNITY')?'MEDIUM':flags.includes('GROWTH')?'GROWTH':'WATCH';
+ return {current:c,baseline60:b,clickRate,impressionRate,positionDelta,ctrDelta,eligible,flags,priority};
+}
+function sssP60BuildStrategy(){
+ const ui=SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
+ if(!lock.tryLock(1000)){ui.alert('別の処理が実行中です。');return;}
+ try{
+  const audit=sssP58Get_(),reduction=sssP53Get_(),partial=sssPeriod51State_();
+  if(!audit||audit.status!=='PASSED'||audit.next!==73||!reduction||reduction.status!=='COMPLETED'||!reduction.final||!partial||partial.status!=='PARTIALS_COMPLETED'||audit.signature!==reduction.signature||audit.finalId!==reduction.final.id||partial.signature!==reduction.signature)throw new Error('最終ZIP品質監査 PASSED と対象データの整合が必要です。');
+  const file=DriveApp.getFileById(reduction.final.id);
+  if(file.isTrashed()||file.getName()!==reduction.final.name)throw new Error('最終ZIPの参照が変わりました。');
+  const result=sssP53Read_(reduction.final,reduction.signature,reduction.siteId);
+  const current=result.maps[30],ninety=result.maps[90];
+  const diagnostics=[],totals={current:{rows:0,clicks:0,impressions:0,weighted:0},baseline:{rows:0,clicks:0,impressions:0,weighted:0}};
+  const keys=new Set([...current.keys(),...ninety.keys()]);
+  for(const page of keys){
+   const c=current.get(page)||sssP58Blank_(),n=ninety.get(page)||sssP58Blank_();
+   const b={rows:n.rows-c.rows,clicks:n.clicks-c.clicks,impressions:n.impressions-c.impressions,weighted:n.weighted-c.weighted};
+   if(b.rows<0||b.clicks<0||b.impressions<0||b.impressions<b.clicks||b.weighted< -0.001)throw new Error('30日と90日の差分が不正です: '+page);
+   const d=sssP60Diagnostic_(c,b);diagnostics.push({page,...d});
+   for(const k of ['rows','clicks','impressions','weighted']){totals.current[k]+=c[k];totals.baseline[k]+=b[k];}
+  }
+  for(const k of ['rows','clicks','impressions']){
+   if(totals.current[k]!==result.totals[30][k]||totals.current[k]+totals.baseline[k]!==result.totals[90][k])throw new Error('集計照合不一致: '+k);
+  }
+  const rank={HIGH:0,MEDIUM:1,GROWTH:2,WATCH:3};
+  diagnostics.sort((a,b)=>rank[a.priority]-rank[b.priority]||b.current.clicks-a.current.clicks||a.page.localeCompare(b.page));
+  const counts={HIGH:0,MEDIUM:0,GROWTH:0,WATCH:0};diagnostics.forEach(x=>counts[x.priority]++);
+  const output={schema:'s3.strategy.preview.v1',status:'READY',siteId:reduction.siteId,signature:reduction.signature,finalId:reduction.final.id,periodEnd:partial.periodEnd||sssDM365State_().end,generatedAt:new Date().toISOString(),counts,pageCount:diagnostics.length,totals,top:diagnostics.slice(0,12).map(x=>({page:x.page,priority:x.priority,flags:x.flags,current:x.current,baseline60:x.baseline60,clickRate:x.clickRate,impressionRate:x.impressionRate,positionDelta:x.positionDelta})),limitations:['30日と直前60日を日数補正して比較。季節性・検索需要変化は未調整。','平均順位はページ内の表示回数加重平均。クエリ構成の変化による影響を含む。','CTR改善候補は探索的な閾値判定であり改善効果の保証ではない。','この診断は保存済みZIPを読み取るのみ。サイトや記事は更新しない。']};
+  // Keep property size bounded; never persist all page-level records.
+  const savedCount=sssP60Put_(output);
+  ui.alert('サイト戦略診断（読取専用）\n状態：READY\nページ数：'+output.pageCount+'\n優先確認：'+counts.HIGH+'件\n改善機会：'+counts.MEDIUM+'件\n成長候補：'+counts.GROWTH+'件\n経過観察：'+counts.WATCH+'件\n上位'+savedCount+'件を保存しました。結果確認メニューをご利用ください。\n※これは探索的診断です。');
+ }catch(e){ui.alert('サイト戦略診断を生成できませんでした：'+String(e.message||e));}
+ finally{lock.releaseLock();}
+}
+// v0.1.62: Japanese diagnostic explanation and auditable 30d-equivalent metrics.
+// Presentation-only change: no recomputation, source writes, or automatic article edits.
+function sssP62Num_(n,d){return typeof n==='number'&&isFinite(n)?n.toLocaleString('ja-JP',{minimumFractionDigits:d===undefined?0:d,maximumFractionDigits:d===undefined?0:d}):'データ不足';}
+function sssP62Pct_(n){return typeof n==='number'&&isFinite(n)?(n*100).toFixed(2)+'%':'データ不足';}
+function sssP62Label_(x){return ({HIGH:'優先確認',MEDIUM:'改善機会',GROWTH:'成長候補',WATCH:'経過観察'})[x]||'判定保留';}
+function sssP62Reasons_(flags){
+ const map={CLICK_DECLINE:'クリック数が減少',IMPRESSION_DECLINE:'表示回数が減少',RANK_DECLINE:'平均掲載順位が低下',GROWTH:'クリック数と表示回数が増加',CTR_OPPORTUNITY:'CTR改善余地の候補'};
+ return (flags||[]).map(x=>map[x]||'未定義の診断コード').join('／')||'特記事項なし';
+}
+function sssP62Advice_(x){
+ const f=x.flags||[];
+ if(f.includes('IMPRESSION_DECLINE'))return '検索需要・露出・季節性を確認。';
+ if(f.includes('RANK_DECLINE'))return '主要クエリと競合・順位推移を確認。';
+ if(f.includes('CTR_OPPORTUNITY'))return '検索意図とタイトル・説明文の適合を確認。';
+ if(f.includes('CLICK_DECLINE'))return 'クリック減少の要因をクエリ別に確認。';
+ if(f.includes('GROWTH'))return '伸びている検索意図と関連ページを確認。';
+ return '追加の観察を推奨。';
+}
+function sssP60ShowStrategy(){
+ const ui=SpreadsheetApp.getUi(),s=sssP60Get_();if(!s){ui.alert('診断結果がありません。先に診断を生成してください。');return;}
+ const r=sssP53Get_(),a=sssP58Get_();if(!r||!a||a.status!=='PASSED'||!r.final||s.finalId!==r.final.id||s.signature!==r.signature){ui.alert('診断結果が現在の検証済みデータと一致しません。再生成してください。');return;}
+ const lines=(s.top||[]).slice(0,5).map((x,i)=>{
+  const c=x.current||{},b=x.baseline60||{};
+  return (i+1)+'. 【'+sssP62Label_(x.priority)+'】 '+x.page+'\n'+
+   '理由：'+sssP62Reasons_(x.flags)+'\n'+
+   'クリック：直近30日 '+sssP62Num_(c.clicks)+' / 前60日の30日換算 '+sssP62Num_(typeof b.clicks==='number'?b.clicks/2:null,1)+'\n'+
+   '表示回数：'+sssP62Num_(c.impressions)+' / '+sssP62Num_(typeof b.impressions==='number'?b.impressions/2:null,1)+'\n'+
+   'CTR：'+sssP62Pct_(c.ctr)+' / '+sssP62Pct_(b.ctr)+'\n'+
+   '平均順位：'+sssP62Num_(c.position,1)+' / '+sssP62Num_(b.position,1)+'\n'+
+   '確認方針：'+sssP62Advice_(x)+'\n※改善の実施判断ではなく調査候補です。';
+ });
+ ui.alert('サイト戦略診断：'+s.status+'\n基準日：'+s.periodEnd+'\n対象ページ：'+s.pageCount+'\n優先確認：'+s.counts.HIGH+' / 改善機会：'+s.counts.MEDIUM+' / 成長候補：'+s.counts.GROWTH+'\n\n優先候補（上位'+lines.length+'件）\n\n'+(lines.join('\n\n')||'該当なし')+'\n\n※前60日のクリック・表示回数は2で割った30日換算値です。CTR・平均順位は前60日の実測値です。季節性・検索需要・クエリ構成は未補正。数値のみで記事修正を決定しないでください。');
+}
+
+// v0.1.64: site-level, read-only descriptive comparison of the persisted audit-backed preview.
+// No API calls, no Drive writes, no article edits, no diagnosis reclassification.
+function sssP64ShowSiteSummary(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const s=sssP60Get_(),r=sssP53Get_(),a=sssP58Get_();
+  if(!s||s.status!=='READY')throw new Error('先にサイト戦略診断を生成してください。');
+  if(!r||!r.final||!a||a.status!=='PASSED'||s.finalId!==r.final.id||s.signature!==r.signature||s.siteId!==r.siteId)throw new Error('診断結果が現在の監査済みデータと一致しません。');
+  const t=s.totals||{},c=t.current,b=t.baseline;
+  if(!c||!b||!Number.isFinite(c.clicks)||!Number.isFinite(b.clicks)||!Number.isFinite(c.impressions)||!Number.isFinite(b.impressions))throw new Error('診断結果に比較用の集計値がありません。');
+  const pct=(n,d)=>d>0?((n/d-1)*100).toFixed(1)+'%':'比較不可（前期間0）';
+  const cCtr=c.impressions>0?c.clicks/c.impressions:null,bCtr=b.impressions>0?b.clicks/b.impressions:null;
+  const cPos=c.impressions>0?c.weighted/c.impressions:null,bPos=b.impressions>0?b.weighted/b.impressions:null;
+  const fmt=n=>sssP62Num_(n,1),rate=n=>sssP62Pct_(n);
+  ui.alert('サイト全体の傾向（読取専用）\n基準日：'+s.periodEnd+'\n対象ページ：'+s.pageCount+'\n\n直近30日 / 前60日を30日換算\nクリック：'+fmt(c.clicks)+' / '+fmt(b.clicks/2)+'（変化 '+pct(c.clicks,b.clicks/2)+'）\n表示回数：'+fmt(c.impressions)+' / '+fmt(b.impressions/2)+'（変化 '+pct(c.impressions,b.impressions/2)+'）\nCTR：'+rate(cCtr)+' / '+rate(bCtr)+'\n平均順位：'+fmt(cPos)+' / '+fmt(bPos)+'\n\n優先確認：'+s.counts.HIGH+'件、改善機会：'+s.counts.MEDIUM+'件、成長候補：'+s.counts.GROWTH+'件\n\n※全ページ集計の記述的比較です。CTR・順位は実測値で、前60日を2で割りません。季節性・検索需要・クエリ構成は未補正。原因や改善効果は確定できません。');
+ }catch(e){ui.alert('サイト全体の傾向を表示できません：'+String(e.message||e));}
+}
+
+// v0.1.66: exploratory site-level action priorities based solely on audited, persisted preview.
+// Read-only: no GSC requests, Drive writes, property mutations, triggers or article edits.
+function sssP65Evaluate_(s){
+ if(!s||s.status!=='READY'||!s.totals||!s.counts)throw new Error('診断結果が未生成です。');
+ const c=s.totals.current,b=s.totals.baseline;
+ if(!c||!b||!Number.isFinite(c.clicks)||!Number.isFinite(b.clicks)||!Number.isFinite(c.impressions)||!Number.isFinite(b.impressions)||c.clicks<0||b.clicks<0||c.impressions<0||b.impressions<0)throw new Error('比較数値が不正です。');
+ const n=Number(s.pageCount),counts=s.counts;
+ if(!Number.isInteger(n)||n<0||['HIGH','MEDIUM','GROWTH','WATCH'].some(k=>!Number.isInteger(counts[k])||counts[k]<0)||counts.HIGH+counts.MEDIUM+counts.GROWTH+counts.WATCH!==n)throw new Error('分類件数が一致しません。');
+ const clickRatio=b.clicks>0?c.clicks/(b.clicks/2):null;
+ const impressionRatio=b.impressions>0?c.impressions/(b.impressions/2):null;
+ const ctrNow=c.impressions>0?c.clicks/c.impressions:null;
+ const ctrPrev=b.impressions>0?b.clicks/b.impressions:null;
+ const suggestions=[];
+ if(clickRatio!==null&&clickRatio<0.8){
+  suggestions.push({name:'検索流入減少の要因を切り分ける',why:'サイト全体のクリック数が比較期間の80%未満',next:'GSCの主要クエリ・ページ別で需要、露出、CTR、順位の変化を確認。'});
+ }
+ if(impressionRatio!==null&&impressionRatio<0.8){
+  suggestions.push({name:'検索露出の減少を確認する',why:'サイト全体の表示回数が比較期間の80%未満',next:'主要クエリの検索需要と掲載順位の変化、インデックス状況を確認。'});
+ }
+ if(ctrNow!==null&&ctrPrev!==null&&ctrNow<ctrPrev*0.8&&c.impressions>=1000){
+  suggestions.push({name:'検索結果での訴求を点検する',why:'サイト全体のCTRが比較期間より相対的に20%以上低下',next:'上位表示ページの検索意図とタイトル・説明文を確認。クエリ構成の変化に注意。'});
+ }
+ if(counts.HIGH>0){suggestions.push({name:'優先確認候補を精査する',why:'優先確認候補 '+counts.HIGH+'件',next:'上位候補のクエリ別推移とManagerの作業状態を確認し、重複改修を避ける。'});}
+ if(counts.GROWTH>0){suggestions.push({name:'成長ページの横展開を検討する',why:'成長候補 '+counts.GROWTH+'件',next:'伸びた検索意図を確認し、関連記事・内部リンクの余地を調査。'});}
+ if(counts.MEDIUM>0){suggestions.push({name:'改善機会を絞り込む',why:'改善機会候補 '+counts.MEDIUM+'件',next:'表示回数、順位、CTR、検索意図を確認し効果見込みを比較。'});}
+ if(!suggestions.length)suggestions.push({name:'定期観察を続ける',why:'現行の探索条件で明確な優先候補なし',next:'次回のデータ更新後に再評価。'});
+ return {suggestions:suggestions.slice(0,4),clickRatio,impressionRatio};
+}
+function sssP65ShowPriorities(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const s=sssP60Get_(),r=sssP53Get_(),a=sssP58Get_();
+  if(!s||!r||!r.final||!a||a.status!=='PASSED'||s.finalId!==r.final.id||s.signature!==r.signature||s.siteId!==r.siteId)throw new Error('監査PASSEDの最新診断結果が必要です。');
+  const out=sssP65Evaluate_(s);
+  const rows=out.suggestions.map((x,i)=>(i+1)+'. '+x.name+'\n根拠：'+x.why+'\n次の確認：'+x.next);
+  ui.alert('サイト戦略・優先施策（探索的提案／読取専用）\n基準日：'+s.periodEnd+'\n対象ページ：'+s.pageCount+'\n\n'+rows.join('\n\n')+'\n\n※順位は仮の確認順です。季節性・検索需要・クエリ構成は未補正。Managerの作業状態は未取得。記事の修正・公開は行いません。');
+ }catch(e){ui.alert('優先施策を表示できません：'+String(e.message||e));}
+}
+
+
+// v0.1.66: transparent impact-oriented triage of stored strategy candidates.
+// No Manager status is inferred. This is not a traffic forecast or a directive to edit articles.
+function sssP66Impact_(x){
+ const c=x.current||{},b=x.baseline60||{};
+ const clicks=Number(c.clicks),prior60=Number(b.clicks),imps=Number(c.impressions);
+ if(!Number.isFinite(clicks)||!Number.isFinite(prior60)||!Number.isFinite(imps)||clicks<0||prior60<0||imps<0)return null;
+ const baseline30=prior60/2;
+ const decline=Math.max(0,baseline30-clicks);
+ return {decline,clicks,imps,baseline30,needsManagerCheck:true};
+}
+function sssP66ShowImpact(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const s=sssP60Get_(),r=sssP53Get_(),a=sssP58Get_();
+  if(!s||s.status!=='READY'||!r||!r.final||!a||a.status!=='PASSED'||s.finalId!==r.final.id||s.signature!==r.signature||s.siteId!==r.siteId)throw new Error('監査PASSEDの診断結果が必要です。');
+  const rows=(s.top||[]).map(x=>({x,impact:sssP66Impact_(x)})).filter(v=>v.impact!==null);
+  rows.sort((a,b)=>b.impact.decline-a.impact.decline||b.impact.imps-a.impact.imps||a.x.page.localeCompare(b.x.page));
+  const lines=rows.slice(0,5).map((v,i)=>(i+1)+'. '+v.x.page+'\n分類：'+sssP62Label_(v.x.priority)+' / '+sssP62Reasons_(v.x.flags)+'\nクリック：直近30日 '+sssP62Num_(v.impact.clicks)+'、前60日30日換算 '+sssP62Num_(v.impact.baseline30,1)+'\n減少幅の参考値：'+sssP62Num_(v.impact.decline,1)+'クリック / 表示回数：'+sssP62Num_(v.impact.imps)+'\n次の確認：クエリ別変化とManager作業状態');
+  ui.alert('サイト戦略・影響度の確認（読取専用）\n基準日：'+s.periodEnd+'\n保存済み候補：'+(s.top||[]).length+'件（全'+s.pageCount+'ページではありません）\n\n'+(lines.join('\n\n')||'有効な候補なし')+'\n\n※減少幅は過去60日の30日換算との差であり、回復可能クリック数の予測ではありません。季節性・需要変化は未補正。Manager作業状態は未取得のため、改善中・モニター中の除外は未実施です。');
+ }catch(e){ui.alert('影響度の表示に失敗：'+String(e.message||e));}
+}
+
+
+/** Read-only assessment: never relocate ZIPs or rewrite a registered folder binding. */
+function sssPreviewBlogFolderUnification(){
+  const ui=SpreadsheetApp.getUi(),c=sssConfig_();
+  if(!c.lockedAt)throw new Error('先にサイトの初回セットアップを完了してください。');
+  const name=c.siteName.replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  const m=sssDriveFolderMap_();
+  if(!m){ui.alert('保存先の確認','保存先は未設定です。新規設定では SIMS ＞ '+name+' ＞ Strategist を使用します。既存の同名ブログとの照合は未実施です。',ui.ButtonSet.OK);return;}
+  sssDriveVerifyMap_(m);
+  if(m.siteFolderName===name){ui.alert('保存先の確認','既にブログ名のみの保存先です。\nSIMS ＞ '+name+' ＞ Strategist\n既存データは変更していません。',ui.ButtonSet.OK);return;}
+  const root=sssDriveGetFolder_(m.rootId),it=root.getFoldersByName(name);
+  let n=0;while(it.hasNext()){it.next();n++;}
+  ui.alert('保存先の統一：事前確認',
+    '現在：SIMS ＞ '+m.siteFolderName+' ＞ Strategist\n目標：SIMS ＞ '+name+' ＞ Strategist\n目標ブログ名フォルダーの検出数：'+n+'\n\n既存データの移動・保存先IDの変更は行っていません。\n'+
+    (n>1?'同名フォルダーが複数あるため統一を停止する必要があります。':
+    n===1?'既存SBMフォルダーとのサイト照合が必要です。':'新規フォルダー作成前に既存データの移行計画が必要です。'),ui.ButtonSet.OK);
+}
+
+
+/** P68: migration preflight is strictly read-only. No folder creation or property mutation. */
+function sssAuditFolderMigration(){
+ const ui=SpreadsheetApp.getUi();
+ try {
+  const c=sssConfig_();if(!c.lockedAt)throw new Error('サイト初回セットアップが必要です。');
+  const m=sssDriveFolderMap_();if(!m)throw new Error('S3保存先が未設定です。');
+  sssDriveVerifyMap_(m);
+  const root=sssDriveGetFolder_(m.rootId);
+  const safe=c.siteName.replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  const matches=root.getFoldersByName(safe),targets=[];
+  while(matches.hasNext())targets.push(matches.next());
+  const current=sssDriveGetFolder_(m.siteIdFolder);
+  const strat=sssDriveGetFolder_(m.strategistId);
+  const report=[];
+  report.push('サイト：'+c.siteName);
+  report.push('現在：SIMS ＞ '+current.getName()+' ＞ Strategist');
+  report.push('目標：SIMS ＞ '+safe+' ＞ Strategist');
+  report.push('目標ブログ名フォルダー：'+targets.length+'件');
+  if(targets.length>1)report.push('判定：停止（同名フォルダーが複数）');
+  else if(targets.length===0)report.push('判定：要確認（目標フォルダーなし）');
+  else if(targets[0].getId()===current.getId())report.push('判定：既に統一済み（移行不要）');
+  else {
+   const it=targets[0].getFoldersByName('Strategist');let count=0;while(it.hasNext()){it.next();count++;}
+   report.push('目標側Strategistフォルダー：'+count+'件');
+   report.push('判定：移行前の手動照合が必要（サイトURL・所有者・既存ファイルを確認）');
+  }
+  const keys=[['Evidence',m.evidenceId],['Baseline',m.baselineId],['Delta',m.deltaId],['Archive',m.archiveId],['Reports',m.reportsId],['Export',m.exportId]];
+  keys.forEach(function(k){const folder=sssDriveGetFolder_(k[1]);let n=0;const files=folder.getFiles();while(files.hasNext()){files.next();n++;}report.push(k[0]+'：直下'+n+'ファイル');});
+  report.push('※サブフォルダー内のファイル数は含みません。');
+  report.push('※Managerとの同一サイト判定は未実施です。');
+  report.push('※移動・作成・削除・保存先設定の変更は一切行いません。');
+  ui.alert('S3保存先・移行前監査',report.join('\n'),ui.ButtonSet.OK);
+ }catch(e){ui.alert('移行前監査：'+String(e.message||e));}
+}
+
+
+/** P69: explicit one-shot read-only Manager preview; no stored spreadsheet IDs, no Drive writes. */
+function sssP69ManagerPreview(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_();if(!c.lockedAt||!c.propertyUri)throw new Error('S3サイト固定が必要です。');
+  const answer=ui.prompt('Manager連携・事前確認（読取専用）','同じブログのSBMスプレッドシートIDを入力してください。IDは保存しません。記事管理の先頭行と件数だけを確認します。',ui.ButtonSet.OK_CANCEL);
+  if(answer.getSelectedButton()!==ui.Button.OK)return;
+  const id=String(answer.getResponseText()||'').trim();
+  if(!/^[a-zA-Z0-9_-]{25,120}$/.test(id))throw new Error('スプレッドシートIDの形式が正しくありません。');
+  const manager=SpreadsheetApp.openById(id),sh=manager.getSheetByName('記事管理');
+  if(!sh||sh.getLastRow()<2)throw new Error('Managerの記事管理シートまたは記事データがありません。');
+  const n=sh.getLastColumn(),headers=sh.getRange(1,1,1,n).getDisplayValues()[0].map(x=>String(x).trim());
+  const required=['記事URL','ArticleID','作業状態'];
+  for(const key of required)if(headers.indexOf(key)<0)throw new Error('Manager記事管理の必須列がありません：'+key);
+  const titleKey=headers.indexOf('記事タイトル')>=0?'記事タイトル':headers.indexOf('H1タイトル')>=0?'H1タイトル':'';
+  if(!titleKey)throw new Error('記事タイトル列がありません。');
+  const urlCol=headers.indexOf('記事URL')+1,rows=sh.getLastRow()-1;
+  // Sample a bounded number of URL cells. Never treat a sample as proof of site ownership.
+  const sample=sh.getRange(2,urlCol,Math.min(rows,200),1).getDisplayValues().map(x=>String(x[0]).trim()).filter(Boolean);
+  let target='';
+  const prop=String(c.propertyUri);
+  if(prop.indexOf('sc-domain:')===0)target=prop.substring(10).toLowerCase();
+  else {const m=/^https?:\/\/([^\/:?#]+)/i.exec(prop);if(m)target=m[1].toLowerCase();}
+  if(!target)throw new Error('S3のGSCプロパティからドメインを判定できません。');
+  let matches=0,foreign=0,invalid=0;
+  for(const u of sample){const m=/^https?:\/\/([^\/:?#]+)/i.exec(u);if(!m){invalid++;continue;}const host=m[1].toLowerCase();if(host===target||host.endsWith('.'+target))matches++;else foreign++;}
+  const verdict=foreign>0?'停止：別ドメインの記事URLを検出':matches===0?'保留：同一ドメインを確認できない':'仮確認：同一ドメインのURLを検出（サイト一致の確定ではありません）';
+  ui.alert('Manager連携・読取専用監査',
+    'S3サイト：'+c.siteName+'\nGSCプロパティ：'+c.propertyUri+'\nManager：'+manager.getName()+'\n記事管理：'+rows+'行\nタイトル列：'+titleKey+'\nURL検査：最大200行\n同一ドメイン：'+matches+'件／別ドメイン：'+foreign+'件／形式不明：'+invalid+'件\n判定：'+verdict+'\n\n記事ID・状態の取得に必要な列を確認しました。\nこの処理は読み取りのみです。IDは保存せず、フォルダー移行・改善候補の除外は行いません。',ui.ButtonSet.OK);
+ }catch(e){ui.alert('Manager連携・事前確認：'+String(e.message||e));}
+}
+
+/** P70: One-shot bounded URL matching audit; never stores Manager ID or changes strategy candidates. */
+function sssP70NormalizeUrl_(raw){
+  const value=String(raw||'').trim();
+  if(!/^https?:\/\//i.test(value))return '';
+  // Refuse URLs with userinfo or nonstandard ports rather than silently matching a different origin.
+  const m=/^https?:\/\/([^\/?#]+)(\/[^?#]*)?(?:[?#].*)?$/i.exec(value);
+  if(!m||m[1].includes('@'))return '';
+  const host=m[1].toLowerCase().replace(/:80$|:443$/,'');
+  if(!/^[a-z0-9.-]+$/.test(host)||host.startsWith('.')||host.endsWith('.'))return '';
+  let path=(m[2]||'/').replace(/\/{2,}/g,'/');
+  if(path!=='/')path=path.replace(/\/+$/,'');
+  return host+path;
+}
+function sssP70AuditManagerMatches(){
+  const ui=SpreadsheetApp.getUi();
+  try{
+    const c=sssConfig_();if(!c.lockedAt||!c.propertyUri)throw new Error('S3サイト固定が必要です。');
+    const data=sssP60Get_(),period=sssP53Get_(),audit=sssP58Get_();
+    if(!data||data.status!=='READY'||!Array.isArray(data.top)||!data.top.length||
+       !period||!period.final||!audit||audit.status!=='PASSED'||
+       data.finalId!==period.final.id||data.signature!==period.signature||data.siteId!==period.siteId||
+       data.siteId!==c.siteId)throw new Error('最新の監査PASSEDデータと一致する戦略診断が必要です。監査と診断を再実行してください。');
+    const ans=ui.prompt('Managerと戦略候補の照合監査','同じサイトのManagerスプレッドシートIDを入力してください（保存しません）。記事管理と戦略候補を読み取り照合します。',ui.ButtonSet.OK_CANCEL);
+    if(ans.getSelectedButton()!==ui.Button.OK)return;
+    const id=String(ans.getResponseText()||'').trim();if(!/^[A-Za-z0-9_-]{25,120}$/.test(id))throw new Error('スプレッドシートIDの形式が不正です。');
+    const book=SpreadsheetApp.openById(id),sheet=book.getSheetByName('記事管理');
+    if(!sheet)throw new Error('記事管理シートがありません。');
+    const count=sheet.getLastRow()-1;if(count<1||count>10000)throw new Error('記事管理行数が検査上限外です（1～10,000行）。分割方式の実装が必要です。');
+    const cols=sheet.getLastColumn(),values=sheet.getRange(1,1,count+1,cols).getDisplayValues();
+    const h=values.shift().map(x=>String(x).trim());
+    const col={};for(const name of ['記事URL','ArticleID','作業状態']){col[name]=h.indexOf(name);if(col[name]<0)throw new Error('必須列なし：'+name);}
+    const title=h.indexOf('記事タイトル')>=0?h.indexOf('記事タイトル'):h.indexOf('H1タイトル');
+    if(title<0)throw new Error('タイトル列がありません。');
+    const scope=sssP72PropertyScope_(c.propertyUri);
+    if(!scope)throw new Error('GSCプロパティの範囲を確認できません。照合を停止しました。');
+    const index={};let foreign=0,invalid=0,duplicates=0;
+    for(const row of values){const raw=row[col['記事URL']],key=sssP70NormalizeUrl_(raw);
+      if(!key){if(String(raw).trim())invalid++;continue;}
+      if(!sssP72WithinScope_(raw,scope)){foreign++;continue;}
+      if(index[key]){duplicates++;index[key].duplicate=true;continue;}
+      index[key]={id:row[col.ArticleID],title:row[title],state:row[col['作業状態']],duplicate:false};
+    }
+    if(foreign)throw new Error('別ドメインの記事URLを'+foreign+'件検出。照合を停止しました。');
+    if(invalid)throw new Error('形式不明の記事URLを'+invalid+'件検出。照合を停止しました（空欄は除外）。');
+    let matched=0,unmatched=0,ambiguous=0,hold=0,eligible=0,unknown=0;const lines=[];
+    for(const item of data.top){if(!sssP72WithinScope_(item.page,scope))throw new Error('S3戦略候補がGSCプロパティ範囲外です。照合を停止しました。');const key=sssP70NormalizeUrl_(item.page);const found=index[key];
+      if(!found){unmatched++;continue;}
+      if(found.duplicate){ambiguous++;continue;}
+      matched++;const state=String(found.state||'').trim();
+      const blocked=/改善中|モニター中|モニタ中/.test(state);
+      if(blocked)hold++;else if(state==='未着手')eligible++;else unknown++;
+      if(lines.length<5)lines.push('・'+String(found.id||'ID未登録')+'／'+state+'／'+String(found.title||'タイトル未登録').slice(0,32));
+    }
+    const status=duplicates?'要確認（重複URLあり。該当候補は保留）':'照合監査完了（サイト所有権の確定ではありません）';
+    ui.alert('Manager・戦略候補の照合結果',
+      'Manager：'+book.getName()+'\n記事管理：'+count+'行\n保存済みS3候補：'+data.top.length+'件\n一致：'+matched+'件／未一致：'+unmatched+'件／重複で保留：'+ambiguous+'件\n一致内：改善中・モニター中 '+hold+'件／未着手 '+eligible+'件／その他 '+unknown+'件\nManager URL重複：'+duplicates+'件／形式不明：'+invalid+'件\n判定：'+status+'\n\n'+lines.join('\n')+'\n\n※今回の検査は保存済みプレビュー候補のみ。実際の除外・書込・ファイル移動は行いません。',ui.ButtonSet.OK);
+  }catch(e){ui.alert('Manager照合監査：'+String(e.message||e));}
+}
+
+/** Domain property covers host and subdomains; URL-prefix property covers exact scheme, host, port and path prefix. */
+function sssP72PropertyScope_(uri){
+  const value=String(uri||'').trim();
+  if(/^sc-domain:/i.test(value)){
+    const host=value.slice(10).toLowerCase().replace(/\.$/,'');
+    return /^[a-z0-9.-]+$/.test(host)&&host.indexOf('.')>0?{kind:'domain',host:host}:null;
+  }
+  try{
+    const u=new URL(value);
+    if(!/^https?:$/.test(u.protocol)||u.username||u.password||!u.hostname)return null;
+    return {kind:'prefix',origin:u.origin.toLowerCase(),path:u.pathname||'/',query:u.search||''};
+  }catch(e){return null;}
+}
+function sssP72WithinScope_(raw,scope){
+  try{
+    const u=new URL(String(raw||'').trim());
+    if(!/^https?:$/.test(u.protocol)||u.username||u.password)return false;
+    const host=u.hostname.toLowerCase().replace(/\.$/,'');
+    if(scope.kind==='domain')return host===scope.host||host.endsWith('.'+scope.host);
+    if(u.origin.toLowerCase()!==scope.origin)return false;
+    // GSC URL-prefix property uses literal prefix matching, including optional query.
+    return (u.pathname+u.search).startsWith(scope.path+scope.query);
+  }catch(e){return false;}
+}
+
+
+/** v0.1.73: Live read-only Manager state view. No persisted Manager ID, no write or auto-exclusion. */
+function sssP73ShowManagerCandidates(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_(),s=sssP60Get_(),r=sssP53Get_(),a=sssP58Get_();
+  if(!c.lockedAt||!c.propertyUri||!s||s.status!=='READY'||!Array.isArray(s.top)||!s.top.length||
+     !r||!r.final||!a||a.status!=='PASSED'||s.finalId!==r.final.id||s.signature!==r.signature||s.siteId!==r.siteId||s.siteId!==c.siteId)
+   throw new Error('現在の監査済みデータと一致する戦略診断が必要です。');
+  const scope=sssP72PropertyScope_(c.propertyUri);
+  if(!scope)throw new Error('GSCプロパティの範囲を確認できません。');
+  const response=ui.prompt('Manager対応状況つき戦略候補','同じサイトのManagerスプレッドシートIDを入力してください（保存しません）。',ui.ButtonSet.OK_CANCEL);
+  if(response.getSelectedButton()!==ui.Button.OK)return;
+  const id=String(response.getResponseText()||'').trim();
+  if(!/^[A-Za-z0-9_-]{25,120}$/.test(id))throw new Error('スプレッドシートIDの形式が不正です。');
+  const sh=SpreadsheetApp.openById(id).getSheetByName('記事管理');
+  if(!sh)throw new Error('記事管理シートがありません。');
+  const n=sh.getLastRow()-1;
+  if(n<1||n>10000)throw new Error('記事管理の行数が検査上限外です。');
+  const rows=sh.getRange(1,1,n+1,sh.getLastColumn()).getDisplayValues();
+  const h=rows.shift().map(x=>String(x).trim());
+  const col={};for(const key of ['記事URL','ArticleID','作業状態']){col[key]=h.indexOf(key);if(col[key]<0)throw new Error('必須列なし：'+key);}
+  const ti=h.indexOf('記事タイトル')>=0?h.indexOf('記事タイトル'):h.indexOf('H1タイトル');
+  if(ti<0)throw new Error('記事タイトル列がありません。');
+  const map=new Map();let foreign=0,invalid=0;
+  for(const row of rows){
+   const raw=String(row[col['記事URL']]||'').trim();if(!raw)continue;
+   const key=sssP70NormalizeUrl_(raw);
+   if(!key){invalid++;continue;}
+   if(!sssP72WithinScope_(raw,scope)){foreign++;continue;}
+   if(map.has(key)){map.get(key).duplicate=true;continue;}
+   map.set(key,{id:row[col.ArticleID],title:row[ti],state:String(row[col['作業状態']]||'').trim(),duplicate:false});
+  }
+  if(foreign||invalid)throw new Error('Manager内に範囲外URL '+foreign+'件、形式不明URL '+invalid+'件。照合を停止しました。');
+  const lines=[];let blocked=0,ready=0,review=0;
+  for(const x of s.top.slice(0,8)){
+   if(!sssP72WithinScope_(x.page,scope))throw new Error('戦略候補にプロパティ範囲外のURLがあります。');
+   const key=sssP70NormalizeUrl_(x.page),v=map.get(key);
+   let label='未照合・要確認';
+   if(v&&!v.duplicate){
+    if(/改善中|モニター中|モニタ中/.test(v.state)){label='Manager対応中・新規改善提案は保留';blocked++;}
+    else if(v.state==='未着手'){label='候補（実施前に再確認）';ready++;}
+    else {label='状態確認が必要（'+(v.state||'空欄')+'）';review++;}
+   }else {label=v&&v.duplicate?'URL重複・保留':'未照合・要確認';review++;}
+   lines.push((lines.length+1)+'. '+sssP62Label_(x.priority)+'／'+label+'\n'+
+     (v&&!v.duplicate?String(v.id||'IDなし')+' '+String(v.title||'タイトルなし').slice(0,45)+'\n':'')+x.page);
+  }
+  ui.alert('Manager対応状況つき戦略候補',
+   '対象：保存済み上位'+lines.length+'件\n対応中：'+blocked+'件／未着手：'+ready+'件／確認待ち：'+review+'件\n\n'+lines.join('\n\n')+
+   '\n\n※Managerの状態は表示時に読み取り。記事修正・候補削除・ファイル移動・ID保存は行いません。',ui.ButtonSet.OK);
+ }catch(e){ui.alert('Manager対応状況つき戦略候補：'+String(e.message||e));}
+}
+
+
+/** P74: recursive, read-only inventory. Never creates folders or changes bindings. */
+function sssP74MigrationInventory(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_(),m=sssDriveFolderMap_();
+  if(!c.lockedAt||!m)throw new Error('サイト固定と保存先設定が必要です。');
+  sssDriveVerifyMap_(m);
+  const root=sssDriveGetFolder_(m.rootId),source=sssDriveGetFolder_(m.strategistId);
+  const safe=c.siteName.replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  const it=root.getFoldersByName(safe),sites=[];
+  while(it.hasNext())sites.push(it.next());
+  if(sites.length!==1)throw new Error('目標ブログ名フォルダーが'+sites.length+'件です。統合前に確認してください。');
+  const targetSite=sites[0];
+  if(targetSite.getId()===sssDriveGetFolder_(m.siteIdFolder).getId()){
+   ui.alert('全階層監査','既にブログ名フォルダーを利用しています。移行不要です。',ui.ButtonSet.OK);return;
+  }
+  const st=targetSite.getFoldersByName('Strategist'),targets=[];
+  while(st.hasNext())targets.push(st.next());
+  if(targets.length>1)throw new Error('統一先にStrategistフォルダーが複数あります。');
+  const limit=20000,scan=function(folder){
+   const out={files:0,folders:0,bytes:0,paths:{},truncated:false},queue=[{folder:folder,path:''}];
+   while(queue.length){
+    if(out.files+out.folders>=limit){out.truncated=true;break;}
+    const cur=queue.shift(),fs=cur.folder.getFiles();
+    while(fs.hasNext()){
+     if(out.files+out.folders>=limit){out.truncated=true;break;}
+     const f=fs.next();if(f.isTrashed())continue;
+     const path=cur.path+'/'+f.getName();
+     (out.paths[path]||(out.paths[path]=[])).push({id:f.getId(),size:f.getSize()});
+     out.files++;out.bytes+=f.getSize();
+    }
+    if(out.truncated)break;
+    const subs=cur.folder.getFolders();
+    while(subs.hasNext()){
+     if(out.files+out.folders>=limit){out.truncated=true;break;}
+     const sub=subs.next();if(sub.isTrashed())continue;
+     out.folders++;queue.push({folder:sub,path:cur.path+'/'+sub.getName()});
+    }
+    if(out.truncated)break;
+   }
+   return out;
+  };
+  const a=scan(source),b=targets.length?scan(targets[0]):{files:0,folders:0,bytes:0,paths:{},truncated:false};
+  const collision=Object.keys(a.paths).filter(function(k){return !!b.paths[k];});
+  const duplicate=Object.keys(a.paths).filter(function(k){return a.paths[k].length>1;});
+  const report=[
+   '現在：SIMS ＞ '+sssDriveGetFolder_(m.siteIdFolder).getName()+' ＞ Strategist',
+   '目標：SIMS ＞ '+safe+' ＞ Strategist',
+   '移行元：'+a.files+'ファイル／'+a.folders+'フォルダー／'+a.bytes+'バイト',
+   '移行先：'+b.files+'ファイル／'+b.folders+'フォルダー／'+b.bytes+'バイト',
+   '同一相対パスのファイル衝突：'+collision.length+'件',
+   '移行元の同一相対パス重複：'+duplicate.length+'件',
+   '件数上限到達：'+(a.truncated||b.truncated?'あり（監査未完了）':'なし'),
+   '判定：'+(a.truncated||b.truncated||collision.length||duplicate.length?'要確認・移行禁止':'ファイル名衝突なし（サイト同一性と内容の検証は別途必要）'),
+   '※Googleドライブのファイル移動・作成・削除、設定変更は一切行いません。'
+  ];
+  if(collision.length)report.push('衝突例：'+collision.slice(0,3).join('、'));
+  ui.alert('S3全階層・移行前監査',report.join('\n'),ui.ButtonSet.OK);
+ }catch(e){ui.alert('全階層監査：'+String(e.message||e));}
+}
+
+/** P75: conservative preflight, no mutations. Does not certify Manager ownership. */
+function sssP75MigrationReadiness(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_(),m=sssDriveFolderMap_();
+  if(!c.lockedAt||!m)throw new Error('サイト固定と保存先設定が必要です。');
+  sssDriveVerifyMap_(m);
+  const root=sssDriveGetFolder_(m.rootId),sourceSite=sssDriveGetFolder_(m.siteIdFolder);
+  const source=sssDriveGetFolder_(m.strategistId);
+  const safe=String(c.siteName||'').replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  if(!safe)throw new Error('ブログ名が空欄です。');
+  const candidates=root.getFoldersByName(safe),targets=[];
+  while(candidates.hasNext())targets.push(candidates.next());
+  const reasons=[];
+  if(targets.length!==1)reasons.push('ブログ名フォルダーの候補が'+targets.length+'件（必要数：1）');
+  const target=targets.length===1?targets[0]:null;
+  if(target&&target.getId()===sourceSite.getId()){
+   ui.alert('移行の安全条件','現在の保存先は既にブログ名フォルダーです。移行は不要です。\n※Managerとのサイト一致確認は別工程です。',ui.ButtonSet.OK);return;
+  }
+  let stratCount=0,managerCount=0,sourceCount=0,targetCount=0;
+  if(target){
+   const st=target.getFoldersByName('Strategist');while(st.hasNext()){st.next();stratCount++;}
+   const mg=target.getFoldersByName('Manager');while(mg.hasNext()){mg.next();managerCount++;}
+   if(stratCount>1)reasons.push('移行先Strategistフォルダーが重複');
+   if(managerCount!==1)reasons.push('移行先Managerフォルダーが一意でない（'+managerCount+'件）');
+   // Existing Strategist data must be inventoried before any merge or copy.
+   if(stratCount===1)reasons.push('移行先Strategistが存在。ファイル衝突と内容照合が必要');
+  }
+  const sourceFiles=source.getFiles();while(sourceFiles.hasNext()){sourceFiles.next();sourceCount++;if(sourceCount>20000)break;}
+  if(sourceCount>20000)reasons.push('移行元直下ファイルの検査上限を超過');
+  // Site identity cannot be inferred from folder name, domain or folder topology.
+  reasons.push('ManagerとS3のサイト同一性を認証する仕組みが未実装');
+  reasons.push('コピー後のハッシュ照合・保存先切替・復旧手順が未実装');
+  const lines=[
+   '移行元：SIMS ＞ '+sourceSite.getName()+' ＞ Strategist',
+   '移行先：SIMS ＞ '+safe+' ＞ Strategist',
+   '移行元直下ファイル：'+(sourceCount>20000?'20,000超':sourceCount)+'件（全階層は別メニューで監査）',
+   '移行先ブログ名フォルダー：'+targets.length+'件',
+   '移行先Managerフォルダー：'+managerCount+'件',
+   '移行先Strategistフォルダー：'+stratCount+'件',
+   '判定：HOLD（移行を許可しません）',
+   '保留理由：\n・'+reasons.join('\n・'),
+   '※この確認ではファイル・フォルダー・設定を一切変更しません。'
+  ];
+  ui.alert('S3保存先移行・安全条件',lines.join('\n'),ui.ButtonSet.OK);
+ }catch(e){ui.alert('移行安全条件の確認：'+String(e.message||e));}
+}
+
+/** P76: independent, read-only folder-identity and ambiguity risk review.
+ * A matching folder name or Manager child is NOT evidence of site ownership.
+ * No Drive writes, no binding change, and no migration permission is issued.
+ */
+function sssP76MigrationRiskReview(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_(),m=sssDriveFolderMap_();
+  if(!c.lockedAt||!m)throw new Error('サイト固定と保存先設定が必要です。');
+  sssDriveVerifyMap_(m);
+  const root=sssDriveGetFolder_(m.rootId),oldSite=sssDriveGetFolder_(m.siteIdFolder);
+  const safe=String(c.siteName||'').replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  if(!safe)throw new Error('ブログ名が空です。');
+  const folders=root.getFoldersByName(safe),candidates=[];
+  while(folders.hasNext()){candidates.push(folders.next());if(candidates.length>20)break;}
+  const risks=[];
+  if(candidates.length!==1)risks.push('同名ブログフォルダーが一意ではありません：'+candidates.length+'件');
+  const target=candidates.length===1?candidates[0]:null;
+  let managerCount=0,stratCount=0;
+  if(target){
+   const mi=target.getFoldersByName('Manager');while(mi.hasNext()){mi.next();managerCount++;}
+   const si=target.getFoldersByName('Strategist');while(si.hasNext()){si.next();stratCount++;}
+   if(managerCount!==1)risks.push('Managerフォルダーが一意ではありません：'+managerCount+'件');
+   if(stratCount>1)risks.push('Strategistフォルダーが重複しています：'+stratCount+'件');
+   // Folder names alone never authorize access to another product's files.
+  }
+  const same=!!target&&target.getId()===oldSite.getId();
+  if(!same)risks.push('Managerのサイト識別情報とS3の同一性は未証明です');
+  risks.push('コピー後の内容検証・切替・復旧処理は未実装です');
+  const out=[
+   '対象サイト：'+c.siteName,
+   'GSCプロパティ：'+c.propertyUri,
+   '現在：SIMS ＞ '+oldSite.getName()+' ＞ Strategist',
+   '目標：SIMS ＞ '+safe+' ＞ Strategist',
+   '目標ブログ名フォルダー：'+candidates.length+'件',
+   'Managerフォルダー：'+managerCount+'件',
+   'Strategistフォルダー：'+stratCount+'件',
+   '現在のフォルダーと目標が同じ：'+(same?'はい':'いいえ'),
+   '判定：'+(same?'保存先の変更は不要（Manager連携の認証は別）':'HOLD（移行不可）'),
+   '確認事項：\n・'+risks.join('\n・'),
+   '※この処理は読取専用です。移動・削除・作成・設定変更はありません。'
+  ];
+  ui.alert('S3保存先統一・リスク確認',out.join('\n'),ui.ButtonSet.OK);
+ }catch(e){ui.alert('保存先統一・リスク確認：'+String(e.message||e));}
+}
+
+/** P78: single read-only overview. This NEVER authorizes migration. */
+function sssP78MigrationDashboard(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_(),m=sssDriveFolderMap_();
+  if(!c.lockedAt||!m)throw new Error('サイト固定と保存先設定が必要です。');
+  sssDriveVerifyMap_(m);
+  const root=sssDriveGetFolder_(m.rootId),current=sssDriveGetFolder_(m.siteIdFolder);
+  const safe=String(c.siteName||'').replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  if(!safe)throw new Error('ブログ名が空です。');
+  const it=root.getFoldersByName(safe),targets=[];
+  while(it.hasNext()){targets.push(it.next());if(targets.length>20)break;}
+  const t=targets.length===1?targets[0]:null;
+  function countChildren_(folder,name){
+   if(!folder)return 0;
+   const iter=folder.getFoldersByName(name);let n=0;
+   while(iter.hasNext()){iter.next();n++;if(n>20)break;}
+   return n;
+  }
+  const manager=countChildren_(t,'Manager'),strategist=countChildren_(t,'Strategist');
+  const same=!!t&&t.getId()===current.getId();
+  const issues=[];
+  if(targets.length!==1)issues.push('ブログ名フォルダーが一意でない');
+  if(t&&manager!==1)issues.push('Managerフォルダーが一意でない');
+  if(t&&strategist>1)issues.push('Strategistフォルダーが重複');
+  if(!same)issues.push('既存保存先と統一先が異なる');
+  issues.push('SBMとS3のサイト同一性は未認証');
+  issues.push('コピー・内容照合・切替・復旧は未実装');
+  const lines=[
+   'サイト：'+c.siteName,
+   'GSC：'+c.propertyUri,
+   '現在：SIMS ＞ '+current.getName()+' ＞ Strategist',
+   '統一先：SIMS ＞ '+safe+' ＞ Strategist',
+   'ブログ名フォルダー候補：'+(targets.length>20?'20超':targets.length)+'件',
+   '統一先のManager：'+manager+'件／Strategist：'+strategist+'件',
+   '保存先の一致：'+(same?'はい':'いいえ'),
+   '判定：'+(same?'保存先変更不要（Manager連携は未認証）':'HOLD（移行禁止）'),
+   '確認事項：\n・'+issues.join('\n・'),
+   '※読取専用。ファイルのコピー・移動・削除、設定変更は行いません。'
+  ];
+  ui.alert('保存先統一・総合チェック',lines.join('\n'),ui.ButtonSet.OK);
+ }catch(e){ui.alert('保存先統一・総合チェック：'+String(e.message||e));}
+}
+
+/** P79: Strict, read-only preflight. A URL-scope match is not proof of ownership. */
+function sssP79ManagerIdentityPreflight(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_(),m=sssDriveFolderMap_();
+  if(!c.lockedAt||!c.siteId||!c.propertyUri||!m)throw new Error('S3のサイト固定と保存先設定が必要です。');
+  sssDriveVerifyMap_(m);
+  const scope=sssP72PropertyScope_(c.propertyUri);
+  if(!scope)throw new Error('GSCプロパティの範囲を確認できません。');
+  const ans=ui.prompt('Managerサイト照合（読取専用）','対象ブログのManagerスプレッドシートIDを入力してください。IDは保存しません。',ui.ButtonSet.OK_CANCEL);
+  if(ans.getSelectedButton()!==ui.Button.OK)return;
+  const id=String(ans.getResponseText()||'').trim();
+  if(!/^[A-Za-z0-9_-]{25,120}$/.test(id))throw new Error('スプレッドシートIDの形式が不正です。');
+  const book=SpreadsheetApp.openById(id),sh=book.getSheetByName('記事管理');
+  if(!sh)throw new Error('Managerの記事管理シートがありません。');
+  const count=sh.getLastRow()-1;
+  if(count<1||count>10000)throw new Error('記事管理の全件監査ができません（対象は1～10,000行）。移行はHOLDです。');
+  const headers=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0].map(v=>String(v).trim());
+  const urlCol=headers.indexOf('記事URL')+1;
+  if(!urlCol||headers.indexOf('ArticleID')<0||headers.indexOf('作業状態')<0)throw new Error('Manager記事管理の必須列がありません。');
+  const urls=sh.getRange(2,urlCol,count,1).getDisplayValues();
+  let inScope=0,outScope=0,invalid=0,blank=0,duplicates=0;
+  const seenUrls=new Set();
+  for(const row of urls){
+   const raw=String(row[0]||'').trim();
+   if(!raw){blank++;continue;}
+   const normalized=sssP70NormalizeUrl_(raw);
+   if(!normalized){invalid++;continue;}
+   if(seenUrls.has(normalized))duplicates++;else seenUrls.add(normalized);
+   if(sssP72WithinScope_(raw,scope))inScope++;else outScope++;
+  }
+  const root=sssDriveGetFolder_(m.rootId),source=sssDriveGetFolder_(m.siteIdFolder);
+  const name=String(c.siteName||'').replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  if(!name)throw new Error('S3のブログ名がありません。');
+  if(source.getName()!==name && source.getName()!==m.siteFolderName){
+   throw new Error('登録済みS3保存先の名称が記録と異なります。移行はHOLDです。');
+  }
+  const iter=root.getFoldersByName(name);let folders=0,target=null;
+  while(iter.hasNext()){target=iter.next();folders++;if(folders>20)break;}
+  let managerFolders=0,strategistFolders=0;
+  if(folders===1){
+   const a=target.getFoldersByName('Manager');while(a.hasNext()){a.next();managerFolders++;if(managerFolders>20)break;}
+   const b=target.getFoldersByName('Strategist');while(b.hasNext()){b.next();strategistFolders++;if(strategistFolders>20)break;}
+  }
+  const reasons=[];
+  if(inScope===0)reasons.push('対象プロパティ内の記事URLがありません');
+  if(blank)reasons.push('記事URLの空欄：'+blank+'件（全記事の照合ができません）');
+  if(outScope)reasons.push('プロパティ範囲外の記事URL：'+outScope+'件');
+  if(invalid)reasons.push('形式不明の記事URL：'+invalid+'件');
+  if(duplicates)reasons.push('記事URLの重複：'+duplicates+'件（同一URLの複数行）');
+  if(folders!==1)reasons.push('ブログ名フォルダーが一意ではありません');
+  if(managerFolders!==1)reasons.push('Managerフォルダーが一意ではありません');
+  if(strategistFolders>1)reasons.push('Strategistフォルダーが重複しています');
+  // URL一致とフォルダー名一致は所有権・サイトID一致の証明にならない。
+  // 読取専用の予備監査は常に移行HOLDとし、別途認証済みの移行ゲートを要求する。
+  const structural=reasons.length===0;
+  ui.alert('Managerサイト照合・移行前確認',[
+   'S3サイト：'+c.siteName,'GSC：'+c.propertyUri,'Manager：'+book.getName(),
+   '記事管理：'+count+'行／対象範囲：'+inScope+'件／範囲外：'+outScope+'件／形式不明：'+invalid+'件／重複：'+duplicates+'件／空欄：'+blank+'件',
+   'ブログ名フォルダー：'+folders+'件／Manager：'+managerFolders+'件／Strategist：'+strategistFolders+'件',
+   '現保存先：'+source.getName()+'（フォルダーID：'+source.getId()+'）',
+   '構造・URL範囲チェック：'+(structural?'予備検査に問題なし（同一サイトの証明ではありません）':'HOLD'),
+   reasons.length?'要確認：\n・'+reasons.join('\n・'):'要確認：サイトの所有・SBMの内部サイトIDは未認証',
+   '最終判定：HOLD（サイトID・保存先所有権の照合未完了／移行禁止）',
+   '※URL範囲一致はサイト同一性の証明ではありません。読取専用。IDを保存せず、移行・切替・削除を行いません。'
+  ].join('\n'),ui.ButtonSet.OK);
+ }catch(e){ui.alert('Managerサイト照合：'+String(e.message||e));}
+}
+
+/** P83: Compare Manager's configured identity without changing either product.
+ * Different products can have different SiteID generation; do not treat a
+ * matching URL or a displayed ID as proof of Drive-folder ownership.
+ */
+function sssP83CompareManagerSiteSettings(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_(),m=sssDriveFolderMap_();
+  if(!c.lockedAt||!c.siteId||!c.propertyUri||!m)throw new Error('S3のサイト固定と保存先登録が必要です。');
+  sssDriveVerifyMap_(m);
+  const answer=ui.prompt('Managerサイト設定の照合（読取専用）','対象ブログのManagerスプレッドシートIDを入力してください。IDは保存しません。',ui.ButtonSet.OK_CANCEL);
+  if(answer.getSelectedButton()!==ui.Button.OK)return;
+  const id=String(answer.getResponseText()||'').trim();
+  if(!/^[A-Za-z0-9_-]{25,120}$/.test(id))throw new Error('スプレッドシートIDの形式が不正です。');
+  const book=SpreadsheetApp.openById(id),sh=book.getSheetByName('Settings');
+  if(!sh)throw new Error('ManagerのSettingsシートがありません。');
+  const last=sh.getLastRow();
+  if(last<2||last>5000)throw new Error('Settingsの行数が監査範囲外です。');
+  const values=sh.getRange(1,1,last,Math.min(sh.getLastColumn(),4)).getDisplayValues();
+  const settings={};
+  for(const row of values){const k=String(row[0]||'').trim();if(k&&!(k in settings))settings[k]=String(row[1]||'').trim();}
+  const blogUrl=settings.BlogUrl||'',blogName=settings.BlogName||'',managerId=settings.SiteID||'',managerProperty=settings.SearchConsoleProperty||'';
+  const scope=sssP72PropertyScope_(c.propertyUri);
+  if(!scope)throw new Error('S3のGSCプロパティを解釈できません。');
+  const issues=[];
+  if(!blogUrl)issues.push('ManagerのBlogUrlが未設定');
+  else if(!sssP72WithinScope_(blogUrl,scope))issues.push('ManagerのBlogUrlがS3のGSCプロパティ範囲外');
+  if(!blogName)issues.push('ManagerのBlogNameが未設定');
+  else if(blogName!==c.siteName)issues.push('ブログ名が異なる（改称・表記揺れの可能性）');
+  if(!managerId)issues.push('ManagerのSiteIDが未設定');
+  if(!managerProperty)issues.push('ManagerのSearchConsolePropertyが未設定');
+  else if(sssCanonicalProperty_(managerProperty)!==sssCanonicalProperty_(c.propertyUri))issues.push('GSCプロパティの設定値が一致しない');
+  ui.alert('Managerサイト設定の照合',[
+   'S3：'+c.siteName+'／'+c.propertyUri,
+   'Manager：'+(blogName||'未設定')+'／'+(blogUrl||'未設定'),
+   'Manager GSC：'+(managerProperty||'未設定'),
+   'Manager SiteID：'+(managerId||'未設定'),
+   'S3 SiteID：'+c.siteId,
+   '設定値の予備照合：'+(issues.length?'HOLD':'矛盾は検出されませんでした'),
+   issues.length?'要確認：\n・'+issues.join('\n・'):'※URL・名前・設定値が一致しても所有権は証明されません。',
+   '移行許可：HOLD（Manager保存先の所有権・紐付け未認証）',
+   '※読取専用。Manager IDは保存せず、ファイル移動・保存先切替も行いません。'
+  ].join('\n'),ui.ButtonSet.OK);
+ }catch(e){ui.alert('Managerサイト設定照合：'+String(e.message||e));}
+}
+
+/** P84: Read-only structural cross-check of Manager's expected Drive tree.
+ * Manager v9.2.4 binds its actual folder IDs in its own DocumentProperties
+ * (SIMS_DRIVE_BACKUP_BINDING_V1). S3 cannot read those properties from a
+ * different Apps Script project; this check MUST NOT assert ownership.
+ */
+function sssP84CheckManagerFolderStructure(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_(),m=sssDriveFolderMap_();
+  if(!c.lockedAt||!m)throw new Error('サイト固定とS3保存先登録が必要です。');
+  sssDriveVerifyMap_(m);
+  const root=sssDriveGetFolder_(m.rootId),current=sssDriveGetFolder_(m.siteIdFolder);
+  const safe=String(c.siteName||'').replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  if(!safe)throw new Error('ブログ名が未設定です。');
+  function unique_(parent,name){
+   const it=parent.getFoldersByName(name),found=[];
+   while(it.hasNext()){const f=it.next();if(!f.isTrashed())found.push(f);if(found.length>1)break;}
+   return {count:found.length,folder:found.length===1?found[0]:null};
+  }
+  const site=unique_(root,safe),manager=site.folder?unique_(site.folder,'Manager'):{count:0,folder:null};
+  const backup=manager.folder?unique_(manager.folder,'Backups'):{count:0,folder:null};
+  const strategist=site.folder?unique_(site.folder,'Strategist'):{count:0,folder:null};
+  const issues=[];
+  if(site.count!==1)issues.push('ブログ名フォルダーが一意ではありません');
+  if(manager.count!==1)issues.push('Managerフォルダーが一意ではありません');
+  if(backup.count!==1)issues.push('Backupsフォルダーが一意ではありません');
+  if(strategist.count>1)issues.push('Strategistフォルダーが重複しています');
+  const same=!!site.folder&&site.folder.getId()===current.getId();
+  if(!same)issues.push('S3の現在の保存先とブログ名フォルダーが異なります');
+  ui.alert('Manager保存先の構造確認',[
+   '対象：'+c.siteName,
+   'SIMS直下のブログ名フォルダー：'+site.count+'件',
+   'Manager：'+manager.count+'件／Backups：'+backup.count+'件',
+   'Strategist：'+strategist.count+'件',
+   'S3保存先と統一先が同じ：'+(same?'はい':'いいえ'),
+   '構造確認：'+(issues.length?'HOLD（要確認）':'構造上の矛盾なし'),
+   issues.length?'確認事項：\n・'+issues.join('\n・'):'',
+   '移行許可：HOLD（Manager固有の保存先bindingは未照合）',
+   '※Manager v9.2.4の正式な保存先IDはManager自身のDocumentPropertiesにあり、S3からは直接読めません。',
+   '※この機能は読取専用です。フォルダー作成・移動・設定変更はしません。'
+  ].filter(Boolean).join('\n'),ui.ButtonSet.OK);
+ }catch(e){ui.alert('Manager保存先構造確認：'+String(e.message||e));}
+}
+
+
+/** P85: Read-only staged-copy plan. No Drive mutations; actual migration remains disabled. */
+function sssP85StageCopyPlan(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_(),m=sssDriveFolderMap_();
+  if(!c.lockedAt||!m)throw new Error('サイト固定と保存先登録が必要です。');
+  sssDriveVerifyMap_(m);
+  const root=sssDriveGetFolder_(m.rootId),source=sssDriveGetFolder_(m.strategistId);
+  const blog=String(c.siteName||'').replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  if(!blog)throw new Error('ブログ名が空欄です。');
+  const candidates=root.getFoldersByName(blog);let target=null,count=0;
+  while(candidates.hasNext()){const f=candidates.next();if(!f.isTrashed()){target=f;count++;if(count>1)break;}}
+  if(count!==1)throw new Error('SBMのブログ名フォルダーが一意ではありません（'+count+'件）。');
+  const manager=target.getFoldersByName('Manager');
+  if(!manager.hasNext())throw new Error('移行先にManagerフォルダーがありません。');
+  manager.next();if(manager.hasNext())throw new Error('Managerフォルダーが重複しています。');
+  const same=target.getId()===m.siteIdFolder;
+  const existing=target.getFoldersByName('Strategist');let existingCount=0;
+  while(existing.hasNext()){existing.next();existingCount++;if(existingCount>1)break;}
+  if(!same&&existingCount)throw new Error('移行先にStrategistフォルダーが存在します。自動上書き・合流は禁止です。');
+  const stats={files:0,folders:0,bytes:0,items:0};
+  const queue=[source],MAX=20000;
+  while(queue.length){
+   const folder=queue.shift();stats.items++;
+   if(stats.items>MAX)throw new Error('監査上限に達しました。移行計画は保留です。');
+   const files=folder.getFiles();while(files.hasNext()){
+    const file=files.next();if(file.isTrashed())continue;
+    stats.files++;stats.items++;stats.bytes+=Number(file.getSize())||0;
+    if(stats.items>MAX)throw new Error('監査上限に達しました。移行計画は保留です。');
+   }
+   const children=folder.getFolders();while(children.hasNext()){
+    const child=children.next();if(child.isTrashed())continue;
+    stats.folders++;queue.push(child);
+   }
+  }
+  ui.alert('ブログ名フォルダー移行計画（読取専用）',[
+   'サイト：'+c.siteName,'移行元：'+source.getName()+' / '+source.getId(),
+   '移行先：SIMS ＞ '+blog+' ＞ Strategist',
+   '対象：'+stats.files+'ファイル／'+stats.folders+'サブフォルダー',
+   '合計：'+stats.bytes+'バイト',
+   '移行先Strategist：'+existingCount+'件',
+   same?'既に同じ保存先です。':'コピー候補の構造監査は完了しました。',
+   '実行判定：HOLD（コピー・検証・切替は未実装）',
+   'この画面はファイル・フォルダー・設定を変更しません。'
+  ].join('\n'),ui.ButtonSet.OK);
+ }catch(e){ui.alert('移行計画：HOLD\n'+String(e.message||e));}
+}
+
+
+/** P86: staged copy prototype. Explicit invocation only; not in the user menu.
+ * Copies at most ONE source file per invocation. Never switches bindings or deletes data.
+ * A staged file is considered copied only after byte-level SHA-256 verification.
+ * Files larger than 10 MiB are held for a later streaming/batched implementation.
+ */
+const SSS_P86_STATE='SSS_P86_STAGING_V1';
+function sssP86Digest_(blob){
+ const bytes=blob.getBytes();
+ return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,bytes)
+  .map(function(x){return ('0'+(x&255).toString(16)).slice(-2);}).join('');
+}
+function sssP86OneCopy(){
+ const ui=SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
+ if(!lock.tryLock(1000))throw new Error('他の処理が実行中です。');
+ try{
+  const c=sssConfig_(),m=sssDriveFolderMap_();
+  if(!c.lockedAt||!m)throw new Error('サイト設定と保存先が必要です。');
+  sssDriveVerifyMap_(m);
+  const root=sssDriveGetFolder_(m.rootId),source=sssDriveGetFolder_(m.strategistId);
+  const name=String(c.siteName||'').replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  if(!name)throw new Error('ブログ名の確認に失敗しました。');
+  const blogIt=root.getFoldersByName(name);
+  if(!blogIt.hasNext())throw new Error('SBMのブログ名フォルダーがありません。');
+  const blog=blogIt.next();if(blogIt.hasNext())throw new Error('同名ブログフォルダーが重複しています。');
+  if(blog.getId()===m.siteIdFolder)throw new Error('保存先は既にブログ名フォルダーです。');
+  const manager=blog.getFoldersByName('Manager');
+  if(!manager.hasNext())throw new Error('Managerフォルダーがありません。');
+  manager.next();if(manager.hasNext())throw new Error('Managerフォルダーが重複しています。');
+  if(blog.getFoldersByName('Strategist').hasNext())throw new Error('移行先にStrategistフォルダーが既に存在します。');
+  const prop=sssProperties_(),raw=prop.getProperty(SSS_P86_STATE);
+  let state=raw?JSON.parse(raw):null;
+  const stagingName='Strategist-Migration-Staging';
+  const stageIt=blog.getFoldersByName(stagingName);
+  let stage;
+  if(state){
+   if(state.siteId!==c.siteId||state.propertyUri!==c.propertyUri||state.sourceId!==source.getId()||state.blogId!==blog.getId())throw new Error('移行状態とサイト設定が一致しません。');
+   if(!stageIt.hasNext())throw new Error('記録済みのステージングフォルダーが見つかりません。');
+   stage=stageIt.next();if(stageIt.hasNext()||stage.getId()!==state.stageId)throw new Error('ステージングのIDが一致しません。');
+  }else{
+   if(stageIt.hasNext())throw new Error('未登録のステージングフォルダーが存在します。');
+   if(ui.alert('S3試験コピー','最大1ファイルを検証付きでコピーします。既存の保存先は切り替えません。実行しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
+   stage=blog.createFolder(stagingName);
+   state={siteId:c.siteId,propertyUri:c.propertyUri,sourceId:source.getId(),blogId:blog.getId(),stageId:stage.getId(),createdAt:new Date().toISOString()};
+   prop.setProperty(SSS_P86_STATE,JSON.stringify(state));
+  }
+  const queue=[{folder:source,target:stage}],MAX=20000;let scanned=0;
+  while(queue.length){
+   const node=queue.shift();if(++scanned>MAX)throw new Error('監査上限に達しました。');
+   // Fail closed on ambiguous names before creating or copying anything in this node.
+   const sourceFileNames={};
+   const fileScan=node.folder.getFiles();
+   while(fileScan.hasNext()){
+    const item=fileScan.next();if(item.isTrashed())continue;
+    const key=item.getName();
+    if(Object.prototype.hasOwnProperty.call(sourceFileNames,key))throw new Error('移行元に同名ファイルが複数あります：'+key);
+    sourceFileNames[key]=true;
+   }
+   const sourceFolderNames={};
+   const folderScan=node.folder.getFolders();
+   while(folderScan.hasNext()){
+    const item=folderScan.next();if(item.isTrashed())continue;
+    const key=item.getName();
+    if(Object.prototype.hasOwnProperty.call(sourceFolderNames,key))throw new Error('移行元に同名サブフォルダーが複数あります：'+key);
+    sourceFolderNames[key]=true;
+   }
+   const fs=node.folder.getFiles();
+   while(fs.hasNext()){ 
+    const f=fs.next();if(f.isTrashed())continue;
+    if(++scanned>MAX)throw new Error('監査上限に達しました。');
+    const matches=node.target.getFilesByName(f.getName());
+    if(matches.hasNext()){
+     const old=matches.next();if(matches.hasNext())throw new Error('同名ファイルが重複しています：'+f.getName());
+     if(f.getSize()>10*1024*1024)throw new Error('大容量ファイルは未対応です：'+f.getName());
+     if(old.getSize()!==f.getSize()||sssP86Digest_(old.getBlob())!==sssP86Digest_(f.getBlob()))throw new Error('コピー済みファイルの内容が異なります：'+f.getName());
+     continue;
+    }
+    if(node.target.getFoldersByName(f.getName()).hasNext())throw new Error('移行先でファイル名とフォルダー名が衝突：'+f.getName());
+    if(f.getSize()>10*1024*1024)throw new Error('10MiB超のファイルは保留：'+f.getName());
+    const blob=f.getBlob(),hash=sssP86Digest_(blob);
+    const copied=node.target.createFile(blob).setName(f.getName());
+    if(copied.getSize()!==f.getSize()||sssP86Digest_(copied.getBlob())!==hash)throw new Error('コピー後の内容照合に失敗：'+f.getName());
+    ui.alert('検証付きコピー完了','1ファイルをコピー・SHA-256照合しました：'+f.getName()+'\n保存先切替は行っていません。',ui.ButtonSet.OK);
+    return;
+   }
+   const folders=node.folder.getFolders();
+   while(folders.hasNext()){
+    const sub=folders.next();if(sub.isTrashed())continue;
+    const it=node.target.getFoldersByName(sub.getName());let target;
+    if(it.hasNext()){target=it.next();if(it.hasNext())throw new Error('同名サブフォルダーが重複しています：'+sub.getName());}
+    else {
+     if(node.target.getFilesByName(sub.getName()).hasNext())throw new Error('移行先でフォルダー名とファイル名が衝突：'+sub.getName());
+     target=node.target.createFolder(sub.getName());
+    }
+    queue.push({folder:sub,target:target});
+   }
+  }
+  ui.alert('ステージング照合完了','対象ファイルはすべて照合済みです。ただし保存先切替は未実装です。',ui.ButtonSet.OK);
+ }finally{lock.releaseLock();}
+}
+
+
+/** P88: read-only full staging verification. Never creates folders, copies files,
+ * changes bindings or authorizes cutover. Fail closed on any ambiguous name.
+ * Uses DriveApp blob reads; large objects are HOLD, not silently skipped.
+ */
+function sssP88VerifyStaging(){
+ const ui=SpreadsheetApp.getUi();
+ try{
+  const c=sssConfig_(),m=sssDriveFolderMap_();
+  if(!c.lockedAt||!m)throw new Error('サイト設定と保存先が必要です。');
+  sssDriveVerifyMap_(m);
+  const prop=sssProperties_(),raw=prop.getProperty(SSS_P86_STATE);
+  if(!raw)throw new Error('ステージング状態が登録されていません。');
+  const state=JSON.parse(raw);
+  if(state.siteId!==c.siteId||state.propertyUri!==c.propertyUri||state.sourceId!==m.strategistId)
+   throw new Error('移行状態とサイト設定が一致しません。');
+  const root=sssDriveGetFolder_(m.rootId),source=sssDriveGetFolder_(m.strategistId);
+  const name=String(c.siteName||'').replace(/[\\/:*?"<>|]/g,'-').slice(0,75);
+  const blogs=root.getFoldersByName(name);
+  if(!blogs.hasNext())throw new Error('ブログ名フォルダーがありません。');
+  const blog=blogs.next();if(blogs.hasNext()||blog.getId()!==state.blogId)throw new Error('ブログフォルダーID不一致または重複。');
+  const stages=blog.getFoldersByName('Strategist-Migration-Staging');
+  if(!stages.hasNext())throw new Error('ステージングフォルダーがありません。');
+  const stage=stages.next();if(stages.hasNext()||stage.getId()!==state.stageId)throw new Error('ステージングフォルダーID不一致または重複。');
+  const MAX_ITEMS=20000,MAX_BYTES=10*1024*1024;
+  let total=0,files=0,folders=0,bytes=0;
+  function inventory(base){
+   const out={},queue=[{folder:base,path:''}];
+   while(queue.length){
+    const node=queue.shift();if(++total>MAX_ITEMS)throw new Error('検証件数の上限に達しました。');
+    const names={};
+    const fit=node.folder.getFiles();
+    while(fit.hasNext()){
+     const f=fit.next();if(f.isTrashed())continue;
+     if(++total>MAX_ITEMS)throw new Error('検証件数の上限に達しました。');
+     const n=f.getName();if(names[n])throw new Error('同一階層に同名項目があります：'+node.path+n);names[n]=true;
+     const size=f.getSize();if(size>MAX_BYTES)throw new Error('10MiB超のファイルがあり検証を保留：'+node.path+n);
+     out[node.path+n]={kind:'file',size:size,digest:sssP86Digest_(f.getBlob())};
+    }
+    const dit=node.folder.getFolders();
+    while(dit.hasNext()){
+     const d=dit.next();if(d.isTrashed())continue;
+     if(++total>MAX_ITEMS)throw new Error('検証件数の上限に達しました。');
+     const n=d.getName();if(names[n])throw new Error('同一階層に同名項目があります：'+node.path+n);names[n]=true;
+     const path=node.path+n+'/';out[path]={kind:'folder'};queue.push({folder:d,path:path});
+    }
+   }
+   return out;
+  }
+  const a=inventory(source),b=inventory(stage);
+  const ak=Object.keys(a),bk=Object.keys(b);
+  const missing=ak.filter(k=>!Object.prototype.hasOwnProperty.call(b,k));
+  const extra=bk.filter(k=>!Object.prototype.hasOwnProperty.call(a,k));
+  const different=ak.filter(k=>Object.prototype.hasOwnProperty.call(b,k)&&
+    (a[k].kind!==b[k].kind||a[k].size!==b[k].size||a[k].digest!==b[k].digest));
+  files=ak.filter(k=>a[k].kind==='file').length;
+  folders=ak.length-files;
+  bytes=ak.reduce((n,k)=>n+(a[k].size||0),0);
+  const ok=!missing.length&&!extra.length&&!different.length;
+  ui.alert('ステージング全件照合（読取専用）',[
+   '判定：'+(ok?'全件一致（切替は未許可）':'HOLD'),
+   '移行元：'+files+'ファイル／'+folders+'フォルダー／'+bytes+'バイト',
+   '不足：'+missing.length+'／余分：'+extra.length+'／不一致：'+different.length,
+   (missing[0]?'不足例：'+missing[0]:''),(extra[0]?'余分例：'+extra[0]:''),(different[0]?'不一致例：'+different[0]:''),
+   'この検証は保存先の切替・ファイルの変更を行いません。'
+  ].filter(Boolean).join('\n'),ui.ButtonSet.OK);
+ }catch(e){ui.alert('ステージング検証：HOLD\n'+String(e.message||e));}
 }
