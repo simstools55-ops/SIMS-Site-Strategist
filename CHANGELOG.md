@@ -1,3 +1,23 @@
+## v0.1.99
+- M1 read-only inventory candidate; existing collection unchanged. Local synthetic tests passed; GAS UAT pending.
+
+## v0.1.98
+- 365日Detailed自動収集専用トリガーを5分から1分へ短縮（待機時間削減）。
+- 既存の1実行最大4日・110秒、LockService、保存済みZIP再利用、停止・再開処理を維持。
+- 実行時間短縮の実機測定は未実施。
+
+## v0.1.97
+- 初回セットアップで Evidence/Detailed を作成。既存設定でも保存先再確認時に不足分を補完。
+- 365日Detailed自動収集の開始前に、登録済みS3保存先を検証してDetailedフォルダーを安全に準備。14日試験収集にも同じ対策。
+- 同名Detailedフォルダーが複数ある場合は停止。既存Evidence ZIPとSBM Managerは変更しない。
+- GAS実機試験は未実施。
+
+## v0.1.96
+- GSC収集確認画面の対象URLがundefinedになる不具合を修正。
+- S3固定サイトとCollector収集先の一致検証を確認画面より前に追加。
+- GSC取得・Evidence処理は変更なし。
+- 静的検査のみ。GAS実機試験は未実施。
+
 ## v0.1.95
 - Fix GSC URL scope checks in Apps Script V8: replace unsupported URL constructor with strict HTTP(S) parser.
 - Preserve SBM read-only setup validation, existing site binding, GSC collection and analysis.

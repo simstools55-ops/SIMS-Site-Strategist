@@ -1,5 +1,5 @@
-/** SIMS Site Strategist v0.1.95 | repair HTML-to-GAS bridge; resumable setup wizard; preserve analytics. */
-const SSS_VERSION = '0.1.95';
+/** SIMS Site Strategist v0.1.99 | M1 read-only article inventory candidate. */
+const SSS_VERSION = '0.1.99';
 const SSS_PREFIX = 'SSS_';
 const SSS_CONFIG_SHEET = 'SiteConfig';
 const SSS_AUDIT_SHEET = 'AuditLog';
@@ -7,6 +7,7 @@ function onOpen() {
   sssRefreshVersion_();
   SpreadsheetApp.getUi().createMenu('SIMS Site Strategist')
     .addItem('Homeを開く', 'sssHome')
+    .addItem('全記事台帳の照合（読取専用）', 'sssM1Preview')
     .addItem('初回セットアップ', 'sssSetupWizard')
     .addItem('登録サイトを確認', 'sssShowSite')
     .addItem('ブログ別保存先を準備・確認', 'sssSetupDriveFolders')
@@ -195,11 +196,11 @@ function sssWizardCheckManager_(value){
 }
 function sssWizardCreateStorage_(value){
   const c=sssConfig_();if(!c.lockedAt)throw new Error('先にサイトを登録してください。');
-  const old=sssDriveFolderMap_();if(old){sssDriveVerifyMap_(old);return sssWizardStatus_();}
+  const old=sssDriveFolderMap_();if(old){sssDriveVerifyMap_(old);sssEnsureDetailedFolder_();return sssWizardStatus_();}
   const run=sdscGetRun_();if(run&&['RUNNING','PAUSED_AUTO_RESUME','ERROR'].includes(run.status))throw new Error('収集が未完了です。');
   const lock=LockService.getDocumentLock();if(!lock.tryLock(30000))throw new Error('別の設定処理が実行中です。');
   try{
-    const prior=sssDriveFolderMap_();if(prior){sssDriveVerifyMap_(prior);return sssWizardStatus_();}
+    const prior=sssDriveFolderMap_();if(prior){sssDriveVerifyMap_(prior);sssEnsureDetailedFolder_();return sssWizardStatus_();}
     const safeName=c.siteName.replace(/[\\/:*?"<>|]/g,'-').trim().slice(0,75);
     if(!safeName||safeName==='.'||safeName==='..')throw new Error('ブログ名が保存先に使えません。');
     const roots=DriveApp.getRootFolder().getFoldersByName('SIMS');
@@ -221,6 +222,7 @@ function sssWizardCreateStorage_(value){
     const map={siteId:c.siteId,propertyUri:c.propertyUri,siteFolderName:safeName,rootId:root.getId(),siteIdFolder:site.getId(),strategistId:strat.getId(),evidenceId:ev.getId(),baselineId:baseline.getId(),deltaId:delta.getId(),archiveId:archive.getId(),reportsId:reports.getId(),exportId:exp.getId()};
     sssDriveVerifyMap_(map);
     sssProperties_().setProperty(SSS_DRIVE_PROP,JSON.stringify(map));
+    sssEnsureDetailedFolder_();
     sssAudit_('DRIVE_FOLDERS_CONFIGURED',c.siteId,'strategistFolderId='+strat.getId()+'; managerChecked=true; source=wizard');
     return sssWizardStatus_();
   }finally{lock.releaseLock();}
@@ -284,6 +286,17 @@ function sssDriveChild_(parent,name){
   }
   return parent.createFolder(name);
 }
+// v0.1.97: Ensure a single Detailed folder in the verified S3 Evidence tree.
+// Never search globally, adopt a different site, or alter existing ZIPs.
+function sssEnsureDetailedFolder_(){
+  const c=sssConfig_();
+  if(!c.lockedAt||!c.siteId||!c.propertyUri)throw new Error('サイト固定が必要です。');
+  const map=sssDriveFolderMap_();
+  if(!map)throw new Error('ブログ別保存先がありません。初回セットアップを完了してください。');
+  sssDriveVerifyMap_(map);
+  const evidence=sssDriveGetFolder_(map.evidenceId);
+  return sssDriveChild_(evidence,'Detailed');
+}
 function sssDriveVerifyMap_(m){
   const c=sssConfig_();
   if(m.siteId!==c.siteId||m.propertyUri!==c.propertyUri)throw new Error('保存先のサイトIDが一致しません。');
@@ -319,7 +332,7 @@ function sssSetupDriveFolders(){
   const c=sssConfig_(),ui=SpreadsheetApp.getUi();
   if(!c.lockedAt)throw new Error('先にサイトの初回セットアップを完了してください。');
   const existing=sssDriveFolderMap_();
-  if(existing){sssDriveVerifyMap_(existing);ui.alert('保存先は設定済みです。\nSIMS ＞ '+existing.siteFolderName+' ＞ Strategist\n'+sssDriveGetFolder_(existing.strategistId).getUrl()+'\n※既存の保存先は自動変更しません。新規収集には新しい開発用シートを使用してください。');return;}
+  if(existing){sssDriveVerifyMap_(existing);sssEnsureDetailedFolder_();ui.alert('保存先は設定済みです。\nSIMS ＞ '+existing.siteFolderName+' ＞ Strategist\n'+sssDriveGetFolder_(existing.strategistId).getUrl()+'\n※既存の保存先は自動変更しません。新規収集には新しい開発用シートを使用してください。');return;}
   const run=sdscGetRun_();
   if(run&&['RUNNING','PAUSED_AUTO_RESUME','ERROR'].includes(run.status))throw new Error('収集が未完了です。完了後に保存先を設定してください。');
   if(ui.alert('ブログ別保存先を作成','マイドライブ直下のSIMSフォルダー内に「'+c.siteName+'」の専用保存先を作成します。既存ZIPは移動しません。\n続行しますか？',ui.ButtonSet.YES_NO)!==ui.Button.YES)return;
@@ -363,6 +376,7 @@ function sssSetupDriveFolders(){
     const map={siteId:c.siteId,propertyUri:c.propertyUri,siteFolderName:folderName,rootId:root.getId(),siteIdFolder:site.getId(),strategistId:strat.getId(),evidenceId:ev.getId(),baselineId:baseline.getId(),deltaId:delta.getId(),archiveId:archive.getId(),reportsId:reports.getId(),exportId:exp.getId()};
     sssDriveVerifyMap_(map);
     sssProperties_().setProperty(SSS_DRIVE_PROP,JSON.stringify(map));
+    sssEnsureDetailedFolder_();
     sssAudit_('DRIVE_FOLDERS_CONFIGURED',c.siteId,'strategistFolderId='+strat.getId()+'; managerChecked='+(!!managerInfo));
     ui.alert('保存先を準備しました。\nSIMS ＞ '+folderName+' ＞ Strategist\n既存ZIPは移動していません。');
   }finally{lock.releaseLock();}
@@ -400,7 +414,10 @@ function sssCollect180(){return sssCollectPeriod_(180);}
 function sssCollect365(){return sssCollectPeriod_(365);}
 function sssCollectPeriod_(days){
   if(days!==180 && days!==365)throw new Error('許可されていない収集期間です。');
-  const c=sssSyncCollectorConfig_();
+  const c=sssConfig_();
+  if(!c.lockedAt || !c.siteId || !c.propertyUri || !c.siteName) throw new Error('収集対象のサイト固定情報が不足しています。初回セットアップを確認してください。');
+  const collector=sssSyncCollectorConfig_();
+  if(collector.siteUrl!==c.propertyUri || collector.siteName!==c.siteName) throw new Error('S3とCollectorの収集対象が一致しません。処理を停止しました。');
   const prev=sdscGetRun_();
   if(prev && ['RUNNING','PAUSED_AUTO_RESUME','ERROR'].indexOf(prev.status)>=0) throw new Error('未完了の収集があります。先に状況確認・再開してください。');
   const ui=SpreadsheetApp.getUi();
@@ -2839,13 +2856,14 @@ function sssAutoSave_(state){sssProperties_().setProperty(SSS_AUTO_KEY_,JSON.str
 function sssAutoClearTriggers_(){
   for(const t of ScriptApp.getProjectTriggers())if(t.getHandlerFunction()===SSS_AUTO_HANDLER_)ScriptApp.deleteTrigger(t);
 }
+// v0.1.98: one-minute recurring continuation trigger; lock prevents overlap.
 // v0.1.37: durable repeating continuation trigger. A forced timeout must not
 // consume the only future execution. Only the dedicated handler is managed.
 function sssAutoSchedule_(){
   const own=ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()===SSS_AUTO_HANDLER_);
   if(own.length===1)return;
   if(own.length>1)throw new Error('専用トリガーが複数あります。安全のため停止しました。');
-  ScriptApp.newTrigger(SSS_AUTO_HANDLER_).timeBased().everyMinutes(5).create();
+  ScriptApp.newTrigger(SSS_AUTO_HANDLER_).timeBased().everyMinutes(1).create();
 }
 function sssAutoStopInternal_(reason){
   const s=sssAutoState_();
@@ -2855,10 +2873,11 @@ function sssAutoStopInternal_(reason){
 }
 function sssStartAutoDetailedPilot(){
   const ui=SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
-  if(!lock.tryLock(1000)){if(!silent)ui.alert('他の処理が実行中です。');return false;}
+  if(!lock.tryLock(1000)){ui.alert('他の処理が実行中です。');return false;}
   try{
     const old=sssAutoState_();
     if(old&&old.status==='RUNNING'){ui.alert('自動収集が既に実行中です。状態確認メニューをご利用ください。');return;}
+    sssEnsureDetailedFolder_();
     const p=sssDailyPageMissingPlan_(365);
     if(p.issues.length)throw new Error('Evidenceの読取異常があるため開始できません：'+p.issues.slice(0,2).join(' / '));
     if(!p.missing.length){ui.alert('未収集日はありません。');return;}
@@ -2945,10 +2964,11 @@ function sssAuditAutoDetailedTriggers(){
 // For safety, start only after the previous pilot is no longer running.
 function sssStartAutoDetailed365(){
   const ui=SpreadsheetApp.getUi(),lock=LockService.getDocumentLock();
-  if(!lock.tryLock(1000)){if(!silent)ui.alert('他の処理が実行中です。');return false;}
+  if(!lock.tryLock(1000)){ui.alert('他の処理が実行中です。');return false;}
   try{
     const old=sssAutoState_();
     if(old&&old.status==='RUNNING')throw new Error('自動収集が既に進行中です。');
+    sssEnsureDetailedFolder_();
     const p=sssDailyPageMissingPlan_(365);
     if(p.issues.length)throw new Error('Evidence読取異常：'+p.issues.slice(0,3).join(' / '));
     if(!p.missing.length){ui.alert('未収集日はありません。');return;}
@@ -4990,4 +5010,53 @@ function sssP88VerifyStaging(){
    'この検証は保存先の切替・ファイルの変更を行いません。'
   ].filter(Boolean).join('\n'),ui.ButtonSet.OK);
  }catch(e){ui.alert('ステージング検証：HOLD\n'+String(e.message||e));}
+}
+
+// M1: read-only article inventory. Strict URL identity, no destructive recommendations.
+function sssM1Join_(articles,pages,scope){
+ const ids=new Map(),urls=new Map(),matched=new Set();
+ const bump=(m,k)=>m.set(k,(m.get(k)||0)+1);
+ for(const a of articles){if(a.article_id)bump(ids,a.article_id);if(a.url)bump(urls,a.url);}
+ const records=articles.map(a=>{
+  let status, metrics=null;
+  if(!sssP72ParseUrl_(a.url)||/\s/.test(a.url))status='INVALID_URL';
+  else if(!sssP72WithinScope_(a.url,scope))status='OUT_OF_SCOPE';
+  else if(!a.article_id||ids.get(a.article_id)>1||urls.get(a.url)>1)status='AMBIGUOUS';
+  else if(pages.has(a.url)){status='MATCHED';metrics=pages.get(a.url);matched.add(a.url);}
+  else status='SBM_ONLY';
+  return Object.assign({},a,{match_status:status,metrics:metrics});
+ });
+ const gscOnly=[];
+ for(const [url,metrics] of pages){if(!urls.has(url))gscOnly.push({url,metrics,match_status:!sssP72ParseUrl_(url)?'INVALID_URL':!sssP72WithinScope_(url,scope)?'OUT_OF_SCOPE':'GSC_ONLY'});}
+ const counts={};for(const a of records)bumpObject(a.match_status);
+ function bumpObject(k){counts[k]=(counts[k]||0)+1;}
+ return {records,gscOnly,counts};
+}
+function sssM1Articles_(values){
+ const h=values[0].map(x=>String(x).trim());
+ const col=(names,required)=>{for(const n of names){const hits=h.filter(x=>x===n).length;if(hits>1)throw new Error('列重複: '+n);if(hits===1)return h.indexOf(n);}if(required)throw new Error('必須列なし: '+names.join('/'));return -1;};
+ const id=col(['ArticleID'],true),url=col(['記事URL'],true),title=col(['記事タイトル','H1タイトル'],true),state=col(['作業状態'],true),date=col(['公開日','記事公開日'],false);
+ return values.slice(1).map((r,i)=>({r,i})).filter(x=>x.r.some(v=>String(v).trim())).map(x=>({article_id:String(x.r[id]||'').trim(),url:String(x.r[url]||'').trim(),title:String(x.r[title]||''),state:String(x.r[state]||''),published_at:date<0?null:String(x.r[date]||'')||null,source_row:x.i+2}));
+}
+function sssM1Load_(managerId){
+ const c=sssConfig_();if(!c.lockedAt||!c.siteId)throw new Error('サイト固定が必要です。');
+ sssCheckManagerIdentityForSetup_(managerId,c);
+ const scope=sssP72PropertyScope_(c.propertyUri);if(!scope)throw new Error('対象範囲不明');
+ const sh=SpreadsheetApp.openById(managerId).getSheetByName('記事管理');
+ if(!sh||sh.getLastRow()<1||sh.getLastRow()>10001)throw new Error('記事管理が存在しないか行数上限外です。');
+ const articles=sssM1Articles_(sh.getRange(1,1,sh.getLastRow(),sh.getLastColumn()).getDisplayValues());
+ const a=sssP58Get_(),r=sssP53Get_(),p=sssPeriod51State_();
+ if(!a||a.status!=='PASSED'||a.next!==73||!r||r.status!=='COMPLETED'||!r.final||!p||p.status!=='PARTIALS_COMPLETED'||a.signature!==r.signature||a.finalId!==r.final.id||p.signature!==r.signature||r.siteId!==c.siteId)throw new Error('監査済み30・90・365日集計が必要です。既存の集計・最終ZIP品質監査を完了してください。');
+ const data=sssP53Read_(r.final,r.signature,c.siteId),pages=new Map();
+ for(const d of [30,90,365])for(const [url,v] of data.maps[d]){if(!pages.has(url))pages.set(url,{30:null,90:null,365:null});pages.get(url)[d]=sssP60Metrics_(v);}
+ const result=sssM1Join_(articles,pages,scope);
+ return Object.assign(result,{schema_version:'s3.inventory.v1',site_id:c.siteId,run_id:Utilities.getUuid(),generated_at:new Date().toISOString(),source_refs:{manager_id:managerId,evidence_id:r.final.id,signature:r.signature},limitations:['検索実績未確認はゼロ・未登録を意味しない','収集期間は既存集計の期間に従う']});
+}
+function sssM1Preview(){
+ const ui=SpreadsheetApp.getUi();
+ const ans=ui.prompt('全記事台帳の照合（読取専用）','対象SBMのスプレッドシートIDを入力してください。保存・書き込みは行いません。',ui.ButtonSet.OK_CANCEL);
+ if(ans.getSelectedButton()!==ui.Button.OK)return;
+ const lock=LockService.getDocumentLock();if(!lock.tryLock(1000)){ui.alert('別の処理が実行中です。');return;}
+ let message;
+ try{const x=sssM1Load_(ans.getResponseText().trim());message='SBM全記事：'+x.records.length+'件\nGSCのみ：'+x.gscOnly.length+'件\n'+Object.keys(x.counts).sort().map(k=>k+'：'+x.counts[k]).join('\n')+'\n\n'+x.limitations.join('\n')+'\nSBM・Evidenceへの書き込みなし。'; console.log(JSON.stringify({site_id:x.site_id,counts:x.counts,total:x.records.length,gscOnly:x.gscOnly.length}));}catch(e){message='照合停止：'+String(e.message||e);}finally{lock.releaseLock();}ui.alert(message);
 }
