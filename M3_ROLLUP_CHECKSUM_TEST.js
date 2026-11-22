@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const code=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const ctx={console,Number,String,JSON,Math,Error};vm.createContext(ctx);
+vm.runInContext(code.slice(code.indexOf('function sssM3RollupDigest_'),code.indexOf('function sssM3RollupStart')),ctx);
+const saved=[['run','site','A',3,12,2],['run','site','B',0,4,1]];
+const displayed=saved.map(r=>r.map(String));
+assert.equal(ctx.sssM3RollupDigest_(saved),ctx.sssM3RollupDigest_(ctx.sssM3RollupCanonicalRows_(displayed)));
+assert.notEqual(ctx.sssM3RollupDigest_(saved),ctx.sssM3RollupDigest_(displayed));
+for(const bad of ['1.5','-1','abc','1,000',''])assert.throws(()=>ctx.sssM3RollupCanonicalRows_([['r','s','A',bad,'10','1']]));
+assert.throws(()=>ctx.sssM3RollupCanonicalRows_([['r','s','A','11','10','1']]));
+console.log('M3 rollup checksum canonicalization passed');

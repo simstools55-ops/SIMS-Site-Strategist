@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const code=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const pick=code.match(/function sssM3GscPlan_\(ref\)\{[\s\S]*?\n\}/)[0]+'\n'+code.match(/function sssM3GscRows_\(response,runId,siteId,offset\)\{[\s\S]*?\n\}/)[0];
+const x=vm.createContext({SSS_M3_GSC_BATCH_:400});vm.runInContext(pick,x);
+assert.equal(x.sssM3GscPlan_(null).available,false);
+assert.equal(x.sssM3GscPlan_({id:'abc',start:'2025-01-01',end:'2025-12-31'}).mode,'GSC_REQUERY');
+const rows=x.sssM3GscRows_({rows:[{keys:['https://example.com/a'],clicks:1,impressions:5,ctr:.2,position:3}]},'r','s',400);
+assert.equal(rows[0][2],402);assert.equal(rows[0][4],1);
+assert.throws(()=>x.sssM3GscRows_({rows:[{keys:['bad'],clicks:1,impressions:5,ctr:.2,position:3}]},'r','s',0));
+assert.throws(()=>x.sssM3GscRows_({rows:[{keys:['https://example.com'],clicks:6,impressions:5,ctr:.2,position:3}]},'r','s',0));
+console.log('M3_GSC_REQUERY_TEST passed');

@@ -1,0 +1,14 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const store=new Map();let digest=0;
+const ctx={Utilities:{DigestAlgorithm:{SHA_256:'SHA_256'},computeDigest:(_,s)=>{digest++;return Array.from(require('crypto').createHash('sha256').update(s).digest()).map(b=>b>127?b-256:b)}},CacheService:{getScriptCache:()=>({get:k=>store.get(k)||null,put:(k,v,ttl)=>{assert.strictEqual(ttl,600);store.set(k,v)}})}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/Code.gs','utf8'),ctx);
+const p={start:'2025-10-28',end:'2026-10-27'},v={publication_gate:'HOLD',content_action:'NONE',query:'youtube 自動再生 オフ'};
+assert.strictEqual(ctx.sssM3EvidenceCacheRead_('evidence','site','youtube 自動再生 オフ',p),null);
+assert.strictEqual(ctx.sssM3EvidenceCachePut_('evidence','site','youtube 自動再生 オフ',p,v),true);
+assert.strictEqual(ctx.sssM3EvidenceCacheRead_('evidence','site','youtube 自動再生 オフ',p).query,v.query);
+assert.strictEqual(ctx.sssM3EvidenceCacheRead_('evidence','other','youtube 自動再生 オフ',p),null);
+assert.strictEqual(ctx.sssM3EvidenceCacheRead_('evidence','site','other',p),null);
+assert.strictEqual(ctx.sssM3EvidenceCacheRead_('timeline','site','youtube 自動再生 オフ',p),null);
+assert.strictEqual(ctx.sssM3EvidenceCachePut_('evidence','site','x',p,{publication_gate:'PASS',content_action:'NONE'}),false);
+assert.throws(()=>ctx.sssM3EvidenceCacheKey_('write','site','q',p));
+assert(digest>0);console.log('M3_EVIDENCE_CACHE_TEST OK');

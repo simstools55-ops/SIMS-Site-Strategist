@@ -1,0 +1,4 @@
+const fs=require('fs'),vm=require('vm');const ctx=vm.createContext({console});vm.runInContext(fs.readFileSync(__dirname+'/Code.gs','utf8'),ctx);vm.runInContext(`
+function check(x){if(!x)throw Error('M2 assertion')}
+let v=sssM2Volume_('100～1,000');check(v.min===100&&v.max===1000&&v.status==='CONFIRMED');check(sssM2Volume_('0').status==='ZERO');check(sssM2Volume_('').status==='UNKNOWN');check(sssM2Volume_('—').status==='UNAVAILABLE');check(sssM2Volume_('100-10').min===null);check(sssM2Volume_('0-10').status==='RANGE_INCLUDES_ZERO');check(sssM2Demand_({volume:''}).volumePointsMin===null);check(sssM2Demand_({volume:100,competition:'高'}).seoDifficulty===null);check(sssM2TrendScore_('20%',8)===5);check(sssM2IntentEvidence_('LINE 新機能 使い方',{title:'Claude 新機能 使い方'}).lexicalScore===null);check(sssM2IntentEvidence_('コシアブラ 増やし方',{title:'コシアブラ 増やし方'}).lexicalScore===1);check(sssM2IntentEvidence_('a',{}).missingFields.length===3);
+`,ctx);console.log('PASS M2 primitives');

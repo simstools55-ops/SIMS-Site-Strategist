@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const s=fs.readFileSync(__dirname+'/Code.gs','utf8');const start=s.indexOf('const SSS_M3_DEEP_DIVE_LIMIT_'),end=s.indexOf('function sssM3QueryDeepDiveCandidates()');
+const ctx={sssM3MatchPageRows_:(articles,rows)=>({rows:rows.map(r=>({status:'MATCHED',article_id:r.url.includes('/a')?'A1':'A2'}))})};vm.createContext(ctx);vm.runInContext(s.slice(start,end),ctx);
+const period={start:'2025-01-01',end:'2025-12-31'};
+const response={rows:[{keys:['https://example.com/a'],clicks:3,impressions:100,position:4},{keys:['https://example.com/b'],clicks:1,impressions:30,position:8}]};
+const x=ctx.sssM3QueryDeepDiveAnalyze_(response,[{article_id:'A1',url:'https://example.com/a'},{article_id:'A2',url:'https://example.com/b'}],'site',period,'test');
+assert.equal(x.classification,'MULTI_ARTICLE_REVIEW');assert.equal(x.article_ids.length,2);assert.equal(x.content_action,'NONE');assert.equal(x.publication_gate,'HOLD');
+assert.throws(()=>ctx.sssM3QueryDeepDiveAnalyze_({rows:[response.rows[0],response.rows[0]]},[],'site',period,'test'));
+assert.throws(()=>ctx.sssM3QueryDeepDiveAnalyze_({rows:[{keys:['https://example.com/a'],clicks:101,impressions:100,position:4}]},[],'site',period,'test'));
+assert.equal(ctx.sssM3QueryDeepDiveAnalyze_({rows:[]},[],'site',period,'test').classification,'NO_PAGE_OBSERVED');
+console.log('M3 exact-query deep dive tests passed');

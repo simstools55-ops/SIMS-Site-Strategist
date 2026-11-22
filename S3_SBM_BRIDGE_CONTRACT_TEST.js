@@ -1,0 +1,14 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const ctx={};vm.createContext(ctx);
+vm.runInContext(fs.readFileSync('S3_SBM_Strategy_Bridge.gs','utf8'),ctx);
+const sbmFile=require('path').join(__dirname,'SBM_S3_Strategy_Intake_TEST_FIXTURE.js');vm.runInContext(fs.readFileSync(sbmFile,'utf8'),ctx);
+const overview={format:'S3_M3_INTEGRATED_OVERVIEW_V1',publication_gate:'HOLD',content_action:'NONE',roles:[{article_id:'A000093',kind:'ACTIVE',sbm_state:'モニター中',role:'OVERLAP_SUSPECTED'},{article_id:'A000195',kind:'KNOWN',sbm_state:'未着手',role:'SPECIALIST'}]};
+const growth={format:'S3_GROWTH_STRATEGY_V1',publication_gate:'HOLD',content_action:'NONE',research_priorities:[{query:'youtube 自動再生 オフ',article_ids:['A000093','A000195'],score:70}]};
+const p=ctx.sssStrategyProposalBuild_('test-site',growth,overview,'2026-11-22T00:00:00Z');
+assert.equal(p.items.length,2);assert(p.items.every(x=>x.content_action==='NONE'&&x.execution_gate==='SBM_REVIEW_REQUIRED'));
+const intake=ctx.sbmS3ValidateProposal_(JSON.parse(JSON.stringify(p)),'test-site');assert.equal(intake.items.length,2);assert(intake.items.every(x=>x.decision==='HOLD'&&!x.execution_allowed));
+assert(intake.items.some(x=>x.sbm_state_snapshot==='モニター中'));
+assert.throws(()=>ctx.sbmS3ValidateProposal_(JSON.parse(JSON.stringify(p)),'wrong-site'));
+const corrupt=JSON.parse(JSON.stringify(p));corrupt.items[0].content_action='UPDATE';assert.throws(()=>ctx.sbmS3ValidateProposal_(corrupt,'test-site'));
+const duplicate=JSON.parse(JSON.stringify(p));duplicate.items.push(duplicate.items[0]);assert.throws(()=>ctx.sbmS3ValidateProposal_(duplicate,'test-site'));
+console.log('S3 -> SBM proposal contract, site guard, HOLD, no execution, duplicate guard: PASS');

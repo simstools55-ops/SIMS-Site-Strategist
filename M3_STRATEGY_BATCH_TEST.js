@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const s=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const a=s.indexOf('const SSS_M3_STRATEGY_QUERY_LIMIT_'),b=s.indexOf('function sssM3StrategyBatchPilot(',a);
+const ctx={};vm.createContext(ctx);vm.runInContext(s.slice(a,b),ctx);
+const rows=Array.from({length:12},(_,i)=>({query:'q'+i,impressions:100-i,clicks:1,position:3}));
+const selected=ctx.sssM3StrategySelect_({status:'PROVISIONAL',queries:rows});assert.equal(selected.length,10);
+assert.throws(()=>ctx.sssM3StrategySelect_({status:'PROVISIONAL',queries:[rows[0],rows[0]]}));
+const deep={status:'PROVISIONAL',query:'q0',content_action:'NONE',publication_gate:'HOLD',classification:'MULTI_ARTICLE_REVIEW',article_ids:['A1','A2'],returned:2,truncated_possible:false};
+const result=ctx.sssM3StrategyInterpret_(rows[0],deep);assert.equal(result.category,'ROLE_REVIEW');assert.equal(result.publication_gate,'HOLD');
+assert.equal(ctx.sssM3StrategyInterpret_(rows[0],{...deep,classification:'NO_PAGE_OBSERVED'}).category,'OPPORTUNITY_RESEARCH');
+assert.equal(ctx.sssM3StrategyInterpret_(rows[0],{...deep,truncated_possible:true}).category,'EVIDENCE_REVIEW');
+assert.throws(()=>ctx.sssM3StrategyInterpret_(rows[0],{...deep,content_action:'PUBLISH'}));
+console.log('M3 strategy batch tests passed');

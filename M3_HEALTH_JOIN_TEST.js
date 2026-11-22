@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const s=fs.readFileSync(__dirname+'/Code.gs','utf8'),ctx={Map,Set,String,Number,Error};vm.createContext(ctx);
+vm.runInContext(s.slice(s.indexOf('function sssM3ArticleHealthJoin_'),s.indexOf('function sssM3ArticleHealthPreview')),ctx);
+const f=ctx.sssM3ArticleHealthJoin_;
+const inv=[{article_id:'A',url:'https://example.com/a',url_status:'VALID',state:'未着手'}, {article_id:'B',url:'https://example.com/b',url_status:'VALID',state:'完了'}, {article_id:'C',url:'',url_status:'MISSING',state:'未着手'}];
+const r=f(inv,[{article_id:'A',clicks:1,impressions:5,page_rows:1}]);
+assert.equal(r.article_count,3);assert.equal(r.articles[0].evidence_status,'OBSERVED_IMPRESSIONS');
+assert.equal(r.articles[1].evidence_status,'NO_GSC_URL_MATCH');assert.equal(r.articles[1].impressions,null);
+assert.equal(r.articles[2].evidence_status,'IDENTITY_REVIEW');assert.equal(r.content_action,'NONE');
+assert.throws(()=>f(inv,[{article_id:'Z',clicks:1,impressions:5,page_rows:1}]));
+assert.throws(()=>f(inv,[{article_id:'A',clicks:6,impressions:5,page_rows:1}]));
+assert.throws(()=>f([inv[0],inv[0]],[]));
+console.log('M3 article health join tests passed');

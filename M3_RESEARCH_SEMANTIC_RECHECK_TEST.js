@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const s=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const a=s.indexOf('function sssM3ResearchSave_('),b=s.indexOf('// v0.1.162: recheck',a);
+const code=s.slice(a,b>0?b:s.indexOf('function sssM3ResearchRecheck_',a));
+const ctx={sssM3StrategyResearchValidate_:()=>({site_id:'site',count:1,reviews:[{query:'q',observed_article_ids:['A000001'],evidence_needed:['x'],reason:'x'}]}),sssConfig_:()=>({siteId:'site'}),SpreadsheetApp:{getActiveSpreadsheet:()=>null}};
+vm.createContext(ctx);vm.runInContext(code,ctx);
+const plan={format:'S3_M3_STRATEGY_RESEARCH_PLAN_V1',site_id:'site',publication_gate:'HOLD',content_action:'NONE',selected:[{query:'q',observed_article_ids:['A000001'],sbm_states:[{id:'A000001',state:'モニター中',extra:'client'}]}]};
+const live={...plan,selected:[{query:'q',observed_article_ids:['A000001'],sbm_states:[{id:'A000001',state:'モニター中'}]}]};
+assert.throws(()=>ctx.sssM3ResearchSave_(plan,'{}',live),/S3のシートが見つかりません/);
+const changed={...live,selected:[{...live.selected[0],sbm_states:[{id:'A000001',state:'完了'}]}]};
+assert.throws(()=>ctx.sssM3ResearchSave_(plan,'{}',changed),/A000001：モニター中 → 完了/);
+assert.throws(()=>ctx.sssM3ResearchSave_(plan,'{}',{...live,selected:[]}),/候補件数/);
+console.log('Semantic recheck regression passed');

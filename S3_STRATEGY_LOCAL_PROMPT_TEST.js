@@ -1,0 +1,15 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const src=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const a=src.indexOf('function sssM3StrategyDialog(){');const b=src.indexOf('\n\n\n// M3 strategic review handoff',a);
+assert(a>=0&&b>a);
+let html='';const ctx={HtmlService:{createHtmlOutput(x){html=x;return {setWidth(){return this},setHeight(){return this}}}},SpreadsheetApp:{getUi(){return {showModalDialog(){}}}}};
+vm.runInNewContext(src.slice(a,b)+'\nsssM3StrategyDialog();',ctx);
+const match=html.match(/<script>([\s\S]*?)<\/script>/);assert(match);
+new vm.Script(match[1]);
+const elements={};const document={getElementById(id){return elements[id]||(elements[id]={value:'',disabled:false,textContent:''})}};
+const browser={document,google:{script:{run:new Proxy({}, {get(){throw Error('unexpected RPC')}})}}};
+vm.createContext(browser);vm.runInContext(match[1],browser);
+const row={query:'youtube 自動再生 オフ',impressions:48000,clicks:120,observed_pages:10,article_ids:['A000015','A000026'],category:'ROLE_REVIEW',reason:'複数記事を観測',publication_gate:'HOLD',content_action:'NONE'};
+vm.runInContext("active=false;site='a1a12e5329f860bde86e';period=JSON.stringify({start:'2025-10-28',end:'2026-10-27'});all=["+JSON.stringify(row)+"];offset=1;buildPrompt()",browser);
+assert(elements.prompt.value.includes('A000026'));assert(elements.prompt.value.includes('S3_M3_STRATEGY_CLAUDE_RESPONSE_V1'));assert.equal(elements.copyPrompt.disabled,false);assert.equal(elements.promptStatus.textContent,'依頼文を作成しました。');
+console.log('S3_STRATEGY_LOCAL_PROMPT_TEST OK');

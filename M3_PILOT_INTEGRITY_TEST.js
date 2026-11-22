@@ -1,0 +1,14 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const s=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const code=s.slice(s.indexOf('function sssM3PilotPlan_('),s.indexOf('function sssM3PilotDialog(){'));
+const statuses=()=>Array.from({length:4},()=>({status:'COMPLETED'}));
+const ctx={sssM1CompactRef_:()=>null,sssM3GscPlan_:()=>({available:false,reason:'no gsc'}),sssConfig_:()=>({siteId:'test'}),sssM3BatchStatus:()=>statuses()[0],sssM3PageStageStatus:()=>statuses()[1],sssM3MetricsJournalStatus:()=>statuses()[2],sssM3RollupStatus:()=>statuses()[3],sssM3HealthReviewPreview:()=>({format:'S3_M3_HEALTH_TRIAGE_V1',status:'PROVISIONAL_REVIEW_ONLY',content_action:'NONE',publication_gate:'HOLD'}),sssM3PageStageSource_:()=>{throw Error('unnecessary');},sssM3CompactFallbackSource_:()=>({available:false}),sssM3PageStageStartCompact_:()=>({status:'COMPLETED'})};
+for(const name of ['sssM3BatchStart','sssM3BatchContinue','sssM3PageStageStart','sssM3PageStageContinue','sssM3MetricsJournalStart','sssM3MetricsJournalContinue','sssM3RollupStart','sssM3RollupContinue'])ctx[name]=()=>({status:'RUNNING'});
+vm.createContext(ctx);vm.runInContext(code,ctx);
+assert.equal(ctx.sssM3PilotPlan_([{status:'NOT_STARTED'},{status:'COMPLETED'},{status:'NOT_STARTED'},{status:'NOT_STARTED'}],true).status,'BLOCKED');
+assert.equal(ctx.sssM3PilotPlan_([{status:'COMPLETED'},{status:'RUNNING'},{status:'COMPLETED'},{status:'NOT_STARTED'}],true).status,'BLOCKED');
+assert.equal(ctx.sssM3PilotPlan_([{status:'COMPLETED'},{status:'COMPLETED'},{status:'COMPLETED'},{status:'COMPLETED'}],true).stage,'HEALTH_REVIEW');
+assert.equal(ctx.sssM3PilotStep().status,'COMPLETED');
+ctx.sssM3HealthReviewPreview=()=>({status:'ERROR'});
+assert.equal(ctx.sssM3PilotStep().status,'BLOCKED');
+console.log('M3 pilot integrity: OK');

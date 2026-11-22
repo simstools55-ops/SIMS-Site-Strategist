@@ -1,0 +1,15 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const source=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const begin=source.indexOf('function sssM3ResearchWorkspaceDialog(initialQuery)');
+assert(begin>=0);
+const frag=source.slice(begin);
+const start=frag.indexOf('HtmlService.createHtmlOutput(`')+'HtmlService.createHtmlOutput(`'.length;
+const end=frag.indexOf('`).setWidth',start);
+assert(end>start);
+const template=frag.slice(start,end);
+const html=vm.runInNewContext('`'+template+'`',{initialQuery:'youtube 自動再生 オフ'});
+const match=html.match(/<script>([\s\S]*?)<\/script>/);
+assert(match,'Workspace inline script missing');
+new vm.Script(match[1],{filename:'S3 Research Workspace rendered inline script'});
+assert(match[1].includes('google.script.run.withSuccessHandler'));
+console.log('S3 workspace rendered inline JavaScript PASS');

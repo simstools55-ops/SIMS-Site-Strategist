@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const ctx=vm.createContext({});vm.runInContext(fs.readFileSync(__dirname+'/Code.gs','utf8'),ctx);
+const r=(start,end,kind,id,c,i,n,status)=>['R','S',start,end,kind,id,c,i,n,status];
+const a=[r(0,2,'ARTICLE','A',1,10,1,'ASSIGNED'),r(0,2,'UNASSIGNED','',0,0,0,'UNMATCHED_OR_AMBIGUOUS'),...['EXACT','NORMALIZED','AMBIGUOUS','UNMATCHED','INVALID_URL'].map(k=>r(0,2,'COUNT','',0,0,k==='EXACT'?1:k==='UNMATCHED'?1:0,k)),r(0,2,'END','',0,0,2,'COMMITTED')];
+const b=[r(2,3,'ARTICLE','A',2,20,1,'ASSIGNED'),r(2,3,'UNASSIGNED','',0,0,0,'UNMATCHED_OR_AMBIGUOUS'),...['EXACT','NORMALIZED','AMBIGUOUS','UNMATCHED','INVALID_URL'].map(k=>r(2,3,'COUNT','',0,0,k==='EXACT'?1:0,k)),r(2,3,'END','',0,0,1,'COMMITTED')];
+const v=ctx.sssM3ConsolidateJournalRows_(a.concat(b),'R','S');assert.equal(v.processed,3);assert.equal(v.batches,2);assert.equal(v.articles[0].clicks,3);assert.equal(v.articles[0].impressions,30);
+assert.throws(()=>ctx.sssM3ConsolidateJournalRows_(a.slice(0,-1),'R','S'));
+assert.throws(()=>ctx.sssM3ConsolidateJournalRows_(a.concat(b.map(x=>{const y=x.slice();y[2]=3;y[3]=4;return y;})),'R','S'));
+assert.throws(()=>ctx.sssM3ConsolidateJournalRows_(a,'X','S'));
+assert.throws(()=>ctx.sssM3ConsolidateJournalRows_(a.map((x,i)=>i===0?[...x.slice(0,6),11,...x.slice(7)]:x),'R','S'));
+console.log('PASS M3 journal consolidation');

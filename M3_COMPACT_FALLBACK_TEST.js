@@ -1,0 +1,12 @@
+const assert=require('assert'),fs=require('fs'),vm=require('vm');
+const code=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const pick=(name)=>{const start=code.indexOf('function '+name+'(');assert(start>=0,name);let depth=0,open=code.indexOf('{',start),end=-1;for(let i=open;i<code.length;i++){if(code[i]==='{')depth++;if(code[i]==='}'&&!--depth){end=i+1;break}}return code.slice(start,end)};
+const ctx={Map,Number,Error};vm.createContext(ctx);vm.runInContext('const SSS_M3_COMPACT_ZIP_MAX_BYTES_=2*1024*1024;const SSS_M3_COMPACT_PAGE_MAX_=10000;'+pick('sssM3CompactFallbackPlan_')+'\n'+pick('sssM3CompactPageRows_'),ctx);
+assert.strictEqual(ctx.sssM3CompactFallbackPlan_(null,0).available,false);
+assert.strictEqual(ctx.sssM3CompactFallbackPlan_({id:'x'},2097153).available,false);
+assert.strictEqual(ctx.sssM3CompactFallbackPlan_({id:'x'},2097152).available,true);
+const pages=new Map([['https://example.com/a',{compact:{windows:{full:{clicks:2,impressions:30,ctr:2/30,position:4}}}}],['https://example.com/b',{compact:{windows:{full:null}}}]]);
+const rows=ctx.sssM3CompactPageRows_(pages,'run','site');assert.strictEqual(rows.length,1);assert.strictEqual(rows[0][3],'https://example.com/a');
+assert.throws(()=>ctx.sssM3CompactPageRows_(new Map([['a',{compact:{windows:{full:{clicks:3,impressions:2,ctr:0,position:1}}}}]]),'r','s'));
+assert(code.includes("result=alternative.available?sssM3PageStageStartCompact_():sssM3PageStageStartGsc_()"));
+console.log('M3_COMPACT_FALLBACK_TEST OK');

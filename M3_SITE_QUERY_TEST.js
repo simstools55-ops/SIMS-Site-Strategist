@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const source=fs.readFileSync(__dirname+'/Code.gs','utf8');const begin=source.indexOf('const SSS_M3_SITE_QUERY_LIMIT_');const end=source.indexOf('function sssM3SiteQueryPilot(){');const ctx={Map,Set,String,Number,Error,Array};vm.createContext(ctx);vm.runInContext(source.slice(begin,end),ctx);
+const classify=ctx.sssM3SiteQueryClassify_,period={start:'2026-01-01',end:'2026-11-01'};
+const row=(q,c,i)=>({keys:[q],clicks:c,impressions:i,position:9});
+const x=classify({rows:[row('Chrome 太字',0,120),row('Notion',5,90)]},period,'site');
+assert.equal(x.queries[0].signal,'CHECK_INTENT');assert.equal(x.queries[0].ownership,'UNCONFIRMED');assert.equal(x.publication_gate,'HOLD');assert.equal(x.observation,'LIVE_GSC_REQUERY');
+assert.throws(()=>classify({rows:[row('Test',0,1),row('Ｔｅｓｔ',0,2)]},period,'site'));
+assert.throws(()=>classify({rows:[row('bad',3,2)]},period,'site'));
+assert.throws(()=>classify({rows:[row('a',0,1)]},{start:'2026-11-02',end:'2026-11-01'},'site'));
+assert.throws(()=>classify({rows:Array.from({length:201},(_,i)=>row('q'+i,0,1))},period,'site'));
+console.log('M3 site-wide query tests passed');

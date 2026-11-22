@@ -1,0 +1,14 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const s=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const code=s.slice(s.indexOf('function sssM3PilotPlan_('),s.indexOf('function sssM3PilotDialog(){'));
+let calls=0, sourceOK=false;
+const ctx={sssM1CompactRef_:()=>null,sssM3GscPlan_:()=>({available:false,reason:'no gsc'}),sssConfig_:()=>({siteId:'x'}),sssM3BatchStatus:()=>({status:'COMPLETED'}),sssM3PageStageStatus:()=>({status:'COMPLETED'}),sssM3MetricsJournalStatus:()=>({status:'COMPLETED'}),sssM3RollupStatus:()=>({status:'COMPLETED'}),sssM3PageStageSource_:()=>{calls++;return {available:sourceOK,reason:'missing'};},sssM3CompactFallbackSource_:()=>({available:false,reason:'no compact'}),sssM3PageStageStartCompact_:()=>({status:'COMPLETED'}),sssM3HealthReviewPreview:()=>({status:'NOT_READY'}),sssM3BatchStart:()=>({status:'RUNNING'}),sssM3BatchContinue:()=>({status:'RUNNING'}),sssM3PageStageStart:()=>({status:'RUNNING'}),sssM3PageStageContinue:()=>({status:'RUNNING'}),sssM3MetricsJournalStart:()=>({status:'RUNNING'}),sssM3MetricsJournalContinue:()=>({status:'RUNNING'}),sssM3RollupStart:()=>({status:'RUNNING'}),sssM3RollupContinue:()=>({status:'RUNNING'})};
+vm.createContext(ctx);vm.runInContext(code,ctx);
+assert.equal(ctx.sssM3PilotStatus().plan.stage,'HEALTH_REVIEW');assert.equal(calls,0);
+assert.equal(ctx.sssM3PilotStep().status,'BLOCKED');
+ctx.sssM3PageStageStatus=()=>({status:'NOT_STARTED'});
+assert.equal(ctx.sssM3PilotStatus().plan.status,'BLOCKED');assert.equal(calls,1);
+ctx.sssM3PageStageSource_=()=>{throw Error('test')};assert.equal(ctx.sssM3PilotStatus().plan.status,'BLOCKED');
+ctx.sssM3PageStageSource_=()=>({available:true});ctx.sssM3PageStageStart=()=>({status:'NOT_AVAILABLE',reason:'no table'});
+assert.equal(ctx.sssM3PilotStep().status,'BLOCKED');
+console.log('M3 pilot guard: OK');

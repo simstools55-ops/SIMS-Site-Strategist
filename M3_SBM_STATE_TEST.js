@@ -1,0 +1,10 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const source=fs.readFileSync(__dirname+'/Code.gs','utf8');const ctx={Map,Set,String,Number,Error,Array};vm.createContext(ctx);
+vm.runInContext(source.slice(source.indexOf('function sssM3ClassifySbmState_'),source.indexOf('function sssM3HealthReviewPreview')),ctx);
+const state=ctx.sssM3ClassifySbmState_;
+assert.equal(state('👀 モニター中').kind,'ACTIVE');assert.equal(state('再診処置').kind,'ACTIVE');assert.equal(state('改善中').kind,'ACTIVE');assert.equal(state('未着手').kind,'KNOWN');assert.equal(state('???').kind,'UNKNOWN');
+const row=(id,s)=>({article_id:id,state:s,evidence_status:'OBSERVED_IMPRESSIONS',clicks:0,impressions:150,page_rows:1});
+const data={format:'S3_M3_ARTICLE_HEALTH_JOIN_V1',status:'VALIDATED',coverage:'ALL_STAGED_PAGES',article_count:3,articles:[row('A','👀 モニター中'),row('B','❓ 不明な状態'),row('C','未着手')]};
+const result=ctx.sssM3HealthReviewTriage_(data);
+assert.equal(result.counts.MONITORING,1);assert.equal(result.counts.STATE_UNVERIFIED,1);assert.equal(result.counts.SEARCH_REVIEW,1);assert.equal(result.state_counts.ACTIVE,1);assert.equal(result.state_counts.UNKNOWN,1);assert.equal(result.publication_gate,'HOLD');
+console.log('M3 SBM state tests passed');

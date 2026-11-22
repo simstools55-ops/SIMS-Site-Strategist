@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const ctx=vm.createContext({});vm.runInContext(fs.readFileSync(__dirname+'/Code.gs','utf8'),ctx);
+const base={format:'S3_M3_METRICS_JOURNAL_V1',site_id:'s',current_site:'s',run_id:'R',article_run:'A',page_run:'P',total:800,next_offset:400,written:9};
+const batch={run_id:'A'},stage={run_id:'P',stored:800};
+const last=['R','s',0,400,'END'];
+const plan=ctx.sssM3MetricsJournalPlan_(base,batch,stage,10,last);
+assert.equal(plan.start,400);assert.equal(plan.count,400);
+assert.throws(()=>ctx.sssM3MetricsJournalPlan_(base,batch,stage,11,last));
+assert.throws(()=>ctx.sssM3MetricsJournalPlan_(base,batch,stage,10,['R','s',0,399,'END']));
+assert.throws(()=>ctx.sssM3MetricsJournalPlan_(base,{run_id:'X'},stage,10,last));
+assert.throws(()=>ctx.sssM3MetricsJournalPlan_({...base,current_site:'other'},batch,stage,10,last));
+assert.equal(ctx.sssM3MetricsJournalPlan_({...base,next_offset:800},batch,stage,10,['R','s',400,800,'END']).count,0);
+console.log('PASS M3 resumable metrics journal');

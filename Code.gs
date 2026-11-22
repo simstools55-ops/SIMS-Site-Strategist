@@ -1,13 +1,72 @@
-/** SIMS Site Strategist v0.1.99 | M1 read-only article inventory candidate. */
-const SSS_VERSION = '0.1.99';
+/** SIMS Site Strategist v0.1.194 | M4/M5 growth strategy foundation. */
+const SSS_VERSION = '0.1.194';
 const SSS_PREFIX = 'SSS_';
 const SSS_CONFIG_SHEET = 'SiteConfig';
 const SSS_AUDIT_SHEET = 'AuditLog';
+
+/**
+ * Stable user-facing entry points. Development-only operations remain in the
+ * separate S3｜開発・試験 menu until their full workflows pass acceptance tests.
+ * No new data mutations or article actions are introduced by this menu.
+ */
+function sssAddOperationalMenu_() {
+  const ui = SpreadsheetApp.getUi();
+  const diagnosis = ui.createMenu('ブログ総合診断')
+    .addItem('総合診断を開く', 'sssM3IntegratedDialog');
+  const structure = ui.createMenu('サイト構造最適化')
+    .addItem('関連記事候補を分析', 'sssM2Preview')
+    .addItem('検索意図・競合を精査', 'sssM2PilotDialog');
+  const growth = ui.createMenu('既存ブログの成長戦略')
+    .addItem('検索戦略をまとめて分析', 'sssM3StrategyDialog');
+  const collection = ui.createMenu('データ収集・更新')
+    .addItem('分析データを更新', 'sssM1RefreshEvidence')
+    .addItem('データの状態・品質を確認', 'sssM1EvidenceStatus')
+    .addItem('GSCデータを収集（365日）', 'sssCollect365')
+    .addItem('収集状況を確認', 'sssCollectionStatus');
+  const settings = ui.createMenu('設定・メンテナンス')
+    .addItem('初回セットアップ', 'sssSetupWizard')
+    .addItem('登録サイトを確認', 'sssShowSite')
+    .addItem('ブログ別保存先を準備・確認', 'sssSetupDriveFolders');
+  ui.createMenu('S3｜サイト戦略')
+    .addItem('ホームを開く', 'sssHome')
+    .addSeparator()
+    .addSubMenu(diagnosis)
+    .addSubMenu(structure)
+    .addSubMenu(growth)
+    .addSeparator()
+    .addSubMenu(collection)
+    .addSubMenu(settings)
+    .addToUi();
+}
+
 function onOpen() {
+
   sssRefreshVersion_();
-  SpreadsheetApp.getUi().createMenu('SIMS Site Strategist')
+  sssAddOperationalMenu_();
+  if (PropertiesService.getScriptProperties().getProperty('S3_SHOW_DEV_MENU') === 'true') SpreadsheetApp.getUi().createMenu('S3｜開発・試験')
     .addItem('Homeを開く', 'sssHome')
+    .addItem('SBM向け戦略提案を出力（試験）', 'sssStrategyProposalDialog')
     .addItem('全記事台帳の照合（読取専用）', 'sssM1Preview')
+    .addItem('関連記事候補の分析（試験）', 'sssM2Preview')
+    .addItem('検索意図・競合精査（試験）', 'sssM2PilotDialog')
+    .addItem('精査済み候補の確認（試験）', 'sssM2CandidatePreview')
+    .addItem('ブログ総合診断・基礎集計（試験）', 'sssM3Preview')
+    .addItem('ブログ総合診断（試験・自動進行）', 'sssM3PilotDialog')
+    .addItem('サイト全体の検索クエリを確認（試験）', 'sssM3SiteQueryDialog')
+    .addItem('検索語と既存記事の関連候補（試験）', 'sssM3SiteQueryCoverageDialog')
+    .addItem('検索語×実績ページの確認（試験）', 'sssM3QueryPageDialog')
+    .addItem('検索語の役割・競合候補を確認（試験）', 'sssM3RoleReviewDialog')
+    .addItem('検索戦略をまとめて分析（試験）', 'sssM3StrategyDialog')
+    .addItem('保存済み検索戦略とSBM状態を照合（試験）', 'sssM3StrategyRoutingDialog')
+    .addItem('追加調査の証拠を自動収集（試験）', 'sssM3ResearchEvidenceDialog')
+    .addItem('期間別GSC・SBM履歴を照合（試験）', 'sssM3ResearchTimelineDialog')
+    .addItem('追加調査の証拠を統合確認（試験）', 'sssM3EvidencePackageDialog')
+    .addItem('記事本文の証拠を確認（試験）', 'sssM3BodyEvidenceDialog')
+    .addItem('複数記事の本文を比較（試験）', 'sssM3BodyCompareDialog')
+    .addItem('保存済み記事役割とSBM状態を照合（試験）', 'sssM3RoleLiveDialog')
+    .addItem('検索語を個別に深掘り（試験）', 'sssM3QueryDeepDiveDialog')
+    .addItem('分析データを更新', 'sssM1RefreshEvidence')
+    .addItem('分析データの状態・品質を確認', 'sssM1EvidenceStatus')
     .addItem('初回セットアップ', 'sssSetupWizard')
     .addItem('登録サイトを確認', 'sssShowSite')
     .addItem('ブログ別保存先を準備・確認', 'sssSetupDriveFolders')
@@ -222,6 +281,7 @@ function sssWizardCreateStorage_(value){
     const map={siteId:c.siteId,propertyUri:c.propertyUri,siteFolderName:safeName,rootId:root.getId(),siteIdFolder:site.getId(),strategistId:strat.getId(),evidenceId:ev.getId(),baselineId:baseline.getId(),deltaId:delta.getId(),archiveId:archive.getId(),reportsId:reports.getId(),exportId:exp.getId()};
     sssDriveVerifyMap_(map);
     sssProperties_().setProperty(SSS_DRIVE_PROP,JSON.stringify(map));
+    sssM1SaveManager_(info,c);
     sssEnsureDetailedFolder_();
     sssAudit_('DRIVE_FOLDERS_CONFIGURED',c.siteId,'strategistFolderId='+strat.getId()+'; managerChecked=true; source=wizard');
     return sssWizardStatus_();
@@ -5012,25 +5072,51 @@ function sssP88VerifyStaging(){
  }catch(e){ui.alert('ステージング検証：HOLD\n'+String(e.message||e));}
 }
 
-// M1: read-only article inventory. Strict URL identity, no destructive recommendations.
+// Shared article identity: ported from SBM v9.3.93 sbmNormalizeUrl_.
+function sssArticleUrlKey_(url) {
+  var raw = String(url || '').trim();
+  if (!raw) return '';
+  if (/^sc-domain:/i.test(raw)) return raw.toLowerCase();
+
+  // Official: URL比較・保存の共通Canonical Key。
+  // Search Console/CMSで末尾スラッシュの有無が異なっても同一記事として扱う。
+  // 運用シートでは「ルート以外は末尾スラッシュなし」に統一し、GSCの生データ表現には依存しない。
+  raw = raw.split('#')[0].split('?')[0].trim();
+  if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw.replace(/^\/+/, '');
+
+  var m = raw.match(/^(https?):\/\/([^\/]+)(\/.*)?$/i);
+  if (!m) return raw;
+  var scheme = String(m[1] || 'https').toLowerCase();
+  var authority = String(m[2] || '').toLowerCase();
+  if (scheme === 'https') authority = authority.replace(/:443$/, '');
+  if (scheme === 'http') authority = authority.replace(/:80$/, '');
+  var path = String(m[3] || '/');
+  if (path !== '/') path = path.replace(/\/+$/, '');
+  return scheme + '://' + authority + path;
+}
+
+function sssM1UrlInfo_(raw,scope){
+ const value=String(raw||'').trim(), noFragment=value.split('#')[0];
+ if(/\s/.test(value)||!sssP72ParseUrl_(noFragment))return {status:'INVALID_URL'};
+ if(!sssP72WithinScope_(noFragment,scope))return {status:'OUT_OF_SCOPE'};
+ return {status:'VALID',key:sssArticleUrlKey_(value)};
+}
 function sssM1Join_(articles,pages,scope){
- const ids=new Map(),urls=new Map(),matched=new Set();
+ const ids=new Map(),urls=new Map(),groups=new Map(),gscOnly=[];
  const bump=(m,k)=>m.set(k,(m.get(k)||0)+1);
- for(const a of articles){if(a.article_id)bump(ids,a.article_id);if(a.url)bump(urls,a.url);}
- const records=articles.map(a=>{
-  let status, metrics=null;
-  if(!sssP72ParseUrl_(a.url)||/\s/.test(a.url))status='INVALID_URL';
-  else if(!sssP72WithinScope_(a.url,scope))status='OUT_OF_SCOPE';
-  else if(!a.article_id||ids.get(a.article_id)>1||urls.get(a.url)>1)status='AMBIGUOUS';
-  else if(pages.has(a.url)){status='MATCHED';metrics=pages.get(a.url);matched.add(a.url);}
+ const prepared=articles.map(a=>({a,u:sssM1UrlInfo_(a.url,scope)}));
+ for(const {a,u} of prepared){if(a.article_id)bump(ids,a.article_id);if(u.key)bump(urls,u.key);}
+ for(const [url,metrics] of pages){const u=sssM1UrlInfo_(url,scope);const row={url,metrics,match_status:u.status==='VALID'?'GSC_ONLY':u.status};if(!u.key){gscOnly.push(row);continue;}if(!groups.has(u.key))groups.set(u.key,[]);groups.get(u.key).push(row);if(!urls.has(u.key))gscOnly.push(row);}
+ const counts={};const records=prepared.map(({a,u})=>{
+  const variants=u.key?groups.get(u.key)||[]:[];let status,metrics=null;
+  if(u.status!=='VALID')status=u.status;
+  else if(!a.article_id||ids.get(a.article_id)>1||urls.get(u.key)>1)status='AMBIGUOUS';
+  else if(variants.length){status='MATCHED';const exact=variants.find(v=>v.url===a.url)||variants.find(v=>v.url===u.key);metrics=exact?exact.metrics:null;}
   else status='SBM_ONLY';
-  return Object.assign({},a,{match_status:status,metrics:metrics});
+  counts[status]=(counts[status]||0)+1;
+  return Object.assign({},a,{canonical_key:u.key||null,match_status:status,metrics,metric_policy:'EXACT_OR_CANONICAL_ONLY',gsc_variants:variants});
  });
- const gscOnly=[];
- for(const [url,metrics] of pages){if(!urls.has(url))gscOnly.push({url,metrics,match_status:!sssP72ParseUrl_(url)?'INVALID_URL':!sssP72WithinScope_(url,scope)?'OUT_OF_SCOPE':'GSC_ONLY'});}
- const counts={};for(const a of records)bumpObject(a.match_status);
- function bumpObject(k){counts[k]=(counts[k]||0)+1;}
- return {records,gscOnly,counts};
+ return {records,gscOnly,counts,raw_url_count:pages.size,unmatched_key_count:new Set(gscOnly.map(v=>sssM1UrlInfo_(v.url,scope).key).filter(Boolean)).size,scope};
 }
 function sssM1Articles_(values){
  const h=values[0].map(x=>String(x).trim());
@@ -5045,18 +5131,2716 @@ function sssM1Load_(managerId){
  const sh=SpreadsheetApp.openById(managerId).getSheetByName('記事管理');
  if(!sh||sh.getLastRow()<1||sh.getLastRow()>10001)throw new Error('記事管理が存在しないか行数上限外です。');
  const articles=sssM1Articles_(sh.getRange(1,1,sh.getLastRow(),sh.getLastColumn()).getDisplayValues());
- const a=sssP58Get_(),r=sssP53Get_(),p=sssPeriod51State_();
- if(!a||a.status!=='PASSED'||a.next!==73||!r||r.status!=='COMPLETED'||!r.final||!p||p.status!=='PARTIALS_COMPLETED'||a.signature!==r.signature||a.finalId!==r.final.id||p.signature!==r.signature||r.siteId!==c.siteId)throw new Error('監査済み30・90・365日集計が必要です。既存の集計・最終ZIP品質監査を完了してください。');
- const data=sssP53Read_(r.final,r.signature,c.siteId),pages=new Map();
- for(const d of [30,90,365])for(const [url,v] of data.maps[d]){if(!pages.has(url))pages.set(url,{30:null,90:null,365:null});pages.get(url)[d]=sssP60Metrics_(v);}
- const result=sssM1Join_(articles,pages,scope);
- return Object.assign(result,{schema_version:'s3.inventory.v1',site_id:c.siteId,run_id:Utilities.getUuid(),generated_at:new Date().toISOString(),source_refs:{manager_id:managerId,evidence_id:r.final.id,signature:r.signature},limitations:['検索実績未確認はゼロ・未登録を意味しない','収集期間は既存集計の期間に従う']});
+ const e=sssM1Evidence_(c),result=sssM1Join_(articles,e.pages,scope);
+ return Object.assign(result,{schema_version:'s3.inventory.v1',site_id:c.siteId,run_id:Utilities.getUuid(),generated_at:new Date().toISOString(),source_refs:Object.assign({manager_id:managerId},e.refs),limitations:['検索実績未確認はゼロ・未登録を意味しない',...e.limitations]});
+}
+function sssM1SaveManager_(info,c){
+ sssProperties_().setProperty('SSS_M1_MANAGER_'+c.siteId,JSON.stringify({id:info.managerSpreadsheetId,siteId:c.siteId,propertyUri:c.propertyUri}));
+}
+function sssM1FindManagers_(){
+ const c=sssConfig_();if(!c.lockedAt||!c.siteId)throw Error('先にサイトを登録してください。');
+ const saved=sssProperties_().getProperty('SSS_M1_MANAGER_'+c.siteId);
+ if(saved){try{const x=JSON.parse(saved);if(x.siteId===c.siteId&&x.propertyUri===c.propertyUri)return {site:c.siteName,candidates:[sssM1ManagerCandidate_(x.id,c)],complete:true};}catch(e){/* revalidate through discovery */}}
+ const map=sssDriveFolderMap_(), candidates=[],seen=new Set();let complete=true;
+ if(map){sssDriveVerifyMap_(map);const site=sssDriveGetFolder_(map.siteIdFolder),folders=site.getFoldersByName('Manager');
+ if(folders.hasNext()){const folder=folders.next();if(folders.hasNext())complete=false;else {const files=folder.getFilesByType(MimeType.GOOGLE_SHEETS);let n=0;while(files.hasNext()){if(++n>40){complete=false;break;}const f=files.next();if(f.isTrashed()||seen.has(f.getId()))continue;seen.add(f.getId());try{candidates.push(sssM1ManagerCandidate_(f.getId(),c));}catch(e){}}}}}
+ return {site:c.siteName,candidates,complete};
+}
+function sssM1ManagerCandidate_(id,c){
+ const info=sssCheckManagerIdentityForSetup_(id,c),book=SpreadsheetApp.openById(id),sh=book.getSheetByName('記事管理');
+ if(!sh||sh.getLastRow()<1)throw Error('記事管理がありません。');
+ sssM1Articles_([sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0]]);
+ return {id:info.managerSpreadsheetId,name:book.getName(),url:book.getUrl()};
+}
+function sssM1ConnectionStatus(){return sssM1FindManagers_();}
+// Classify URL shapes only; never infer canonical identity or deletion eligibility.
+function sssM1ClassifyUrls_(result,scope){
+ const known=new Set(result.records.map(a=>a.url));
+ const counts={}, examples={};
+ for(const row of result.gscOnly){
+  const u=sssP72ParseUrl_(row.url.split('#')[0]);let k;
+  if(row.match_status==='INVALID_URL'||!u)k='INVALID';
+  else if(row.match_status==='OUT_OF_SCOPE')k='OUTSIDE';
+  else if(u.query&&known.has(row.url.slice(0,row.url.indexOf('?'))))k='ARTICLE_PARAMETER';
+  else if(/^\/archive(?:\/|$)/.test(u.path))k='ARCHIVE';
+  else if(/^\/(?:category|tag)(?:\/|$)/.test(u.path))k='CATEGORY';
+  else if(/^\/(?:search|page)(?:\/|$)/.test(u.path))k='LIST_SEARCH';
+  else if(u.path==='/')k='HOME';
+  else if(u.query)k='OTHER_PARAMETER';
+  else if(/\.hatenablog\.(?:com|jp)$|\.hateblo\.jp$|\.hatenadiary\.com$/.test(u.host)&&/^\/entry\/[^/]/.test(u.path))k='ARTICLE_CANDIDATE';
+  else k='UNKNOWN';
+  counts[k]=(counts[k]||0)+1;if(!examples[k])examples[k]=[];if(examples[k].length<2)examples[k].push(row.url);
+ }
+ return {counts,examples};
+}
+function sssM1ResultText_(x){
+ const labels={MATCHED:'検索実績と照合済み',SBM_ONLY:'検索実績未確認',AMBIGUOUS:'重複・識別不能',INVALID_URL:'不正URL',OUT_OF_SCOPE:'対象範囲外'};
+ const kinds={ARTICLE_PARAMETER:'登録記事のパラメーター付きURL',ARCHIVE:'アーカイブ・カテゴリー一覧',CATEGORY:'カテゴリー・タグ',LIST_SEARCH:'一覧・検索',HOME:'トップページ',OTHER_PARAMETER:'その他パラメーター付き',ARTICLE_CANDIDATE:'未登録記事候補（URL形式）',UNKNOWN:'その他・要確認',INVALID:'不正URL',OUTSIDE:'対象範囲外'};
+ const y=sssM1ClassifyUrls_(x,x.scope);
+ return ['SBM登録記事：'+x.records.length+'件',...Object.keys(labels).map(k=>labels[k]+'：'+(x.counts[k]||0)+'件'),'','GSC側のみの元URL：'+x.gscOnly.length+'件（記事数ではありません）','正規化後の未照合キー：'+x.unmatched_key_count+'件（有効・範囲内のみ）','登録記事に対応する元URL：'+(x.raw_url_count-x.gscOnly.length)+'件','実績は完全一致または正規化キーそのものの行のみ採用。別表記の実績は合算しません。',...Object.keys(kinds).filter(k=>y.counts[k]).map(k=>kinds[k]+'：'+y.counts[k]+'件\n  例：'+y.examples[k][0]),'','URL形式による暫定分類です。登録漏れ・正規URL・削除対象は確定していません。',...x.limitations,'SBM・Evidenceへの書き込みなし。連携先はS3に保存しました。'].join('\n');
+}
+function sssM1RunConnection(value){
+ const lock=LockService.getDocumentLock();if(!lock.tryLock(1000))throw Error('別の処理が実行中です。');
+ try{const c=sssConfig_(),id=sssWizardManagerId_(value);sssM1ManagerCandidate_(id,c);const x=sssM1Load_(id);sssM1SaveManager_({managerSpreadsheetId:id},c);
+ return sssM1ResultText_(x);
+ }finally{lock.releaseLock();}
 }
 function sssM1Preview(){
- const ui=SpreadsheetApp.getUi();
- const ans=ui.prompt('全記事台帳の照合（読取専用）','対象SBMのスプレッドシートIDを入力してください。保存・書き込みは行いません。',ui.ButtonSet.OK_CANCEL);
- if(ans.getSelectedButton()!==ui.Button.OK)return;
- const lock=LockService.getDocumentLock();if(!lock.tryLock(1000)){ui.alert('別の処理が実行中です。');return;}
- let message;
- try{const x=sssM1Load_(ans.getResponseText().trim());message='SBM全記事：'+x.records.length+'件\nGSCのみ：'+x.gscOnly.length+'件\n'+Object.keys(x.counts).sort().map(k=>k+'：'+x.counts[k]).join('\n')+'\n\n'+x.limitations.join('\n')+'\nSBM・Evidenceへの書き込みなし。'; console.log(JSON.stringify({site_id:x.site_id,counts:x.counts,total:x.records.length,gscOnly:x.gscOnly.length}));}catch(e){message='照合停止：'+String(e.message||e);}finally{lock.releaseLock();}ui.alert(message);
+ const html=HtmlService.createHtmlOutput(`<!doctype html><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:18px;color:#202124}button,input,select{padding:10px;margin:8px 0;box-sizing:border-box}input,select{width:100%}button{cursor:pointer;border:1px solid #aaa;background:#fff;border-radius:5px}#go{background:#2459a6;color:white;border:0}body{overflow-wrap:anywhere}#msg{white-space:pre-wrap;line-height:1.6;overflow-wrap:anywhere;}a{word-break:break-all}</style><p id="msg">連携先のSBMを確認しています…</p><div id="choices" hidden><select id="pick"></select><p id="url"></p><button id="go" onclick="run(document.getElementById('pick').value)">照合を開始</button></div><div id="manual" hidden><p>対象ブログのSBMを開き、ブラウザのアドレス欄のURLをコピーして貼り付けてください。</p><input id="address" placeholder="https://docs.google.com/spreadsheets/d/…/edit"><button onclick="run(document.getElementById('address').value)">URLで照合</button></div><button onclick="google.script.host.close()">閉じる</button><script>
+ const el=id=>document.getElementById(id);function fail(e){el('msg').textContent='処理停止：'+e.message;el('manual').hidden=false;el('choices').hidden=true;document.querySelectorAll('#manual button').forEach(b=>b.disabled=false)}
+ function run(id){if(!id.trim())return;el('choices').hidden=true;el('manual').hidden=true;el('msg').textContent='全記事と検索実績を照合しています…';google.script.run.withFailureHandler(fail).withSuccessHandler(x=>el('msg').textContent=x).sssM1RunConnection(id)}
+ google.script.run.withFailureHandler(fail).withSuccessHandler(x=>{el('msg').textContent='対象ブログ：'+x.site+'\\nSBMのデータは変更しません。';const p=el('pick');p.add(new Option('連携先を選択してください',''));for(const c of x.candidates)p.add(new Option(c.name,c.id));if(x.candidates.length===1&&x.complete)p.selectedIndex=1;function show(){const c=x.candidates.find(y=>y.id===p.value);el('url').textContent='';el('go').disabled=!c}p.onchange=show;show();el('choices').hidden=!x.candidates.length;el('manual').hidden=!!x.candidates.length&&x.complete;if(!x.candidates.length)el('msg').textContent+='\\n連携先を自動特定できませんでした。';}).sssM1ConnectionStatus();
+ </script>`).setWidth(640).setHeight(540);SpreadsheetApp.getUi().showModalDialog(html,'全記事台帳の照合');
+}
+
+// Compact snapshots use their actual windows, never disguise 28 days as 30 days.
+function sssM1CompactPages_(rows,days){
+ const windows=['full','first_half','second_half','recent28','previous28'];
+ const header=['key'];for(const w of windows)for(const k of ['clicks','impressions','ctr','position'])header.push(k+'_'+w);
+ if(!rows.length||rows[0].join('|')!==header.join('|'))throw Error('簡易Evidenceのヘッダー不一致');
+ const pages=new Map();for(const row of rows.slice(1)){
+  if(row.length===1&&row[0]==='')continue;
+  if(row.length!==header.length||!row[0]||pages.has(row[0]))throw Error('簡易EvidenceのURL重複・行不正');
+  const m={30:null,90:null,365:null,compact:{days,windows:{}}};
+  windows.forEach((w,i)=>{const raw=row.slice(1+i*4,5+i*4),n=raw.map(Number);if(raw.some(v=>String(v).trim()==='')||!n.every(Number.isFinite)||n.some(v=>v<0)||!Number.isSafeInteger(n[0])||!Number.isSafeInteger(n[1])||n[0]>n[1]||n[2]>1)throw Error('簡易Evidenceの数値不正');m.compact.windows[w]=n[1]===0?null:{clicks:n[0],impressions:n[1],ctr:n[2],position:n[3]};});
+  if(days===365)m[365]=m.compact.windows.full;pages.set(row[0],m);
+ }return pages;
+}
+function sssM1CompactRef_(c){
+ const sh=sssSpreadsheet_().getSheetByName(SSS_EVIDENCE_SHEET);if(!sh||sh.getLastRow()<2)return null;
+ const rows=sh.getRange(2,1,sh.getLastRow()-1,12).getValues();
+ const refs=rows.filter(v=>String(v[1])===c.siteId&&String(v[2])===c.propertyUri&&[180,365].includes(Number(v[5]))&&['VERIFIED','VERIFIED_WITH_LIMITATIONS'].includes(String(v[11]))&&!String(v[8]).startsWith('SIMS-DeltaEvidence-')).map(v=>({id:String(v[7]),start:sssEvidenceDateKey_(v[3]),end:sssEvidenceDateKey_(v[4]),days:Number(v[5])}));
+ refs.sort((a,b)=>b.end.localeCompare(a.end)||b.days-a.days);return refs[0]||null;
+}
+function sssM1ReadCompact_(c,ref){
+ const f=DriveApp.getFileById(ref.id);if(f.isTrashed()||f.getMimeType()!=='application/zip'||f.getSize()>90*1024*1024)throw Error('簡易Evidence ZIPが不正');
+ const by={};for(const b of Utilities.unzip(f.getBlob())){const k=b.getName();if(by[k])throw Error('ZIP内重複');by[k]=b;}
+ const mf=JSON.parse(by['manifest.json'].getDataAsString('UTF-8'));
+ if(mf.format!=='SIMS_DOCTOR_SITE_EVIDENCE_PACKAGE_V2'||mf.storageMode!=='COMPACT_EVIDENCE'||mf.siteId!==c.siteId||mf.site.searchConsoleProperty!==c.propertyUri||mf.period.startDate!==ref.start||mf.period.endDate!==ref.end||Number(mf.period.days)!==ref.days)throw Error('簡易Evidenceのサイト・期間不一致');
+ const pages=sssM1CompactPages_(Utilities.parseCsv(by['page_summary.csv'].getDataAsString('UTF-8')),ref.days);
+ const d=mf.datasets.find(x=>x.file==='page_summary.csv');if(!d||d.status!=='VALID'||Number(d.rowCount)!==pages.size)throw Error('簡易Evidenceのページ件数・品質不一致');
+ return {pages,refs:{evidence_id:ref.id,mode:'COMPACT',period:ref},limitations:['簡易Evidence：'+ref.start+' ～ '+ref.end+'（'+ref.days+'日）','30・90日実績は未取得。28日・半期は別項目。ゼロ埋めされた期間は未確認扱い。','GSCの網羅性は保証されません。']};
+}
+function sssM1Evidence_(c){
+ const a=sssP58Get_(),r=sssP53Get_(),p=sssPeriod51State_(),m=sssDM365State_(),ref=sssM1CompactRef_(c);
+ const detailedEnd=m&&r&&m.signature===r.signature&&m.siteId===c.siteId&&m.propertyUri===c.propertyUri?m.end:null;
+ if(sssM1PreferDetailed_(detailedEnd,ref)&&a&&a.status==='PASSED'&&a.next===73&&r&&r.status==='COMPLETED'&&r.final&&p&&p.status==='PARTIALS_COMPLETED'&&a.signature===r.signature&&a.finalId===r.final.id&&p.signature===r.signature&&r.siteId===c.siteId){
+  const data=sssP53Read_(r.final,r.signature,c.siteId),pages=new Map();for(const d of [30,90,365])for(const [url,v] of data.maps[d]){if(!pages.has(url))pages.set(url,{30:null,90:null,365:null});pages.get(url)[d]=sssP60Metrics_(v);}
+  return {pages,refs:{evidence_id:r.final.id,signature:r.signature,mode:'DETAILED',period:{start:m.start,end:m.end,days:365}},limitations:['詳細Evidence：'+m.start+' ～ '+m.end+'（365日）']};
+ }
+ if(!ref)throw Error('監査済みEvidenceがありません。「分析データを更新」から収集し、品質検証を行ってください。');return sssM1ReadCompact_(c,ref);
+}
+function sssM1PreferDetailed_(end,ref){return !!end&&(!ref||end>=ref.end);}
+// Verification runs outside the Collector document lock and is retriable on demand.
+function sssM1VerifyCompleted_(){
+ const c=sssConfig_(),run=sdscGetRun_();sssAssertRunSite_(run,c);
+ if(!run||run.status!=='COMPLETED'||run.deltaAcquisition||![180,365].includes(Number(run.period.days)))return '対象の完了収集なし';
+ const lock=LockService.getDocumentLock();if(!lock.tryLock(1000))throw Error('別の処理が実行中です。');
+ let rows;try{const current=sdscGetRun_();if(!current||current.outputFileId!==run.outputFileId||current.status!=='COMPLETED')throw Error('収集状態が変わりました。');sssIndexCompletedEvidence_(run);const sh=sssEvidenceSheet_(),n=sh.getLastRow();rows=sh.getRange(2,1,n-1,12).getValues();}finally{lock.releaseLock();}
+ const hits=rows.map((v,i)=>({v,row:i+2})).filter(x=>String(x.v[7])===String(run.outputFileId)&&String(x.v[1])===c.siteId&&String(x.v[2])===c.propertyUri);
+ if(hits.length!==1)throw Error('完了ZIPの台帳照合不一致');
+ const x=hits[0];if(['VERIFIED','VERIFIED_WITH_LIMITATIONS'].includes(String(x.v[11])))return String(x.v[11]);
+ return sssVerifyEvidenceRow_(x.row).status;
+}
+function sssM1StatusText_(e,verification,today){
+ const p=e.refs.period, age=Math.round((Date.parse(today+'T00:00:00Z')-Date.parse(p.end+'T00:00:00Z'))/86400000);
+ const v={VERIFIED:'検証済み',VERIFIED_WITH_LIMITATIONS:'検証済み（制限あり）','対象の完了収集なし':'新たな検証対象なし'};
+ return ['既存の'+(e.refs.mode==='DETAILED'?'詳細':'簡易')+'データを利用できます','収集期間：'+p.start+' ～ '+p.end+'（'+p.days+'日）','最終データ日から：'+(Number.isFinite(age)&&age>=0?age+'日':'確認不能'),'新規収集の品質確認：'+(v[verification]||verification),...e.limitations].join('\n');
+}
+function sssM1EvidenceStatus(){
+ const ui=SpreadsheetApp.getUi();let verification;try{verification=sssM1VerifyCompleted_();}catch(e){verification='品質検証保留：'+e.message;}
+ try{const e=sssM1Evidence_(sssConfig_());ui.alert('分析データの状態',sssM1StatusText_(e,verification,Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd')),ui.ButtonSet.OK);}catch(e){ui.alert('分析データの状態：'+verification+'\n'+e.message);}
+}
+function sssM1RefreshEvidence(){
+ const ui=SpreadsheetApp.getUi(),c=sssConfig_();if(!c.lockedAt)throw Error('先にサイトを登録してください。');
+ const run=sdscGetRun_();sssAssertRunSite_(run,c);
+ if(run&&['RUNNING','PAUSED_AUTO_RESUME','ERROR'].includes(run.status)){ui.alert('未完了の収集があります。既存の収集状況・再開メニューを使用してください。');return;}
+ if(run&&run.status==='COMPLETED'){try{sssM1VerifyCompleted_();}catch(e){ui.alert('前回収集の品質検証が保留です：'+e.message);return;}}
+ const ref=sssM1CompactRef_(c);const msg=(ref?'検証済み簡易Evidence：'+ref.end+'（'+ref.days+'日）':'検証済み簡易Evidenceなし')+'\n365日分を再収集しますか？既存ZIPは保持されます。収集後は「分析データの状態・品質を確認」で検証できます。';
+ if(ui.alert('分析データを更新',msg,ui.ButtonSet.YES_NO)===ui.Button.YES)sssCollect365();
+}
+
+// M2 pure analytical primitives; no menu or network side effects.
+function sssM2ParseTrendPercent_(value) {
+  const raw = String(value == null ? '' : value).trim();
+  if (!raw) return null;
+  if (raw === '∞' || /^inf(?:inity)?$/i.test(raw)) return Infinity;
+  const n = Number(raw.replace(/,/g,'').replace(/％/g,'%').replace(/%/g,''));
+  return isFinite(n) ? n : null;
+}
+
+function sssM2TrendScore_(value, maxAbs) {
+  const n = sssM2ParseTrendPercent_(value);
+  if (n === null) return 0;
+  if (n === Infinity) return maxAbs;
+  if (n >= 100) return maxAbs;
+  if (n >= 20) return Math.max(2, Math.round(maxAbs * 0.65));
+  if (n > 0) return Math.max(1, Math.round(maxAbs * 0.35));
+  if (n <= -100) return -maxAbs;
+  if (n <= -20) return -Math.max(2, Math.round(maxAbs * 0.65));
+  if (n < 0) return -Math.max(1, Math.round(maxAbs * 0.35));
+  return 0;
+}
+
+function sssM2AdsCompetitionSignal_(competition, competitionIndex) {
+  // Google Adsの競合性はSEO難易度ではないため、減点材料には使わない。
+  // 広告主需要の補助Signalとして最大3点だけ加点する。
+  let score = 0;
+  const c = String(competition || '').trim().toLowerCase();
+  if (['高','high'].includes(c)) score += 2;
+  else if (['中','medium'].includes(c)) score += 1;
+  const idx = Number(String(competitionIndex || '').replace(/,/g,''));
+  if (isFinite(idx) && idx >= 70) score += 1;
+  else if (isFinite(idx) && idx >= 30) score += 0.5;
+  return Math.min(3, score);
+}
+
+function sssM2NormalizeQuery_(q){
+  return String(q||'').toLowerCase()
+    .normalize('NFKC')
+    .replace(/[　\s]+/g,' ')
+    .replace(/[｜|／/・,，。!！?？:：;；()[\]【】「」『』]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function sssM2GenericIntentToken_(t){
+  const x=String(t||'').toLowerCase();
+  return /^(202[0-9]|20[0-9]{2}|最新版|最新|完全版|方法|やり方|使い方|手順|設定|解除|変更|新機能|機能|原因|対処|対処法|直し方|意味|とは|できない|エラー|不具合|確認|おすすめ|戻す|追加|表示|使う|やる)$/.test(x);
+}
+
+function sssM2QueryTokens_(q){
+  return sssM2NormalizeQuery_(q).split(' ')
+    .map(x=>x.trim())
+    .filter(x=>x&&x.length>=2)
+    .filter(x=>!sssM2GenericIntentToken_(x));
+}
+
+function sssM2AnchorTokens_(q){
+  // Topic/entity anchors only. Generic intent words must never establish ownership.
+  return sssM2QueryTokens_(q).filter(x=>{
+    if(sssM2GenericIntentToken_(x))return false;
+    // Avoid numeric-only / year-only anchors.
+    if(/^\d+$/.test(x))return false;
+    return true;
+  });
+}
+
+function sssM2HasTopicAnchorMatch_(query,text){
+  const anchors=sssM2AnchorTokens_(query);
+  const nt=sssM2NormalizeQuery_(text);
+  if(!anchors.length)return false;
+  return anchors.some(a=>nt.indexOf(a)>=0);
+}
+
+function sssM2QuerySimilarity_(a,b){
+  const na=sssM2NormalizeQuery_(a),nb=sssM2NormalizeQuery_(b);
+  if(!na||!nb)return 0;
+  if(na===nb)return 1;
+  if(na.indexOf(nb)>=0||nb.indexOf(na)>=0)return .85;
+
+  const ta=sssM2QueryTokens_(na),tb=sssM2QueryTokens_(nb);
+  if(!ta.length||!tb.length)return 0;
+  const sa={};ta.forEach(x=>sa[x]=1);
+  let common=0;tb.forEach(x=>{if(sa[x])common++});
+  const union={};ta.concat(tb).forEach(x=>union[x]=1);
+  return common/Math.max(Object.keys(union).length,1);
+}
+
+function sssM2TitleQueryCoverage_(title,q){
+  const nt=sssM2NormalizeQuery_(title),nq=sssM2NormalizeQuery_(q);
+  if(!nt||!nq)return 0;
+  if(nt.indexOf(nq)>=0)return 1;
+
+  const terms=sssM2QueryTokens_(nq);
+  if(!terms.length)return 0;
+
+  // Critical gate: at least one topic/entity anchor must be present.
+  // Example: "LINEラボ 新機能 使い方" must not match a Claude article
+  // merely because both contain "新機能" and "使い方".
+  if(!sssM2HasTopicAnchorMatch_(q,title))return 0;
+
+  let hit=0;
+  terms.forEach(t=>{if(nt.indexOf(t)>=0)hit++});
+  return hit/terms.length;
+}
+
+// BOS v0.14.41 demand adapter. Unknown is not zero; ranges stay ranges.
+function sssM2Volume_(value) {
+  const raw=String(value==null?'':value).trim();
+  const t=raw.normalize('NFKC').replace(/,/g,'').trim();
+  const m=t.match(/^(\d+)(?:\s*[-–—~〜]\s*(\d+))?$/);
+  if(!m)return {status:/^(?:-|—|n\/a|取得不可)$/i.test(t)?'UNAVAILABLE':'UNKNOWN',min:null,max:null,raw:raw};
+  const min=Number(m[1]),max=m[2]===undefined?min:Number(m[2]);
+  if(!Number.isSafeInteger(min)||!Number.isSafeInteger(max)||max<min)return {status:'UNKNOWN',min:null,max:null,raw:raw};
+  return {status:max===0?'ZERO':min===0?'RANGE_INCLUDES_ZERO':'CONFIRMED',min:min,max:max,raw:raw};
+}
+function sssM2Demand_(metrics) {
+  metrics=metrics||{};
+  const volume=sssM2Volume_(metrics.volume);
+  const points=v=>Math.min(13,Math.log10(v+1)*5);
+  return {volume:volume,volumePointsMin:volume.min===null?null:points(volume.min),volumePointsMax:volume.max===null?null:points(volume.max),trend3mPoints:sssM2TrendScore_(metrics.trend3m,8),trendYoyPoints:sssM2TrendScore_(metrics.trendYoy,6),adsSignal:sssM2AdsCompetitionSignal_(metrics.competition,metrics.competitionIndex),seoDifficulty:null};
+}
+// SKE lexical evidence only; missing fields cannot establish non-ownership.
+function sssM2IntentEvidence_(query,article) {
+  article=article||{};
+  const title=article.title||'', mq=article.mainQuery||'', intent=article.intent||'';
+  const anchor=sssM2HasTopicAnchorMatch_(query,title)||sssM2HasTopicAnchorMatch_(query,mq);
+  const score=anchor?Math.max(sssM2QuerySimilarity_(query,mq),sssM2TitleQueryCoverage_(title,query),sssM2QuerySimilarity_(query,intent)):null;
+  return {anchor:anchor,lexicalScore:score,missingFields:['title','mainQuery','intent'].filter(k=>!String(article[k]||'').trim()),ownership:'UNCONFIRMED'};
+}
+
+// BOS v0.14.41 column aliases.
+function sssM2ResolveColumns_(headers) {
+  const norm = s => String(s || '').replace(/^\uFEFF/, '').trim().toLowerCase();
+  const find = names => headers.findIndex(h => names.some(n => norm(h) === norm(n)));
+  return {
+    no: find(['No','番号']),
+    wordCount: find(['単語数','語数','word count','words']),
+    keyword: find(['キーワード','keyword','query','検索キーワード']),
+    seoDifficulty: find(['SEO難易度','seo difficulty','difficulty']),
+    volume: find(['月間検索数','平均月間検索数','search volume','volume','monthly searches','avg. monthly searches','average monthly searches']),
+    cpc: find(['CPC ($)','cpc','CPC']),
+    competition: find(['競合性','competition']),
+    occurrence: find(['出現時期','occurrence']),
+    trend3m: find(['3 か月の推移','3か月の推移','3 month change','three month change']),
+    trendYoy: find(['前年比の推移','前年比','year over year change','yoy change']),
+    competitionIndex: find(['Competition (indexed value)','competition indexed value','競合性（インデックス値）','競合性指数'])
+  };
+}
+
+// Import adapter: text already decoded by caller; no persistent writes.
+function sssM2ImportKeywords_(text, filename, parseCsv){
+ const clean=String(text||'').replace(/^\uFEFF/,'');
+ const lines=clean.split(/\r?\n/); let rows=null, idx=null, offset=-1;
+ for(let i=0;i<Math.min(30,lines.length);i++){
+  const delimiter=lines[i].includes('\t')?'\t':',';
+  const header=parseCsv(lines[i],delimiter)[0]||[];
+  const found=sssM2ResolveColumns_(header);
+  if(found.keyword<0)continue;
+  rows=parseCsv(lines.slice(i).join('\n'),delimiter);idx=found;offset=i;break;
+ }
+ if(!rows)throw Error('キーワード列を認識できません');
+ const out=[];
+ for(let i=1;i<rows.length;i++){
+  const row=rows[i];if(row.every(x=>!String(x).trim()))continue;
+  if(row.length!==rows[0].length)throw Error('列数不一致: '+(offset+i+1));
+  const get=k=>idx[k]<0?null:String(row[idx[k]]).trim();
+  const keyword=get('keyword');if(!keyword)continue;
+  const metrics={volume:get('volume'),trend3m:get('trend3m'),trendYoy:get('trendYoy'),competition:get('competition'),competitionIndex:get('competitionIndex')};
+  out.push({keyword,source:filename||'IMPORT',source_row:offset+i+1,metrics,demand:sssM2Demand_(metrics),externalSeoDifficulty:get('seoDifficulty'),cpc:get('cpc')});
+ }return out;
+}
+function sssM2ImportBlob_(blob){
+ const bytes=blob.getBytes();const a=bytes[0]&255,b=bytes[1]&255;
+ const charset=a===255&&b===254?'UTF-16LE':a===254&&b===255?'UTF-16BE':'UTF-8';
+ return sssM2ImportKeywords_(blob.getDataAsString(charset),blob.getName(),(t,d)=>Utilities.parseCsv(t,d));
+}
+// Read-only provisional lexical candidates; never infer ownership from a title.
+function sssM2InventoryCandidates_(query,inventory,limit){
+ if(!sssM2NormalizeQuery_(query))throw Error('キーワードが空です');
+ const records=inventory.records; if(!Array.isArray(records))throw Error('記事台帳が不正');
+ const hits=[];let skipped=0;
+ for(const a of records){
+  if(!['MATCHED','SBM_ONLY'].includes(a.match_status)){skipped++;continue;}
+  const evidence=sssM2IntentEvidence_(query,a);
+  if(evidence.anchor)hits.push({article_id:a.article_id,url:a.url,title:a.title,match_status:a.match_status,evidence});
+ }
+ hits.sort((a,b)=>b.evidence.lexicalScore-a.evidence.lexicalScore);
+ return {query,site_id:inventory.site_id||null,inventory_run_id:inventory.run_id||null,scanned:records.length,skipped,hit_count:hits.length,candidates:hits.slice(0,Math.max(1,Math.min(100,Number(limit)||20))),ownership:'UNCONFIRMED',limitations:['語彙候補のみ。本文・検索意図・クエリ実績の確認が必要。']};
+}
+
+// M2: compact page/query evidence is independent of the selected page metrics period.
+function sssM2QueryEvidence_(rows, inventory, ref, scope, dataset){
+ if(!Array.isArray(rows)||!rows.length||!dataset||Number(dataset.rowCount)!==rows.length-1)throw Error('クエリEvidence件数不一致');
+ if(JSON.stringify(rows[0])!==JSON.stringify(['page','query','clicks','impressions','ctr','position']))throw Error('クエリEvidence列不一致');
+ const owners=new Map(), index=new Map(), seen=new Set();let ignored=0;
+ for(const a of inventory.records)if(['MATCHED','SBM_ONLY'].includes(a.match_status)&&a.canonical_key)owners.set(a.canonical_key,a);
+ for(const r of rows.slice(1)){
+  if(r.length!==6)throw Error('クエリEvidence行不正');
+  const u=sssM1UrlInfo_(r[0],scope), q=sssM2NormalizeQuery_(r[1]), id=JSON.stringify([r[0],r[1]]);
+  if(seen.has(id))throw Error('クエリEvidence重複');seen.add(id);
+  const a=owners.get(u.key);if(!a||u.status!=='VALID'||!q){ignored++;continue;}
+  const nums=r.slice(2).map(v=>String(v).trim()===''?NaN:Number(v));if(nums.some(v=>!Number.isFinite(v)||v<0))throw Error('クエリEvidence数値不正');
+  if(!index.has(q))index.set(q,[]);
+  index.get(q).push({article_id:a.article_id,url:r[0],query:r[1],clicks:nums[0],impressions:nums[1],ctr:nums[2],position:nums[3]});
+ }
+ return {index,period:ref,ignored,coverage:'TOP_QUERIES_ONLY',limitations:['記事別上位クエリのみ。未観測は需要ゼロ・非所有を意味しない。別表記URLの実績は合算しない。']};
+}
+// Site-level observations are independent of article ownership.
+function sssM2SiteQueryIndex_(rows,d){
+ const periods=['full','first_half','second_half','recent28','previous28'];
+ const headers=['key'];for(const p of periods)for(const k of ['clicks','impressions','ctr','position'])headers.push(k+'_'+p);
+ if(!d||d.status!=='VALID'||!Array.isArray(rows)||Number(d.rowCount)!==rows.length-1||JSON.stringify(rows[0])!==JSON.stringify(headers))throw Error('サイトクエリEvidence不正');
+ const index=new Map();for(const r of rows.slice(1)){
+  if(r.length!==headers.length||r.slice(1).some(v=>String(v).trim()===''||!Number.isFinite(Number(v))||Number(v)<0))throw Error('サイトクエリ数値不正');
+  const q=sssM2NormalizeQuery_(r[0]);if(!q)continue;if(!index.has(q))index.set(q,[]);index.get(q).push({query:r[0],clicks:Number(r[1]),impressions:Number(r[2])});
+ }return index;
+}
+// Bounded lexical variants: discovery only, never proof of identical intent.
+function sssM2DiscoveryKey_(q){return sssM2NormalizeQuery_(q).replace(/クローム/g,'chrome').replace(/太く(?:する|した|なった|なる|したい)?|太字/g,'太字').replace(/\s+/g,'');}
+function sssM2RelatedQueryKeys_(q,index){
+ const terms=sssM2QueryTokens_(q).map(sssM2DiscoveryKey_).filter(Boolean);
+ if(terms.length<2||!index)return [];
+ const exact=sssM2NormalizeQuery_(q),hits=[];
+ for(const k of index.keys()){if(k===exact)continue;const n=sssM2DiscoveryKey_(k);if(terms.every(t=>n.includes(t)))hits.push(k);}
+ return hits;
+}
+function sssM2QueryDiagnostics_(q,e){
+ const key=sssM2NormalizeQuery_(q),site=e&&e.siteIndex?e.siteIndex.get(key)||[]:null;
+ return {site_status:site===null?'UNAVAILABLE':site.some(x=>x.impressions>0)?'OBSERVED':'NOT_OBSERVED',site_rows:site||[],article_query_keys:e?e.index.size:0,site_query_keys:e&&e.siteIndex?e.siteIndex.size:0,ignored:e?e.ignored:0,site_related:sssM2RelatedQueryKeys_(q,e&&e.siteIndex),article_related:sssM2RelatedQueryKeys_(q,e&&e.index)};
+}
+function sssM2LoadQueryEvidence_(inventory){
+ const c=sssConfig_();if(inventory.site_id!==c.siteId)throw Error('台帳サイト不一致');
+ const ref=sssM1CompactRef_(c);if(!ref)return null;
+ const f=DriveApp.getFileById(ref.id);if(f.isTrashed()||f.getMimeType()!=='application/zip'||f.getSize()>90*1024*1024)throw Error('クエリEvidence ZIP不正');
+ const by={};for(const b of Utilities.unzip(f.getBlob())){const k=b.getName();if(by[k])throw Error('ZIP内重複');by[k]=b;}
+ const m=JSON.parse(by['manifest.json'].getDataAsString('UTF-8'));
+ if(m.format!=='SIMS_DOCTOR_SITE_EVIDENCE_PACKAGE_V2'||m.storageMode!=='COMPACT_EVIDENCE'||m.siteId!==c.siteId||m.site.searchConsoleProperty!==c.propertyUri||m.period.startDate!==ref.start||m.period.endDate!==ref.end||Number(m.period.days)!==ref.days)throw Error('クエリEvidenceサイト・期間不一致');
+ const d=m.datasets.find(x=>x.file==='page_query_top.csv');if(!d||!by['page_query_top.csv']||!['VALID','VALID_WITH_LIMITATIONS'].includes(d.status))return null;
+ const e=sssM2QueryEvidence_(Utilities.parseCsv(by['page_query_top.csv'].getDataAsString('UTF-8')),inventory,ref,sssP72PropertyScope_(c.propertyUri),d);
+ const sd=m.datasets.find(x=>x.file==='query_summary.csv');if(sd&&by['query_summary.csv']&&sd.status==='VALID')e.siteIndex=sssM2SiteQueryIndex_(Utilities.parseCsv(by['query_summary.csv'].getDataAsString('UTF-8')),sd);return e;
+}
+function sssM2OwnershipSignals_(query,inventory,evidence){
+ const lexical=sssM2InventoryCandidates_(query,inventory,100);
+ const observed=evidence?evidence.index.get(sssM2NormalizeQuery_(query))||[]:[];
+ return {lexical,observed,query_period:evidence?evidence.period:null,observation_status:observed.length?'OBSERVED':evidence?'NOT_OBSERVED':'UNAVAILABLE',ownership:'UNCONFIRMED'};
+}
+// BOS band mapping, with an explicit unknown state instead of false RED.
+function sssM2SerpGrade_(band,hardBlock){
+ if(hardBlock===true)return 'BLOCK';if(hardBlock!==false)return 'UNCONFIRMED';
+ return ({TOP10:'GREEN',TOP20:'YELLOW',TOP30:'PALE_PINK',OUT:'RED'})[String(band||'').trim().toUpperCase()]||'UNCONFIRMED';
+}
+
+// M2 SERP contract adapter, based on BOS v0.14.41. Pure functions; no persistence.
+function sssM2SerpRequest_(requestId,site,candidates,generatedAt){
+ if(!String(requestId||'').trim()||!site||!site.id||!site.url||!Array.isArray(candidates)||!candidates.length||candidates.length>5)throw Error('SERP依頼情報不正');
+ const keys=new Set();const list=candidates.map(c=>{const keyword=String(c.main_keyword||c.keyword||'').trim(),key=sssM2NormalizeQuery_(keyword);if(!key||keys.has(key))throw Error('依頼キーワード不正・重複');keys.add(key);return Object.assign({},c,{main_keyword:keyword});});
+ return {format:'SIMS_BOS_SERP_REVIEW_REQUEST_V1',contract_version:'1.0',product:'SIMS Site Strategist',product_version:SSS_VERSION,request_id:requestId,generated_at:generatedAt,site:{id:site.id,name:site.name||'',url:site.url},candidate_count:list.length,candidates:list,evaluation_policy:{minimum_verified_results_per_candidate:5,require_web_verification:true,do_not_assume_volume_zero_means_no_demand:true,do_not_finalize_article_green_before_cannibalization_check:true}};
+}
+function sssM2SerpPrompt_(p){return ['現在のWeb検索で各候補を精査。確認済みの個別ページを最低5件。架空URL・検索一覧・推測順位は禁止。取得不足は明示。需要不明だけでhard_blockにしない。自サイト記事があっても検索意図の独立性を別途確認する。','SIMS_BOS_SERP_REVIEW_RESULT_V2 のJSONを返す。request_idを一致させる。resultsには main_keyword, checked_count, serp_evidence [{title,url,rank?,site_type,weakness_or_strength}], reachable_band (TOP10/TOP20/TOP30/OUT), confidence_percent, hard_block, block_reason, blue_ocean_score, search_intent, evidence_summary を含める。順位帯を推測できない場合はnull。','REQUEST JSON:',JSON.stringify(p,null,2)].join('\n');}
+function sssM2ParseSerp_(raw){const s=String(raw||'').trim();const fenced=s.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);return JSON.parse(fenced?fenced[1]:s);}
+function sssM2ValidateSerp_(p,request,scope){
+ if(!request||request.format!=='SIMS_BOS_SERP_REVIEW_REQUEST_V1'||!p||p.format!=='SIMS_BOS_SERP_REVIEW_RESULT_V2'||p.request_id!==request.request_id||!Array.isArray(p.results)||p.results.length!==request.candidates.length)throw Error('SERP回答契約不一致');
+ if(p.site&&((p.site.id&&p.site.id!==request.site.id)||(p.site.url&&p.site.url!==request.site.url)))throw Error('SERP回答サイト不一致');
+ const expected=new Set(request.candidates.map(c=>sssM2NormalizeQuery_(c.main_keyword))), seen=new Set();
+ if(expected.size!==request.candidates.length)throw Error('依頼重複');
+ const results=p.results.map(r=>{
+  const key=sssM2NormalizeQuery_(r.main_keyword);if(!expected.has(key)||seen.has(key))throw Error('回答キーワード不一致・重複');seen.add(key);
+  if(!Array.isArray(r.serp_evidence)||typeof r.hard_block!=='boolean'||!Number.isInteger(r.checked_count)||r.checked_count!==r.serp_evidence.length)throw Error('検索証拠件数・停止判定不正');
+  if(typeof r.blue_ocean_score!=='number'||!Number.isFinite(r.blue_ocean_score)||r.blue_ocean_score<0||r.blue_ocean_score>100||typeof r.confidence_percent!=='number'||!Number.isFinite(r.confidence_percent)||r.confidence_percent<0||r.confidence_percent>100)throw Error('評価数値不正');
+  for(const f of ['search_intent','evidence_summary'])if(typeof r[f]!=='string'||!r[f].trim())throw Error('必須説明不足: '+f);
+  if(r.hard_block&&(!String(r.block_reason||'').trim()))throw Error('停止理由不足');
+  if(r.reachable_band!==null&&!['TOP10','TOP20','TOP30','OUT'].includes(r.reachable_band))throw Error('順位帯不正');
+  const urls=new Set();let own=false;
+  for(const e of r.serp_evidence){const url=String(e.url||'').trim();if(!String(e.title||'').trim()||!/^https?:\/\/[^\s/?#]+(?:[^\s]*)$/i.test(url)||/\/search(?:[/?#]|$)/i.test(url)||/[?&](?:q|s|query|search_query)=/i.test(url))throw Error('検索証拠URL不正');const u=sssM1UrlInfo_(url,scope);if(u.status==='INVALID_URL')throw Error('検索証拠URL不正');const k=sssArticleUrlKey_(url);if(!k||urls.has(k))throw Error('検索証拠URL重複・不正');urls.add(k);if(u.status==='VALID')own=true;if(e.rank!=null&&(!Number.isInteger(e.rank)||e.rank<1))throw Error('順位不正');}
+  const sufficient=urls.size>=5;return {keyword:r.main_keyword,grade:sufficient?sssM2SerpGrade_(r.reachable_band,r.hard_block):'UNCONFIRMED',evidence_status:sufficient?'REPORTED_SUFFICIENT':'INSUFFICIENT',own_site_hit:own,cannibal_status:'UNCONFIRMED',publication_gate:'HOLD',raw:r};
+ });return {request_id:request.request_id,site_id:request.site.id,results,evidence_verification:'STRUCTURAL_ONLY'};
+}
+
+// M2 integrated read-only screening: SKE ownership hints and BOS risk are provisional.
+function sssM2Screen_(keyword,inventory,evidence){
+ const signals=sssM2OwnershipSignals_(keyword,inventory,evidence);
+ const by=new Map(signals.lexical.candidates.map(a=>[a.article_id,{article_id:a.article_id,title:a.title,url:a.url,lexical:a.evidence.lexicalScore,observations:[]} ]));
+ const articles=new Map(inventory.records.filter(a=>['MATCHED','SBM_ONLY'].includes(a.match_status)).map(a=>[a.article_id,a]));
+ for(const o of signals.observed){const a=articles.get(o.article_id);if(!a)continue;if(!by.has(o.article_id))by.set(o.article_id,{article_id:a.article_id,title:a.title,url:a.url,lexical:null,observations:[]});by.get(o.article_id).observations.push(o);}
+ const candidates=Array.from(by.values());
+ const relatedKeys=sssM2RelatedQueryKeys_(keyword,evidence&&evidence.index);
+ for(const key of relatedKeys){for(const o of evidence.index.get(key)){const a=articles.get(o.article_id);if(!a)continue;let item=by.get(o.article_id);if(!item){item={article_id:a.article_id,title:a.title,url:a.url,lexical:null,observations:[],related_queries:[]};by.set(o.article_id,item);candidates.push(item);}if(!item.related_queries)item.related_queries=[];if(!item.related_queries.includes(key))item.related_queries.push(key);}}
+
+ const risk=candidates.length>1?'MULTIPLE_ARTICLES_REVIEW':candidates.length?'RELATED_ARTICLE_REVIEW':'NO_SIGNAL_NOT_CONFIRMED';
+ return {keyword,site_id:inventory.site_id,inventory_run_id:inventory.run_id,scanned:signals.lexical.scanned,skipped:signals.lexical.skipped,lexical_hit_count:signals.lexical.hit_count,observation_status:signals.observation_status,query_period:signals.query_period,candidates,risk,ownership:'UNCONFIRMED',publication_gate:'HOLD',limitations:['上位クエリと語彙による暫定候補。本文・検索意図の精査が必要。','語彙候補の表示上限100件。検索実績は合算しない。']};
+}
+function sssM2RunScreen(keyword){
+ const q=String(keyword||'').trim();if(!q||q.length>200)throw Error('検索キーワードを200文字以内で入力してください。');
+ const c=sssConfig_(),connection=sssM1FindManagers_();if(!connection.complete||connection.candidates.length!==1)throw Error('先に全記事台帳の照合でSBM連携先を確定してください。');
+ const inventory=sssM1Load_(connection.candidates[0].id),evidence=sssM2LoadQueryEvidence_(inventory),r=sssM2Screen_(q,inventory,evidence),d=sssM2QueryDiagnostics_(q,evidence);
+ return ['対象ブログ：'+c.siteName,'対象キーワード：'+q,'探索記事：'+r.scanned+'件（識別保留 '+r.skipped+'件）','記事別上位クエリ：'+(r.observation_status==='UNAVAILABLE'?'利用不可':r.observation_status==='OBSERVED'?'観測あり':'観測なし'),'クエリ期間：'+(r.query_period?r.query_period.start+' ～ '+r.query_period.end:'不明'),'サイト全体クエリ：'+({OBSERVED:'観測あり',NOT_OBSERVED:'観測なし',UNAVAILABLE:'利用不可'})[d.site_status], 'サイト全体の一致行：'+d.site_rows.length+'件（合算なし）', 'クエリ索引：サイト '+d.site_query_keys+'種類 / 記事別 '+d.article_query_keys+'種類 / 記事未照合等 '+d.ignored+'行','サイト関連クエリ：'+d.site_related.length+'種類（暫定・合算なし）',...d.site_related.slice(0,10).map(k=>'  '+k),'記事別関連クエリ：'+d.article_related.length+'種類（暫定）','語彙候補：'+r.lexical_hit_count+'件','関連候補：'+r.candidates.length+'件（暫定）',...r.candidates.slice(0,10).map(a=>a.article_id+' '+a.title+' / クエリ観測 '+a.observations.length+'件 / 関連語 '+(a.related_queries||[]).slice(0,3).join('、')),'記事作成判定：保留','本文・検索意図の精査が必要です。観測なしは需要ゼロではありません。'].join('\n');
+}
+function sssM2Preview(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:16px;color:#202124}input{width:100%;box-sizing:border-box;padding:10px}button{padding:10px 16px;margin:12px 8px 0 0;border:1px solid #aaa;border-radius:5px;background:white}#go{background:#2459a6;color:white}#result{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}</style><p>既存記事と検索クエリから関連記事候補を確認します。SBM・Evidenceは変更しません。</p><input id="q" placeholder="例：LINE 通知 来ない" maxlength="200"><button id="go" onclick="run()">分析を開始</button><button onclick="google.script.host.close()">閉じる</button><p id="result"></p><script>function run(){const q=document.getElementById('q').value.trim(),b=document.getElementById('go'),r=document.getElementById('result');if(!q){r.textContent='キーワードを入力してください。';return;}b.disabled=true;r.textContent='全記事と検索実績を分析しています…';google.script.run.withSuccessHandler(x=>{b.disabled=false;r.textContent=x}).withFailureHandler(e=>{b.disabled=false;r.textContent='処理停止：'+e.message}).sssM2RunScreen(q)}</script>`).setWidth(640).setHeight(540);SpreadsheetApp.getUi().showModalDialog(html,'関連記事候補の分析（試験）');
+}
+
+// M2 intent review adapter: bounded evidence, separate from SERP ranking and demand.
+function sssM2IntentRequest_(id,site,screen,evidence,at){
+ if(!id||!site||!site.id||screen.site_id!==site.id||!screen.keyword)throw Error('検索意図依頼不正');
+ const d=sssM2QueryDiagnostics_(screen.keyword,evidence),keys=d.site_related.slice(0,50),articles=screen.candidates.slice(0,30);
+ return {format:'S3_INTENT_REVIEW_REQUEST_V1',request_id:id,site_id:site.id,property:site.url,keyword:screen.keyword,generated_at:at,period:screen.query_period,exact_site_rows:d.site_rows,related_site_queries:keys.map(k=>({key:k,rows:evidence.siteIndex.get(k)})),articles,coverage:{scanned:screen.scanned,skipped:screen.skipped,related_total:d.site_related.length,article_total:screen.candidates.length,limited:keys.length<d.site_related.length||articles.length<screen.candidates.length,ownership:'UNCONFIRMED'},publication_gate:'HOLD'};
+}
+function sssM2IntentPrompt_(p){return ['既存記事URLの本文を確認し、検索意図を比較してください。サイト全体クエリを個別記事に帰属させない。未観測は需要ゼロではない。関連語は同一意図とは限らない。アクセス不可は明記し、推測で確定しない。','S3_INTENT_REVIEW_RESULT_V1 のJSONを返す。request_id,site_id,keyword,assessment (SAME_INTENT/DISTINCT_INTENT/UNCERTAIN), articles [{article_id,body_status (VERIFIED/UNAVAILABLE),reason}], reason を含める。記事作成承認は行わない。',JSON.stringify(p,null,2)].join('\n');}
+function sssM2ValidateIntent_(p,r){
+ if(!r||r.format!=='S3_INTENT_REVIEW_REQUEST_V1'||!p||p.format!=='S3_INTENT_REVIEW_RESULT_V1'||p.request_id!==r.request_id||p.site_id!==r.site_id||p.keyword!==r.keyword||!['SAME_INTENT','DISTINCT_INTENT','UNCERTAIN'].includes(p.assessment)||!String(p.reason||'').trim()||!Array.isArray(p.articles)||p.articles.length!==r.articles.length)throw Error('検索意図回答不正');
+ const ids=new Set(r.articles.map(a=>a.article_id));for(const a of p.articles){if(!ids.delete(a.article_id)||!['VERIFIED','UNAVAILABLE'].includes(a.body_status)||!String(a.reason||'').trim())throw Error('記事確認回答不正');}
+ const sufficient=r.articles.length>0&&!r.coverage.limited&&!r.coverage.skipped&&p.articles.every(a=>a.body_status==='VERIFIED');
+ return {request_id:r.request_id,assessment:sufficient?p.assessment:'UNCERTAIN',verification:'REPORTED_ONLY',publication_gate:'HOLD',raw:p};
+}
+
+// M2 read-only end-to-end pilot. All outputs remain provisional; no publication mutation.
+function sssM2CombinedDecision_(d,s,i){
+ const grade=s.grade, intent=i.assessment;
+ const action=grade==='BLOCK'?'BLOCK':intent==='SAME_INTENT'?'REVIEW_EXISTING':intent!=='DISTINCT_INTENT'?'HOLD_INTENT':grade==='UNCONFIRMED'?'HOLD_SERP':d.volume.status!=='CONFIRMED'?'HOLD_DEMAND':grade==='GREEN'||grade==='YELLOW'?'REVIEW_NEW_ARTICLE':'LOW_PRIORITY';
+ return {action,grade,intent,demand:d.volume.status,publication_gate:'HOLD',verification:'REPORTED_ONLY'};
+}
+function sssM2PilotPrepare(q,volume){
+ q=String(q||'').trim();if(!q||q.length>200)throw Error('キーワードを200文字以内で入力してください。');
+ const c=sssConfig_(),conn=sssM1FindManagers_();if(!conn.complete||conn.candidates.length!==1)throw Error('先にSBM連携先を確定してください。');
+ const inv=sssM1Load_(conn.candidates[0].id),e=sssM2LoadQueryEvidence_(inv),screen=sssM2Screen_(q,inv,e),id=Utilities.getUuid(),at=new Date().toISOString(),site={id:c.siteId,name:c.siteName,url:c.propertyUri};
+ const demand=sssM2Demand_({volume}),serp=sssM2SerpRequest_(id,site,[{main_keyword:q,demand}],at),intent=sssM2IntentRequest_(id,site,screen,e,at);
+ const packet={site_id:c.siteId,property:c.propertyUri,demand,serp,intent};
+ // Store immutable request in S3 document properties, chunked below per-value limit.
+ const raw=JSON.stringify(packet);if(raw.length>100000)throw Error('依頼データが大きすぎます。');
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);try{const p=sssProperties_(),old=Number(p.getProperty('SSS_M2_PILOT_N')||0);p.deleteProperty('SSS_M2_PILOT_N');for(let n=0;n<old;n++)p.deleteProperty('SSS_M2_PILOT_'+n);const chunks=raw.match(/[\s\S]{1,2000}/g);const values={};chunks.forEach((v,n)=>values['SSS_M2_PILOT_'+n]=v);p.setProperties(values);p.setProperty('SSS_M2_PILOT_N',String(chunks.length));}finally{lock.releaseLock();}
+ return '次の二つの調査を実施し、単一JSON {"serp": SERP回答オブジェクト, "intent": 検索意図回答オブジェクト} を返してください。\n'+sssM2SerpPrompt_(serp)+'\n\n'+sssM2IntentPrompt_(intent);
+}
+function sssM2PilotReceive(raw){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);try{const p=sssProperties_(),n=Number(p.getProperty('SSS_M2_PILOT_N')||0);if(!Number.isInteger(n)||n<1||n>50)throw Error('先に依頼を作成してください。');let data='';for(let j=0;j<n;j++){const part=p.getProperty('SSS_M2_PILOT_'+j);if(part===null)throw Error('依頼保存不完全');data+=part;}const r=JSON.parse(data),c=sssConfig_();if(c.siteId!==r.site_id||c.propertyUri!==r.property)throw Error('対象サイト不一致');const a=sssM2ParseSerp_(raw),s=sssM2ValidateSerp_(a.serp,r.serp,sssP72PropertyScope_(c.propertyUri)),i=sssM2ValidateIntent_(a.intent,r.intent);const decision=sssM2CombinedDecision_(r.demand,s.results[0],i);sssM2SaveReview_(SpreadsheetApp.getActiveSpreadsheet(),r,a,decision);return sssM2ReviewText_(r,decision);}finally{lock.releaseLock();}
+}
+function sssM2PilotDialog(){
+ const h=HtmlService.createHtmlOutput(`<!doctype html><meta charset="utf-8"><style>html,body{margin:0;height:100%;box-sizing:border-box}body{font:14px Arial;display:flex;flex-direction:column;padding:12px;gap:8px}main{flex:1;min-height:0;overflow:auto;padding:0 8px 12px}label{display:block;margin-top:8px}input,textarea{box-sizing:border-box;width:100%;margin:6px 0}input{padding:6px}textarea{height:110px;resize:vertical}button{padding:9px;margin:4px 6px 4px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}.op{display:flex;align-items:center;flex-wrap:wrap;gap:6px}.status{flex:1;min-width:140px;overflow-wrap:anywhere;color:#174b79}.status.error{color:#a11;background:#fce8e6}footer{flex:none;border-top:1px solid #ddd}</style><main><p>検索需要・競合・検索意図の連携試験。SBMとEvidenceは変更しません。新規依頼は前回の試験依頼を置き換えます。</p><div class="op"><button id="resume" onclick="resume()">前回の依頼を再開</button><span class="status" id="resumeStatus" role="status"></span></div><label>キーワード<input id="q" value="Chrome 太字"></label><label>月間検索数（不明なら空欄）<input id="v"></label><div class="op"><button id="prepare" onclick="prepare()">精査依頼を作成</button><span class="status" id="prepareStatus" role="status" aria-live="polite"></span></div><label>精査依頼文<textarea id="req" readonly></textarea></label><div class="op"><button id="copy" onclick="copyRequest()" disabled>依頼文をコピー</button><span class="status" id="copyStatus" role="status" aria-live="polite"></span></div><label>Claude回答JSON<textarea id="ans"></textarea></label><div class="op"><button id="receive" onclick="receive()" disabled>回答を検証</button><span class="status" id="receiveStatus" role="status" aria-live="polite"></span></div><pre id="result" tabindex="-1"></pre></main><footer><button id="close" onclick="google.script.host.close()">閉じる</button></footer><script>const el=id=>document.getElementById(id);let pending=false,ready=false;function status(id,t,error){const x=el(id+'Status');x.textContent=t;x.className=error?'status error':'status'}function busy(v){pending=v;el('prepare').disabled=v;el('resume').disabled=v;el('close').disabled=v;el('copy').disabled=v||!ready;el('receive').disabled=v||!ready;el('q').disabled=v;el('v').disabled=v;el('ans').disabled=v}function fail(id,e){busy(false);status(id,'停止：'+(e.message||e),true)}async function copyRequest(){if(pending||!ready)return;try{let ok=false;try{if(navigator.clipboard){await navigator.clipboard.writeText(el('req').value);ok=true}}catch(e){}if(!ok){el('req').focus();el('req').select();ok=document.execCommand('copy')}if(!ok)throw Error('copy');status('copy','コピーしました！')}catch(e){status('copy','コピーできませんでした。依頼文を選択して Ctrl+C でコピーしてください。',true)}}function prepare(){if(pending)return;ready=false;busy(true);status('prepare','分析中…');status('copy','');status('receive','');el('req').value='';el('ans').value='';el('result').textContent='';google.script.run.withFailureHandler(e=>fail('prepare',e)).withSuccessHandler(x=>{el('req').value=x;ready=true;busy(false);status('prepare','依頼作成完了。依頼文をコピーしてください。')}).sssM2PilotPrepare(el('q').value,el('v').value)}function resume(){if(pending)return;busy(true);status('resume','読込中…');google.script.run.withFailureHandler(e=>fail('resume',e)).withSuccessHandler(x=>{el('q').value=x.keyword;el('v').value=x.volume;el('req').value=x.prompt;el('ans').value='';el('result').textContent=x.result||'';ready=!x.saved;busy(false);status('resume',x.saved?'登録済みの結果を表示しました。':'依頼を再開しました。')}).sssM2PilotResume()}function receive(){if(pending||!ready)return;if(!el('ans').value.trim()){status('receive','Claude回答JSONを貼り付けてください。',true);return}busy(true);status('receive','検証中…');el('result').textContent='';google.script.run.withFailureHandler(e=>fail('receive',e)).withSuccessHandler(x=>{busy(false);el('result').textContent=x;status('receive','回答の検証完了。結果を確認してください。')}).sssM2PilotReceive(el('ans').value)}</script>`).setWidth(650).setHeight(620);SpreadsheetApp.getUi().showModalDialog(h,'検索意図・競合精査（試験）');
+}
+
+// S3-only review ledger. Request ID is the immutable deduplication key.
+function sssM2ReviewText_(r,d){
+ const labels={REVIEW_EXISTING:'既存記事の改善を検討',REVIEW_NEW_ARTICLE:'新記事作成の精査候補',HOLD_INTENT:'検索意図の追加精査',HOLD_SERP:'競合の追加精査',HOLD_DEMAND:'検索需要の追加確認',LOW_PRIORITY:'優先度を下げる',BLOCK:'記事化停止'};
+ return ['対象：'+r.intent.keyword,'推奨処置：'+(labels[d.action]||d.action),'検索意図：'+({SAME_INTENT:'重複あり',DISTINCT_INTENT:'独立',UNCERTAIN:'未確定'}[d.intent]||d.intent),'上位表示見込み：'+(d.grade==='UNCONFIRMED'?'未確定':d.grade),'検索需要：'+(d.demand==='UNKNOWN'?'未確認':d.demand),'新記事作成：保留','証拠：AI報告に基づく（独立検証なし）','精査履歴に保存済み'].join('\n');
+}
+function sssM2SaveReview_(ss,r,a,d){
+ const name='S3_精査履歴',header=['request_id','site_id','keyword','saved_at','action','grade','intent','demand','publication_gate','verification','request_json_1','request_json_2','request_json_3','response_json_1','response_json_2','response_json_3'];
+ const split=x=>{const t=JSON.stringify(x);if(t.length>120000)throw Error('精査履歴の保存上限を超えました。');return [t.slice(0,40000),t.slice(40000,80000),t.slice(80000)].map(v=>"'"+v);};
+ const row=[r.intent.request_id,r.site_id,"'"+r.intent.keyword,new Date().toISOString(),d.action,d.grade,d.intent,d.demand,d.publication_gate,d.verification,...split(r),...split(a)];
+ let sh=ss.getSheetByName(name);if(!sh){sh=ss.insertSheet(name);sh.getRange(1,1,1,header.length).setValues([header]);sh.setFrozenRows(1);}
+ if(JSON.stringify(sh.getRange(1,1,1,header.length).getValues()[0])!==JSON.stringify(header))throw Error('精査履歴の列構成が一致しません。');
+ const n=sh.getLastRow();if(n>1&&sh.getRange(2,1,n-1,1).getValues().some(x=>x[0]===row[0]))throw Error('この依頼は登録済みです。');
+ sh.getRange(n+1,1,1,row.length).setValues([row]);
+}
+
+// Candidate view derives from the immutable review ledger; no duplicate persistent state.
+function sssM2CandidateRows_(rows,site){
+ const latest=new Map();for(const r of rows){if(r[1]!==site||!r[0]||!r[2])continue;const key=sssM2NormalizeQuery_(String(r[2]).replace(/^'/,''));if(!key)continue;const prev=latest.get(key);if(!prev||String(r[3])>=String(prev[3]))latest.set(key,r);}
+ return Array.from(latest.values()).sort((a,b)=>String(b[3]).localeCompare(String(a[3])));
+}
+function sssM2LedgerRows_(ss){const sh=ss.getSheetByName('S3_精査履歴');if(!sh||sh.getLastRow()<2)return [];const h=sh.getRange(1,1,1,10).getValues()[0];if(h.join('|')!=='request_id|site_id|keyword|saved_at|action|grade|intent|demand|publication_gate|verification')throw Error('精査履歴の列構成が一致しません。');return sh.getRange(2,1,sh.getLastRow()-1,10).getValues();}
+function sssM2CandidatePreview(){const c=sssConfig_(),rows=sssM2CandidateRows_(sssM2LedgerRows_(SpreadsheetApp.getActiveSpreadsheet()),c.siteId);const text=rows.length?rows.slice(0,50).map(r=>sssM2ReviewText_({intent:{keyword:String(r[2]).replace(/^'/,'')}},{action:r[4],grade:r[5],intent:r[6],demand:r[7]})).join('\n\n'):'精査済み候補はありません。';SpreadsheetApp.getUi().alert('精査済み候補（最新・最大50件／全'+rows.length+'件）',text,SpreadsheetApp.getUi().ButtonSet.OK);}
+function sssM2PilotResume(){const lock=LockService.getDocumentLock();lock.waitLock(10000);try{const p=sssProperties_(),n=Number(p.getProperty('SSS_M2_PILOT_N')||0);if(!Number.isInteger(n)||n<1||n>50)throw Error('再開できる依頼がありません。');let raw='';for(let j=0;j<n;j++){const part=p.getProperty('SSS_M2_PILOT_'+j);if(part===null)throw Error('依頼保存不完全');raw+=part;}const r=JSON.parse(raw),c=sssConfig_();if(c.siteId!==r.site_id||c.propertyUri!==r.property)throw Error('対象サイト不一致');const saved=sssM2LedgerRows_(SpreadsheetApp.getActiveSpreadsheet()).find(x=>x[0]===r.intent.request_id&&x[1]===c.siteId);return {keyword:r.intent.keyword,volume:r.demand.volume.raw||'',prompt:'次の二つの調査を実施し、単一JSON {"serp": SERP回答オブジェクト, "intent": 検索意図回答オブジェクト} を返してください。\n'+sssM2SerpPrompt_(r.serp)+'\n\n'+sssM2IntentPrompt_(r.intent),saved:!!saved,result:saved?sssM2ReviewText_(r,{action:saved[4],grade:saved[5],intent:saved[6],demand:saved[7]}):''};}finally{lock.releaseLock();}}
+
+// M3 evidence coverage triage: data quality only. No content-quality or SEO judgment.
+function sssM3EvidenceTriage_(inventory){
+ if(!inventory||!Array.isArray(inventory.records))throw Error('M3台帳不正');
+ const groups={IDENTITY_REVIEW:[],NO_GSC_URL_MATCH:[],MATCHED_METRICS_UNAVAILABLE:[],OBSERVED_IMPRESSIONS:[],MATCHED_ZERO_IMPRESSIONS:[],INVALID_METRICS:[]};
+ for(const a of inventory.records){
+  const id=String(a.article_id||''),entry={article_id:id,title:String(a.title||''),url:String(a.url||'')};
+  let key='';
+  if(a.match_status!=='MATCHED'&&a.match_status!=='SBM_ONLY')key='IDENTITY_REVIEW';
+  else if(a.match_status==='SBM_ONLY')key='NO_GSC_URL_MATCH';
+  else if(!a.metrics)key='MATCHED_METRICS_UNAVAILABLE';
+  else {
+   const m=a.metrics[365]||a.metrics.compact&&a.metrics.compact.windows&&a.metrics.compact.windows.full;
+   if(!m)key='MATCHED_METRICS_UNAVAILABLE';
+   else if(!Number.isFinite(Number(m.impressions))||Number(m.impressions)<0||!Number.isFinite(Number(m.clicks))||Number(m.clicks)<0||Number(m.clicks)>Number(m.impressions))key='INVALID_METRICS';
+   else key=Number(m.impressions)>0?'OBSERVED_IMPRESSIONS':'MATCHED_ZERO_IMPRESSIONS';
+  }
+  groups[key].push(entry);
+ }
+ const counts={},examples={};for(const k of Object.keys(groups)){counts[k]=groups[k].length;examples[k]=groups[k].slice(0,3);}
+ const total=Object.values(counts).reduce((a,b)=>a+b,0);if(total!==inventory.records.length)throw Error('M3分類件数不一致');
+ return {format:'S3_M3_EVIDENCE_TRIAGE_V1',site_id:inventory.site_id||null,counts,examples,total,
+  decision:'NO_CONTENT_ACTION',limitations:['観測ゼロは需要ゼロではない','URL未照合は未インデックスを意味しない','記事品質・統合・削除・noindexは判定しない','集計は採用Evidenceの対象期間に限定']};
+}
+
+// M3: site-wide evidence inventory snapshot. No ranking, deletion, merge or publication decision.
+function sssM3Summarize_(inventory, queryEvidence, reviewRows){
+ if(!inventory||!Array.isArray(inventory.records)||!inventory.site_id)throw Error('M3台帳不正');
+ const counts={MATCHED:0,SBM_ONLY:0,AMBIGUOUS:0,INVALID_URL:0,OUT_OF_SCOPE:0};
+ const states={},seen=new Set();let duplicateIds=0,withMetrics=0;
+ for(const a of inventory.records){
+  if(!a||!a.match_status)throw Error('M3記事状態不正');
+  counts[a.match_status]=(counts[a.match_status]||0)+1;
+  const st=String(a.state||'未設定');states[st]=(states[st]||0)+1;
+  if(a.article_id){if(seen.has(a.article_id))duplicateIds++;seen.add(a.article_id);}
+  if(a.metrics!==null&&a.metrics!==undefined)withMetrics++;
+ }
+ const q=queryEvidence||null;
+ const own=(reviewRows||[]).filter(r=>r[1]===inventory.site_id);
+ const latest=sssM2CandidateRows_(own,inventory.site_id);
+ return {format:'S3_SITE_DIAGNOSTIC_SNAPSHOT_V1',site_id:inventory.site_id,inventory_run_id:inventory.run_id||null,
+  articles:inventory.records.length,match_counts:counts,workflow_states:states,duplicate_article_ids:duplicateIds,
+  metrics_attached:withMetrics,metrics_missing:inventory.records.length-withMetrics,
+  gsc_only_raw:(inventory.gscOnly||[]).length,gsc_only_normalized:inventory.unmatched_key_count||0,
+  query_status:q?'AVAILABLE':'UNAVAILABLE',article_query_keys:q&&q.index?q.index.size:null,
+  site_query_keys:q&&q.siteIndex?q.siteIndex.size:null,query_ignored:q?q.ignored:null,
+  reviewed_requests:own.length,latest_reviewed_keywords:latest.length,
+  limitations:['未観測はクリック・需要ゼロを意味しない','URL別実績は合算しない','検索クエリのサイト全体実績を記事に帰属させない','削除・noindex・統合・新規作成は本集計で決定しない']};
+}
+function sssM3RunDeepPreview_(){
+ const c=sssConfig_(),conn=sssM1FindManagers_();
+ if(!conn.complete||conn.candidates.length!==1)throw Error('先にSBM連携先を確定してください。');
+ const inv=sssM1Load_(conn.candidates[0].id),q=sssM2LoadQueryEvidence_(inv);
+ const rows=sssM2LedgerRows_(SpreadsheetApp.getActiveSpreadsheet()),d=sssM3Summarize_(inv,q,rows),t=sssM3EvidenceTriage_(inv);
+ return ['ブログ総合診断・基礎集計（試験）','対象ブログ：'+c.siteName,'記事総数：'+d.articles+'件',
+ 'GSC照合：一致 '+d.match_counts.MATCHED+'件／SBMのみ '+d.match_counts.SBM_ONLY+'件',
+ '照合保留・URL異常：'+(d.match_counts.AMBIGUOUS+d.match_counts.INVALID_URL+d.match_counts.OUT_OF_SCOPE)+'件',
+ '記事ID重複：'+d.duplicate_article_ids+'件','検索実績の紐付けあり：'+d.metrics_attached+'件（未紐付け '+d.metrics_missing+'件）',
+ 'GSC側のみ：生URL '+d.gsc_only_raw+'件／正規化キー '+d.gsc_only_normalized+'件',
+ '記事状態：'+Object.entries(d.workflow_states).map(([k,v])=>k+' '+v+'件').join('、'),
+ '検索クエリ：'+(d.query_status==='AVAILABLE'?'利用可能':'利用不可'),
+ 'サイト全体クエリ：'+(d.site_query_keys===null?'不明':d.site_query_keys+'種類'),
+ '記事別上位クエリ：'+(d.article_query_keys===null?'不明':d.article_query_keys+'種類'),
+ '精査履歴：'+d.reviewed_requests+'件／最新候補 '+d.latest_reviewed_keywords+'件',
+ '【分析データの確認対象】',
+ '記事識別の確認：'+t.counts.IDENTITY_REVIEW+'件',
+ 'GSC URL照合なし：'+t.counts.NO_GSC_URL_MATCH+'件',
+ 'URL照合あり・数値未取得：'+t.counts.MATCHED_METRICS_UNAVAILABLE+'件',
+ '表示回数の観測あり：'+t.counts.OBSERVED_IMPRESSIONS+'件',
+ 'URL照合あり・表示回数0：'+t.counts.MATCHED_ZERO_IMPRESSIONS+'件',
+ '数値異常：'+t.counts.INVALID_METRICS+'件',
+ '確認対象の例（最大3件）：'+t.examples.IDENTITY_REVIEW.concat(t.examples.INVALID_METRICS).slice(0,3).map(x=>x.article_id+' '+x.title).join('／'),
+ '※これは全記事の基礎集計です。削除・統合・noindex・記事作成の判断は行いません。',
+ '※検索実績未確認は検索需要ゼロではありません。'].join('\n');
+}
+// Fast first-stage M3 snapshot. Do not decompress 365-day detailed Evidence or
+// the 96k-keyword query archive in an interactive google.script.run request.
+// The slow deep preview remains internal until a bounded/batched reader exists.
+function sssM3QuickSummarize_(articles,siteName,source){
+ if(!Array.isArray(articles))throw Error('記事台帳が不正です。');
+ const states={},seen=new Set(),dupes=[];let missingId=0,missingUrl=0;
+ for(const a of articles){
+  const st=String(a.state||'未設定');states[st]=(states[st]||0)+1;
+  if(!a.article_id)missingId++;
+  else if(seen.has(a.article_id)){if(dupes.length<3)dupes.push(a.article_id);}else seen.add(a.article_id);
+  if(!a.url)missingUrl++;
+ }
+ return {format:'S3_M3_FAST_SNAPSHOT_V1',site:siteName,articles:articles.length,states,missingId,missingUrl,duplicateIds:dupes,
+  evidence:source||'未確認',gsc:'NOT_LOADED',query:'NOT_LOADED',contentAction:'NONE'};
+}
+function sssM3RunPreview(){
+ const c=sssConfig_(),conn=sssM1FindManagers_();
+ if(!conn.complete||conn.candidates.length!==1)throw Error('先にSBM連携先を確定してください。');
+ const id=conn.candidates[0].id;
+ // Limit the initial request to the SBM inventory; no Drive ZIP reads or CSV expansion.
+ const sh=SpreadsheetApp.openById(id).getSheetByName('記事管理');
+ if(!sh||sh.getLastRow()<1||sh.getLastRow()>10001)throw Error('SBM記事管理の行数が不正です。');
+ const articles=sssM1Articles_(sh.getRange(1,1,sh.getLastRow(),sh.getLastColumn()).getDisplayValues());
+ const e=sssM3QuickSummarize_(articles,c.siteName,'この画面ではEvidenceの展開を省略');
+ return ['ブログ総合診断・高速基礎集計（試験）','対象ブログ：'+e.site,'記事総数：'+e.articles+'件',
+  '記事ID未設定：'+e.missingId+'件','記事URL未設定：'+e.missingUrl+'件',
+  '記事ID重複（表示最大3件）：'+(e.duplicateIds.join('／')||'検出なし'),
+  '記事状態：'+Object.entries(e.states).map(([k,v])=>k+' '+v+'件').join('、'),
+  'GSC URL照合・記事別検索実績：今回未取得',
+  '検索クエリ・Evidence品質：今回未取得',
+  '精査履歴：今回未取得',
+  '処理方針：SBM記事台帳のみを高速集計。大量ZIPの読み込みは行いません。',
+  '※未取得を0件・検索需要ゼロと解釈しません。',
+  '※削除・統合・noindex・記事作成の判断は行いません。'].join('\n');
+}
+function sssM3Preview(){
+ const h=HtmlService.createHtmlOutput(`<!doctype html><meta charset="utf-8"><style>html,body{height:100%;margin:0;box-sizing:border-box}body{font:14px Arial;display:flex;flex-direction:column;padding:16px;gap:12px}main{flex:1;min-height:0;overflow:auto}button{padding:9px 14px}#msg{margin-left:10px;color:#174b79}#result{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}footer{border-top:1px solid #ddd;padding-top:8px}</style><main><p>SBMの記事台帳だけを高速集計します。GSC・Evidenceの詳細集計は次工程です。記事やデータは変更しません。</p><button id="go" onclick="run()">診断を開始</button><span id="msg" role="status"></span><pre id="result"></pre><hr><button id="batch" onclick="startBatch()">全記事の分割台帳診断を開始</button><button onclick="resumeBatch()">途中から再開</button><span id="batchMsg" role="status"></span><pre id="batchResult"></pre><hr><button id="meta" onclick="runMeta()">分析データの登録状態を確認</button><span id="metaMsg" role="status"></span><pre id="metaResult"></pre></main><footer><button onclick="google.script.host.close()">閉じる</button></footer><script>function run(){const b=document.getElementById('go'),m=document.getElementById('msg'),r=document.getElementById('result');b.disabled=true;m.textContent='集計中…';r.textContent='';google.script.run.withSuccessHandler(x=>{b.disabled=false;m.textContent='集計が完了しました。';r.textContent=x}).withFailureHandler(e=>{b.disabled=false;m.textContent='集計停止：'+(e.message||e)}).sssM3RunPreview()}function runMeta(){const b=document.getElementById('meta'),m=document.getElementById('metaMsg'),r=document.getElementById('metaResult');b.disabled=true;m.textContent='確認中…';r.textContent='';google.script.run.withSuccessHandler(x=>{b.disabled=false;m.textContent='確認が完了しました。';r.textContent=x}).withFailureHandler(e=>{b.disabled=false;m.textContent='確認停止：'+(e.message||e)}).sssM3RunMetadataPreview()}function startBatch(){const b=document.getElementById('batch'),m=document.getElementById('batchMsg'),r=document.getElementById('batchResult');b.disabled=true;m.textContent='分割処理を準備中…';r.textContent='';google.script.run.withSuccessHandler(x=>nextBatch()).withFailureHandler(e=>{b.disabled=false;m.textContent='開始停止：'+(e.message||e)}).sssM3BatchStart()}function nextBatch(){const b=document.getElementById('batch'),m=document.getElementById('batchMsg'),r=document.getElementById('batchResult');google.script.run.withSuccessHandler(x=>{m.textContent='台帳走査：'+(x.scanned===undefined?x.processed:x.scanned)+'/'+x.total+'行／有効記事'+x.processed+'件';if(x.status==='COMPLETED'){google.script.run.withSuccessHandler(z=>{b.disabled=false;m.textContent='分割集計完了';r.textContent=JSON.stringify(z,null,2)}).withFailureHandler(e=>{b.disabled=false;m.textContent='集計結果の表示停止：'+(e.message||e)}).sssM3BatchSummary_()}else nextBatch()}).withFailureHandler(e=>{b.disabled=false;m.textContent='処理停止：'+(e.message||e)+'。再開可能です。'}).sssM3BatchContinue()}function resumeBatch(){const b=document.getElementById('batch'),m=document.getElementById('batchMsg');b.disabled=true;m.textContent='再開中…';nextBatch()}</script>`).setWidth(650).setHeight(610);
+ SpreadsheetApp.getUi().showModalDialog(h,'ブログ総合診断・基礎集計（試験）');
+}
+
+
+// M3 stage 2: bounded metadata only. Never decompress ZIPs or read query CSVs here.
+function sssM3MetadataSummarize_(site,compact,detailed,ledgerCount){
+ if(!site||!site.siteId)throw Error('サイト設定がありません。');
+ const valid=(x)=>x&&/^\d{4}-\d{2}-\d{2}$/.test(String(x.end||''));
+ const cp=valid(compact)?{mode:'COMPACT',end:compact.end,days:compact.days,id:compact.id}:null;
+ const dp=valid(detailed)&&detailed.status==='VERIFIED'?{mode:'DETAILED',end:detailed.end,days:365,id:detailed.id}:null;
+ const chosen=dp&&(!cp||dp.end>=cp.end)?dp:cp;
+ return {format:'S3_M3_METADATA_SNAPSHOT_V1',site_id:site.siteId,
+  compact:cp?{end:cp.end,days:cp.days}:null,
+  detailed:dp?{end:dp.end,days:dp.days}:null,
+  selected:chosen?{mode:chosen.mode,end:chosen.end,days:chosen.days}:null,
+  review_count:ledgerCount,content_action:'NONE',metrics_status:'NOT_LOADED',
+  limitations:['ZIP・検索クエリ・記事別数値は読み込まない','登録情報だけではZIPの現時点の実在性・完全性は保証できない','データなしは需要ゼロを意味しない']};
+}
+function sssM3RunMetadataPreview(){
+ const c=sssConfig_(),ref=sssM1CompactRef_(c),m=sssDM365State_(),a=sssDM365AuditState_(),r=sssDM365ReconState_();
+ const detailed=m&&m.siteId===c.siteId&&m.propertyUri===c.propertyUri&&a&&a.status==='PASSED'&&r&&r.status==='COMPLETED'&&m.signature===r.signature&&r.final?{status:'VERIFIED',end:m.end,id:r.final.id}:null;
+ const ss=SpreadsheetApp.getActiveSpreadsheet(),sh=ss.getSheetByName('S3_精査履歴');
+ let n=0;if(sh&&sh.getLastRow()>=2){const ids=sh.getRange(2,2,sh.getLastRow()-1,1).getValues();n=ids.filter(x=>String(x[0])===c.siteId).length;}
+ const d=sssM3MetadataSummarize_(c,ref,detailed,n);
+ return ['分析データの登録状態（軽量確認）','対象ブログ：'+c.siteName,
+  '簡易Evidence：'+(d.compact?d.compact.end+'まで（'+d.compact.days+'日）':'検証済み登録なし'),
+  '詳細Evidence：'+(d.detailed?d.detailed.end+'まで（365日）':'完了・監査済み登録なし'),
+  '採用予定：'+(d.selected?d.selected.mode+'／'+d.selected.end:'未選択'),
+  '保存済み精査履歴：'+d.review_count+'件',
+  '検索実績・記事別数値：今回未取得',
+  '※ZIP本体を読み込まないため、品質・検索需要・記事健全性は判定しません。',
+  '※SBM・Evidence・記事への書き込みは行いません。'].join('\n');
+}
+
+
+// M3 stage 3: bounded, resumable inventory preparation. No Evidence ZIP decompression.
+// S3 owns this checkpoint sheet; SBM and the Evidence registry are strictly read-only.
+const SSS_M3_BATCH_KEY_ = 'SSS_M3_BATCH_V1';
+const SSS_M3_BATCH_SHEET_ = 'S3_M3_記事基盤';
+const SSS_M3_BATCH_HEADERS_ = ['run_id','site_id','article_id','url','title','state','published_at','source_row','url_status'];
+// Stable checksum of the source header; catches column reordering with unchanged width.
+function sssM3HeaderSignature_(headers){
+ const raw=JSON.stringify(headers.map(v=>String(v).trim()));
+ // Non-cryptographic FNV-1a, adequate for accidental header edits.
+ let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
+ return h.toString(16).padStart(8,'0');
+}
+function sssM3BatchRowCount_(state){return state.total_rows-1;}
+function sssM3BatchValidate_(state,config,managerId){
+ if(!state||state.format!=='S3_M3_BATCH_V1'||state.site_id!==config.siteId||state.property!==config.propertyUri||state.manager_id!==managerId||!Number.isInteger(state.next_row)||!Number.isInteger(state.total_rows)||state.next_row<2||state.next_row>state.total_rows+1||state.total_rows>10001||!Number.isInteger(state.processed)||state.processed<0||state.processed>sssM3BatchRowCount_(state)||!Number.isInteger(state.scanned_rows===undefined?state.next_row-2:state.scanned_rows)||(state.scanned_rows===undefined?state.next_row-2:state.scanned_rows)!==state.next_row-2||state.processed>state.next_row-2||!state.header_signature)throw Error('M3分割処理の状態が不一致です。再開始してください。');
+ return state;
+}
+function sssM3BatchSheet_(){
+ const ss=SpreadsheetApp.getActiveSpreadsheet();let sh=ss.getSheetByName(SSS_M3_BATCH_SHEET_);
+ if(!sh)sh=ss.insertSheet(SSS_M3_BATCH_SHEET_);
+ const head=sh.getRange(1,1,1,SSS_M3_BATCH_HEADERS_.length).getDisplayValues()[0];
+ if(head.some((x,i)=>x!==SSS_M3_BATCH_HEADERS_[i])){
+  if(sh.getLastRow()>1)throw Error('M3作業シートの列構成が異なります。自動上書きはしません。');
+  sh.getRange(1,1,1,SSS_M3_BATCH_HEADERS_.length).setValues([SSS_M3_BATCH_HEADERS_]);
+ }
+ return sh;
+}
+function sssM3BatchStart(){
+ const c=sssConfig_(),conn=sssM1FindManagers_();
+ if(!conn.complete||conn.candidates.length!==1)throw Error('SBM連携先が一意に確定していません。');
+ const managerId=conn.candidates[0].id,src=SpreadsheetApp.openById(managerId).getSheetByName('記事管理');
+ if(!src||src.getLastRow()<1||src.getLastRow()>10001)throw Error('SBM記事管理の行数が不正です。');
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const sh=sssM3BatchSheet_();
+  const previous=sssProperties_().getProperty(SSS_M3_BATCH_KEY_);
+  if(previous){const old=JSON.parse(previous);if(old.status==='RUNNING')throw Error('実行中の分割処理があります。続きから再開してください。');}
+  const header=src.getRange(1,1,1,src.getLastColumn()).getDisplayValues()[0];
+  sssM1Articles_([header]); // Validate required columns before deleting old checkpoints.
+  if(sh.getLastRow()>1)sh.deleteRows(2,sh.getLastRow()-1);
+  const state={format:'S3_M3_BATCH_V1',run_id:Utilities.getUuid(),site_id:c.siteId,property:c.propertyUri,manager_id:managerId,next_row:2,total_rows:src.getLastRow(),source_columns:src.getLastColumn(),header_signature:sssM3HeaderSignature_(header),status:'RUNNING',processed:0,scanned_rows:0,started_at:new Date().toISOString()};
+  sssProperties_().setProperty(SSS_M3_BATCH_KEY_,JSON.stringify(state));
+  return {status:state.status,processed:0,total:state.total_rows-1,run_id:state.run_id};
+ }finally{lock.releaseLock();}
+}
+function sssM3BatchContinue(){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const c=sssConfig_(),p=sssProperties_(),raw=p.getProperty(SSS_M3_BATCH_KEY_);
+  if(!raw)throw Error('先にM3分割処理を開始してください。');
+  const s=JSON.parse(raw);sssM3BatchValidate_(s,c,s.manager_id);
+  if(s.status==='COMPLETED')return {status:'COMPLETED',processed:s.processed,total:s.total_rows-1,run_id:s.run_id};
+  if(s.status!=='RUNNING')throw Error('M3処理が停止しています。');
+  const source=SpreadsheetApp.openById(s.manager_id).getSheetByName('記事管理');
+  if(!source||source.getLastRow()!==s.total_rows||source.getLastColumn()!==s.source_columns)throw Error('SBM記事管理の行数・列数が開始時から変わりました。再開始してください。');
+  const header=source.getRange(1,1,1,s.source_columns).getDisplayValues()[0];
+  if(sssM3HeaderSignature_(header)!==s.header_signature)throw Error('SBM記事管理の列名または並びが変わりました。再開始してください。');
+  // One bounded batch per RPC; avoids large Drive ZIPs and long synchronous operations.
+  const count=Math.min(75,s.total_rows-s.next_row+1),sh=sssM3BatchSheet_();
+  if(sh.getLastRow()!==s.processed+1)throw Error('M3作業シートの進捗が一致しません。再開始してください。');
+  // Verify the last committed checkpoint row before appending. This detects a manual
+  // sheet edit or an interrupted commit without re-reading the entire inventory.
+  if(s.processed>0){const last=sh.getRange(s.processed+1,1,1,9).getDisplayValues()[0];
+   if(last[0]!==s.run_id||last[1]!==c.siteId||(!Number.isInteger(Number(last[7]))||Number(last[7])>=s.next_row||Number(last[7])<2))throw Error('M3作業シートの最終行が不一致です。再開始してください。');}
+  if(count>0){
+   const rows=source.getRange(s.next_row,1,count,s.source_columns).getDisplayValues();
+   const articles=sssM1Articles_([header,...rows]);const scope=sssP72PropertyScope_(c.propertyUri);
+   const out=articles.map(a=>[s.run_id,c.siteId,a.article_id,a.url,a.title,a.state,a.published_at||'',s.next_row+a.source_row-2,sssM1UrlInfo_(a.url,scope).status]);
+   if(out.length)sh.getRange(sh.getLastRow()+1,1,out.length,SSS_M3_BATCH_HEADERS_.length).setValues(out);
+   s.processed+=out.length;s.next_row+=count;s.scanned_rows=s.next_row-2;
+  }
+  if(s.next_row>s.total_rows){s.status='COMPLETED';s.completed_at=new Date().toISOString();}
+  p.setProperty(SSS_M3_BATCH_KEY_,JSON.stringify(s));
+  return {status:s.status,processed:s.processed,scanned:s.next_row-2,total:s.total_rows-1,run_id:s.run_id};
+ }finally{lock.releaseLock();}
+}
+function sssM3BatchStatus(){
+ const c=sssConfig_(),raw=sssProperties_().getProperty(SSS_M3_BATCH_KEY_);
+ if(!raw)return {status:'NOT_STARTED',processed:0};
+ const s=JSON.parse(raw);if(s.site_id!==c.siteId||s.property!==c.propertyUri)return {status:'OTHER_SITE',processed:0};
+ return {status:s.status,processed:s.processed,scanned:s.next_row-2,total:s.total_rows-1,run_id:s.run_id};
+}
+function sssM3BatchSummary_(){
+ const st=sssM3BatchStatus();if(st.status!=='COMPLETED')throw Error('M3分割処理が完了していません。');
+ const sh=sssM3BatchSheet_(),rows=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,9).getDisplayValues():[];
+ if(rows.some(r=>r[0]!==st.run_id))throw Error('別の実行結果が混在しています。');
+ if(rows.length!==st.processed||rows.some((r,i)=>r[1]!==sssConfig_().siteId||(i>0&&Number(r[7])<=Number(rows[i-1][7]))))throw Error('M3作業シートの行順・サイトが不一致です。');
+ const articles=rows.map(r=>({article_id:r[2],url:r[3],state:r[5]}));
+ const summary=sssM3QuickSummarize_(articles,sssConfig_().siteName,'NOT_LOADED');
+ const urls={};for(const r of rows)urls[r[8]]=(urls[r[8]]||0)+1;
+ return {format:'S3_M3_BATCH_SUMMARY_V1',run_id:st.run_id,articles:summary.articles,states:summary.states,missing_id:summary.missingId,missing_url:summary.missingUrl,duplicate_ids:summary.duplicateIds,url_states:urls,evidence:'NOT_LOADED',content_action:'NONE'};
+}
+
+// M3 evidence execution planner: metadata-only, never opens or decompresses a ZIP.
+// A ZIP cannot be streamed by Utilities.unzip. Therefore a 75-row article batch
+// does not itself bound ZIP expansion; a separate materialization step is required.
+function sssM3EvidencePlan_(compact,detailed){
+ const valid=x=>!!x&&/^\d{4}-\d{2}-\d{2}$/.test(String(x.end||''));
+ const cp=valid(compact)?{mode:'COMPACT',end:String(compact.end),id:String(compact.id||'')}:null;
+ const dp=valid(detailed)&&detailed.status==='VERIFIED'?{mode:'DETAILED',end:String(detailed.end),id:String(detailed.id||'')}:null;
+ const selected=dp&&(!cp||dp.end>=cp.end)?dp:cp;
+ return {format:'S3_M3_EVIDENCE_PLAN_V1',selected:selected||null,
+  materialization:'NOT_STARTED',article_batch_size:75,
+  zip_expansion_bounded:false,
+  content_action:'NONE',
+  next_step:selected?'MATERIALIZE_EVIDENCE_INDEX':'VERIFY_EVIDENCE_FIRST',
+  limitations:['ZIPの展開は一括処理のため、記事75行分割では時間上限を回避できない',
+   '記事ごとの実績は中間索引が完成するまで未取得','未観測を表示回数ゼロとみなさない']};
+}
+
+
+// M3 stage 4: bounded materialization from the Collector's already extracted
+// _SDSC_PAGE_PERIOD sheet. This deliberately does NOT open an Evidence ZIP.
+// It is available only while the Collector's completed run still corresponds
+// to the selected compact Evidence. Other cases return NOT_AVAILABLE, not zero.
+const SSS_M3_PAGE_STAGE_KEY_='SSS_M3_PAGE_STAGE_V1';
+const SSS_M3_PAGE_STAGE_SHEET_='S3_M3_ページ中間索引';
+const SSS_M3_PAGE_STAGE_HEADERS_=['run_id','site_id','source_row','page','clicks','impressions','ctr','position'];
+function sssM3PageStageSource_(){
+ const c=sssConfig_(),ref=sssM1CompactRef_(c),run=sdscGetRun_();
+ if(!ref||!run||run.status!=='COMPLETED'||run.deltaAcquisition||String(run.outputFileId||'')!==ref.id)
+  return {available:false,reason:'採用済み簡易Evidenceと一致する完了収集の作業表がありません。ZIPは展開しません。'};
+ sssAssertRunSite_(run,c);
+ if(!run.period||run.period.startDate!==ref.start||run.period.endDate!==ref.end||Number(run.period.days)!==ref.days)
+  return {available:false,reason:'作業表の収集期間が採用済みEvidenceと一致しません。'};
+ const sh=sssSpreadsheet_().getSheetByName(SDSC_CONFIG.sheets.pagePeriod);
+ if(!sh||sh.getLastRow()<1||sh.getLastRow()>200001||sh.getLastColumn()!==6)
+  return {available:false,reason:'ページ集計の作業表がないか、処理上限を超えています。'};
+ const h=sh.getRange(1,1,1,6).getDisplayValues()[0];
+ if(h.join('|')!=='period|page|clicks|impressions|ctr|position')
+  return {available:false,reason:'ページ集計の列構成が一致しません。'};
+ return {available:true,site_id:c.siteId,evidence_id:ref.id,source_rows:sh.getLastRow(),source_signature:sssM3HeaderSignature_(h),sheet:sh};
+}
+function sssM3PageStageSheet_(){
+ const ss=sssSpreadsheet_();let sh=ss.getSheetByName(SSS_M3_PAGE_STAGE_SHEET_);
+ if(!sh)sh=ss.insertSheet(SSS_M3_PAGE_STAGE_SHEET_);
+ const h=sh.getRange(1,1,1,8).getDisplayValues()[0];
+ if(h.some((v,i)=>v!==SSS_M3_PAGE_STAGE_HEADERS_[i])){
+  if(sh.getLastRow()>1)throw Error('既存のページ中間索引の列構成が異なります。自動上書きしません。');
+  sh.getRange(1,1,1,8).setValues([SSS_M3_PAGE_STAGE_HEADERS_]);
+ }
+ return sh;
+}
+// M3 compact Evidence fallback. Only small verified compact packages are eligible.
+// The compressed-size guard avoids automatically unzipping large archives; it
+// does not imply that ZIP decompression is streaming or fully memory bounded.
+const SSS_M3_COMPACT_ZIP_MAX_BYTES_=2*1024*1024;
+const SSS_M3_COMPACT_PAGE_MAX_=10000;
+function sssM3CompactFallbackPlan_(ref,size){
+ if(!ref||!ref.id)return {available:false,reason:'検証済みの簡易Evidenceがありません。'};
+ if(!Number.isFinite(size)||size<=0||size>SSS_M3_COMPACT_ZIP_MAX_BYTES_)
+  return {available:false,reason:'簡易Evidence ZIPが安全な自動展開上限（2MB）を超えています。大容量ZIPは自動展開しません。'};
+ return {available:true,mode:'COMPACT_ZIP',evidence_id:ref.id};
+}
+function sssM3CompactFallbackSource_(){
+ const c=sssConfig_(),ref=sssM1CompactRef_(c);
+ if(!ref)return sssM3CompactFallbackPlan_(null,0);
+ try{const f=DriveApp.getFileById(ref.id);
+  if(f.isTrashed()||f.getMimeType()!=='application/zip')return {available:false,reason:'簡易Evidence ZIPが存在しないか形式が不正です。'};
+  return sssM3CompactFallbackPlan_(ref,f.getSize());
+ }catch(e){return {available:false,reason:'簡易Evidence ZIPの情報を確認できません：'+String(e&&e.message||e)};}
+}
+// M3 fallback for large compact ZIPs: bounded Search Console page re-query.
+// This is NEW OBSERVATION of the same date window, NOT a read of archived Evidence.
+// Never label its numbers as verified archived Evidence or infer zero demand.
+const SSS_M3_GSC_BATCH_=400;
+const SSS_M3_GSC_PAGE_CAP_=48000;
+function sssM3GscPlan_(ref){
+ if(!ref||!ref.id||!/^\d{4}-\d{2}-\d{2}$/.test(ref.start)||!/^\d{4}-\d{2}-\d{2}$/.test(ref.end))
+  return {available:false,reason:'GSC再取得の基準となる検証済みEvidenceの期間がありません。'};
+ return {available:true,mode:'GSC_REQUERY',reason:'大容量ZIPを展開せず、Evidenceと同じ日付範囲のGSCページ実績を小分けに再取得します。保存済みEvidenceの数値と同一である保証はありません。',start:ref.start,end:ref.end};
+}
+function sssM3GscRows_(response,runId,siteId,offset){
+ if(!response||!Array.isArray(response.rows))throw Error('GSCページ実績の応答形式が不正です。');
+ if(response.rows.length>SSS_M3_GSC_BATCH_)throw Error('GSCの返却行数が上限を超えています。');
+ const urls=new Set();
+ return response.rows.map((r,i)=>{
+  if(r&&Array.isArray(r.keys)&&r.keys.length===1){if(urls.has(String(r.keys[0])))throw Error('同一GSC応答内にURL重複があります。');urls.add(String(r.keys[0]));}
+  if(!r||!Array.isArray(r.keys)||r.keys.length!==1||!/^https?:\/\//i.test(String(r.keys[0])))throw Error('GSCページURLが不正です。');
+  const n=[r.clicks,r.impressions,r.ctr,r.position].map(Number);
+  if(!n.every(Number.isFinite)||n.some(v=>v<0)||!Number.isSafeInteger(n[0])||!Number.isSafeInteger(n[1])||n[0]>n[1]||n[2]>1)throw Error('GSCページ実績の数値が不正です。');
+  return [runId,siteId,offset+i+2,String(r.keys[0]),...n];
+ });
+}
+function sssM3GscFetch_(c,ref,offset){
+ if(!Number.isSafeInteger(offset)||offset<0||offset>SSS_M3_GSC_PAGE_CAP_)throw Error('GSCの取得位置が不正です。');
+ const response=sdscSearchAnalyticsQuery_(c.propertyUri,{startDate:ref.start,endDate:ref.end,type:'web',dataState:'final',dimensions:['page'],rowLimit:SSS_M3_GSC_BATCH_,startRow:offset});
+ return response;
+}
+function sssM3PageStageStartGsc_(){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const c=sssConfig_(),ref=sssM1CompactRef_(c),plan=sssM3GscPlan_(ref);
+  if(!plan.available)return {status:'NOT_AVAILABLE',reason:plan.reason};
+  const p=sssProperties_(),old=p.getProperty(SSS_M3_PAGE_STAGE_KEY_);
+  if(old)throw Error('ページ中間索引の既存状態があります。自動上書きしません。');
+  const sh=sssM3PageStageSheet_();if(sh.getLastRow()>1)throw Error('ページ中間索引に既存データがあります。自動上書きしません。');
+  // Fetch before committing checkpoint: permission/network errors leave no state.
+  const response=sssM3GscFetch_(c,ref,0),runId=Utilities.getUuid(),rows=sssM3GscRows_(response,runId,c.siteId,0);
+  if(!rows.length)return {status:'NOT_AVAILABLE',reason:'GSCからページ実績を取得できませんでした。ゼロ需要とは判断しません。'};
+  sh.getRange(2,1,rows.length,8).setValues(rows);
+  const finished=rows.length<SSS_M3_GSC_BATCH_;
+  const st={format:'S3_M3_PAGE_STAGE_V1',status:finished?'COMPLETED':'RUNNING',run_id:runId,site_id:c.siteId,
+   evidence_id:ref.id,source_mode:'GSC_REQUERY',source_signature:'GSC_REQUERY:'+ref.id+':'+ref.start+':'+ref.end,
+   start:ref.start,end:ref.end,next_offset:rows.length,scanned:rows.length,stored:rows.length,
+   source_rows:finished?rows.length+1:SSS_M3_GSC_PAGE_CAP_+1,next_row:rows.length+2,
+   limitations:['保存済みEvidenceではなくGSC APIから同じ期間を再取得','GSCの返却上限・再取得時点の差異により網羅性は保証されない']};
+  p.setProperty(SSS_M3_PAGE_STAGE_KEY_,JSON.stringify(st));
+  return {status:st.status,scanned:st.scanned,stored:st.stored,total:finished?st.stored:null,source_mode:st.source_mode,content_action:'NONE'};
+ }finally{lock.releaseLock();}
+}
+function sssM3PageStageContinueGsc_(){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const c=sssConfig_(),p=sssProperties_(),raw=p.getProperty(SSS_M3_PAGE_STAGE_KEY_);
+  if(!raw)throw Error('GSCページ索引が未開始です。');
+  const st=JSON.parse(raw),ref=sssM1CompactRef_(c),sh=sssM3PageStageSheet_();
+  if(st.format!=='S3_M3_PAGE_STAGE_V1'||st.source_mode!=='GSC_REQUERY'||st.site_id!==c.siteId||!ref||st.evidence_id!==ref.id||
+   st.source_signature!=='GSC_REQUERY:'+ref.id+':'+ref.start+':'+ref.end||st.start!==ref.start||st.end!==ref.end||
+   !Number.isSafeInteger(st.next_offset)||st.next_offset!==st.stored||st.scanned!==st.stored||sh.getLastRow()!==st.stored+1)
+   throw Error('GSC再取得のサイト・期間・保存進捗が一致しません。');
+  if(st.status==='COMPLETED')return {status:'COMPLETED',scanned:st.scanned,stored:st.stored,total:st.stored,source_mode:st.source_mode};
+  if(st.status!=='RUNNING'||st.next_offset>=SSS_M3_GSC_PAGE_CAP_)throw Error('GSCの取得上限に達しました。網羅性が確認できないため安全停止します。');
+  const last=sh.getRange(st.stored+1,1,1,8).getDisplayValues()[0];
+  if(last[0]!==st.run_id||last[1]!==c.siteId||Number(last[2])!==st.stored+1)throw Error('GSC再取得の末尾行が一致しません。');
+  const response=sssM3GscFetch_(c,ref,st.next_offset),rows=sssM3GscRows_(response,st.run_id,c.siteId,st.next_offset);
+  // Duplicate page keys across batches indicate unstable pagination; do not continue.
+  if(rows.length){
+   const seen=new Set(sh.getRange(2,4,st.stored,1).getDisplayValues().map(r=>r[0]));
+   if(rows.some(r=>seen.has(r[3])))throw Error('GSCのページングでURL重複を検出しました。再取得の整合性を保証できません。');
+   sh.getRange(sh.getLastRow()+1,1,rows.length,8).setValues(rows);
+  }
+  st.stored+=rows.length;st.scanned+=rows.length;st.next_offset+=rows.length;st.next_row=st.stored+2;
+  if(rows.length<SSS_M3_GSC_BATCH_){st.status='COMPLETED';st.source_rows=st.stored+1;}
+  p.setProperty(SSS_M3_PAGE_STAGE_KEY_,JSON.stringify(st));
+  return {status:st.status,scanned:st.scanned,stored:st.stored,total:st.status==='COMPLETED'?st.stored:null,source_mode:st.source_mode,content_action:'NONE'};
+ }finally{lock.releaseLock();}
+}
+function sssM3CompactPageRows_(pages,runId,siteId){
+ if(!(pages instanceof Map)||pages.size>SSS_M3_COMPACT_PAGE_MAX_)throw Error('簡易Evidenceのページ数が安全上限を超えています。');
+ const out=[];let sourceRow=1;
+ for(const [url,value] of pages){sourceRow++;
+  const m=value&&value.compact&&value.compact.windows&&value.compact.windows.full;
+  // Null is unknown / zero-filled in compact Evidence, never a measured zero.
+  if(!m)continue;
+  const nums=[m.clicks,m.impressions,m.ctr,m.position];
+  if(!url||!nums.every(Number.isFinite)||nums.some(v=>v<0)||!Number.isSafeInteger(nums[0])||!Number.isSafeInteger(nums[1])||nums[0]>nums[1]||nums[2]>1)throw Error('簡易Evidenceのページ実績が不正です。');
+  out.push([runId,siteId,sourceRow,url,...nums]);
+ }
+ return out;
+}
+function sssM3PageStageStartCompact_(){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const c=sssConfig_(),fallback=sssM3CompactFallbackSource_();
+  if(!fallback.available)return {status:'NOT_AVAILABLE',reason:fallback.reason};
+  const p=sssProperties_(),raw=p.getProperty(SSS_M3_PAGE_STAGE_KEY_);
+  if(raw){const prev=JSON.parse(raw);
+   if(prev.site_id!==c.siteId||prev.status==='RUNNING')throw Error('既存のページ中間索引を保護するため停止しました。');
+   if(prev.status==='COMPLETED')throw Error('ページ中間索引は既に完了しています。');
+  }
+  // The package reader validates manifest, site, period, and page CSV.
+  // ZIP is unzipped only after the compressed-size gate above.
+  const ref=sssM1CompactRef_(c),e=sssM1ReadCompact_(c,ref),runId=Utilities.getUuid();
+  const rows=sssM3CompactPageRows_(e.pages,runId,c.siteId);
+  const sh=sssM3PageStageSheet_();
+  if(sh.getLastRow()>1)throw Error('既存のページ中間索引があるため、自動上書きしません。');
+  for(let i=0;i<rows.length;i+=400)sh.getRange(sh.getLastRow()+1,1,Math.min(400,rows.length-i),8).setValues(rows.slice(i,i+400));
+  const st={format:'S3_M3_PAGE_STAGE_V1',status:'COMPLETED',run_id:runId,site_id:c.siteId,evidence_id:ref.id,
+   source_rows:e.pages.size+1,source_signature:'COMPACT_EVIDENCE:'+ref.id,next_row:e.pages.size+2,
+   scanned:e.pages.size,stored:rows.length,source_mode:'COMPACT_ZIP',unknown_pages:e.pages.size-rows.length};
+  p.setProperty(SSS_M3_PAGE_STAGE_KEY_,JSON.stringify(st));
+  return {status:'COMPLETED',scanned:st.scanned,stored:st.stored,total:st.scanned,unknown_pages:st.unknown_pages,source_mode:st.source_mode,content_action:'NONE'};
+ }finally{lock.releaseLock();}
+}
+function sssM3PageStageStart(){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const source=sssM3PageStageSource_();if(!source.available)return {status:'NOT_AVAILABLE',reason:source.reason};
+  const p=sssProperties_(),previous=p.getProperty(SSS_M3_PAGE_STAGE_KEY_);
+  if(previous&&JSON.parse(previous).status==='RUNNING')throw Error('中間索引作成中です。続きから実行してください。');
+  const sh=sssM3PageStageSheet_();if(sh.getLastRow()>1)sh.deleteRows(2,sh.getLastRow()-1);
+  const st={format:'S3_M3_PAGE_STAGE_V1',status:'RUNNING',run_id:Utilities.getUuid(),site_id:source.site_id,evidence_id:source.evidence_id,source_rows:source.source_rows,source_signature:source.source_signature,next_row:2,scanned:0,stored:0};
+  p.setProperty(SSS_M3_PAGE_STAGE_KEY_,JSON.stringify(st));return {status:st.status,scanned:0,total:st.source_rows-1,stored:0};
+ }finally{lock.releaseLock();}
+}
+function sssM3PageStageContinue(){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const p=sssProperties_(),raw=p.getProperty(SSS_M3_PAGE_STAGE_KEY_);
+  if(!raw)throw Error('ページ中間索引を先に開始してください。');
+  const st=JSON.parse(raw),src=sssM3PageStageSource_();
+  if(!src.available)throw Error(src.reason);
+  if(st.format!=='S3_M3_PAGE_STAGE_V1'||st.site_id!==src.site_id||st.evidence_id!==src.evidence_id||st.source_rows!==src.source_rows||st.source_signature!==src.source_signature||!Number.isInteger(st.next_row)||st.next_row<2||st.next_row>st.source_rows+1||st.scanned!==st.next_row-2)throw Error('ページ中間索引の再開条件が変わりました。');
+  if(st.status==='COMPLETED')return {status:st.status,scanned:st.scanned,stored:st.stored,total:st.source_rows-1};
+  if(st.status!=='RUNNING')throw Error('ページ中間索引は実行中ではありません。');
+  const dest=sssM3PageStageSheet_();if(dest.getLastRow()!==st.stored+1)throw Error('中間索引の保存行数が一致しません。');
+  if(st.stored){const last=dest.getRange(st.stored+1,1,1,8).getDisplayValues()[0];if(last[0]!==st.run_id||last[1]!==st.site_id)throw Error('中間索引の実行IDが一致しません。');}
+  const n=Math.min(400,st.source_rows-st.next_row+1),rows=n>0?src.sheet.getRange(st.next_row,1,n,6).getDisplayValues():[];
+  const out=[];
+  rows.forEach((r,i)=>{
+   if(r[0]!=='full')return;
+   const vals=r.slice(2).map(Number);
+   if(!r[1]||r.slice(2).some(x=>String(x).trim()==='')||!vals.every(Number.isFinite)||vals.some(x=>x<0)||vals[0]>vals[1]||vals[2]>1)throw Error('ページ集計に不正な数値があります（元行'+(st.next_row+i)+'）。');
+   out.push([st.run_id,st.site_id,st.next_row+i,r[1],...vals]);
+  });
+  if(out.length)dest.getRange(dest.getLastRow()+1,1,out.length,8).setValues(out);
+  st.next_row+=n;st.scanned+=n;st.stored+=out.length;
+  if(st.next_row>st.source_rows)st.status='COMPLETED';
+  p.setProperty(SSS_M3_PAGE_STAGE_KEY_,JSON.stringify(st));
+  return {status:st.status,scanned:st.scanned,stored:st.stored,total:st.source_rows-1};
+ }finally{lock.releaseLock();}
+}
+function sssM3PageStageStatus(){
+ const raw=sssProperties_().getProperty(SSS_M3_PAGE_STAGE_KEY_);
+ if(!raw)return {status:'NOT_STARTED'};
+ const st=JSON.parse(raw),c=sssConfig_();
+ return st.site_id===c.siteId?{status:st.status,run_id:st.run_id,scanned:st.scanned,stored:st.stored,total:st.source_rows-1}:{status:'OTHER_SITE'};
+}
+
+
+// M3 stage 5: conservative URL-to-article matching, independent of Evidence ZIP.
+// Pure matching helper. A normalized match is never used when two SBM articles
+// share that key; GSC-only pages remain unowned. This is not a content decision.
+function sssM3MatchPageRows_(articleRows,pageRows){
+ const exact=new Map(),normalized=new Map(),bad=[];
+ const add=(map,key,a)=>{if(!key)return;const list=map.get(key)||[];list.push(a);map.set(key,list);};
+ for(const a of articleRows){
+  const id=String(a.article_id||'').trim(),url=String(a.url||'').trim();
+  if(!id||!url){bad.push({article_id:id,reason:'MISSING_ID_OR_URL'});continue;}
+  add(exact,url,a);add(normalized,sssP70NormalizeUrl_(url),a);
+ }
+ const out=[],counts={EXACT:0,NORMALIZED:0,AMBIGUOUS:0,UNMATCHED:0,INVALID_URL:0};
+ for(const p of pageRows){
+  const url=String(p.url||'').trim(),key=sssP70NormalizeUrl_(url);
+  if(!key){counts.INVALID_URL++;out.push({url,status:'INVALID_URL',article_id:null});continue;}
+  const candidates=normalized.get(key)||[];
+  const unique=[...new Map(candidates.map(a=>[a.article_id,a])).values()];
+  // Exact URLs may have multiple registered IDs; never pick arbitrarily.
+  const status=unique.length>1?'AMBIGUOUS':unique.length===0?'UNMATCHED':exact.has(url)?'EXACT':'NORMALIZED';
+  counts[status]++;
+  out.push({url,status,article_id:unique.length===1?unique[0].article_id:null,
+   clicks:p.clicks,impressions:p.impressions});
+ }
+ return {format:'S3_M3_PAGE_MATCH_V1',counts,rows:out,invalid_articles:bad,content_action:'NONE'};
+}
+// Bounded read-only pilot for a single slice of the already staged page index.
+// Does not save a diagnosis or modify SBM, Evidence, or existing article data.
+function sssM3MatchPagePreview(offset){
+ const c=sssConfig_(),batch=sssM3BatchStatus(),stage=sssM3PageStageStatus();
+ if(batch.status!=='COMPLETED'||stage.status!=='COMPLETED')
+  return {status:'NOT_READY',reason:'記事基盤とページ中間索引の両方を完了してください。'};
+ const articleSheet=sssM3BatchSheet_(),pageSheet=sssM3PageStageSheet_();
+ if(articleSheet.getLastRow()>10001||pageSheet.getLastRow()>200001)throw Error('分析対象の行数が上限を超えました。');
+ const ar=articleSheet.getLastRow()>1?articleSheet.getRange(2,1,articleSheet.getLastRow()-1,9).getDisplayValues():[];
+ if(ar.length!==batch.processed||ar.some(r=>r[0]!==batch.run_id||r[1]!==c.siteId))throw Error('記事基盤の実行ID・サイトが一致しません。');
+ const start=Number(offset===undefined?0:offset);
+ if(!Number.isSafeInteger(start)||start<0||start>stage.stored)throw Error('ページ分析の開始位置が不正です。');
+ const count=Math.min(400,stage.stored-start),pr=count?pageSheet.getRange(start+2,1,count,8).getDisplayValues():[];
+ if(pr.some(r=>r[0]!==stage.run_id||r[1]!==c.siteId))throw Error('ページ索引の実行ID・サイトが一致しません。');
+ const articles=ar.map(r=>({article_id:r[2],url:r[3]}));
+ const pages=pr.map(r=>({url:r[3],clicks:Number(r[4]),impressions:Number(r[5])}));
+ if(pages.some(p=>!Number.isFinite(p.clicks)||!Number.isFinite(p.impressions)||p.clicks<0||p.impressions<0||p.clicks>p.impressions))throw Error('ページ索引の数値が不正です。');
+ const result=sssM3MatchPageRows_(articles,pages);
+ return {status:start+count>=stage.stored?'COMPLETED':'RUNNING',offset:start,next_offset:start+count,total:stage.stored,
+  counts:result.counts,sample:result.rows.slice(0,10),content_action:'NONE',
+  note:'400ページ以内の読取専用照合。未照合は検索需要ゼロを意味しません。'};
+}
+
+
+// M3 stage 6: aggregate a bounded, validated page-match slice by article.
+// This is deliberately a partial observation, not a full-period diagnosis.
+// Unmatched/ambiguous pages are never assigned to an article.
+function sssM3AggregateMatchSlice_(match){
+ if(!match||match.format!=='S3_M3_PAGE_MATCH_V1'||!Array.isArray(match.rows))throw Error('M3照合データの形式が不正です。');
+ const byId=new Map(),counts={EXACT:0,NORMALIZED:0,AMBIGUOUS:0,UNMATCHED:0,INVALID_URL:0};
+ let unassignedClicks=0,unassignedImpressions=0;
+ for(const r of match.rows){
+  if(!Object.prototype.hasOwnProperty.call(counts,r.status))throw Error('M3照合状態が不正です。');
+  counts[r.status]++;
+  const clicks=Number(r.clicks),impressions=Number(r.impressions);
+  if(r.status==='INVALID_URL')continue;
+  if(!Number.isFinite(clicks)||!Number.isFinite(impressions)||clicks<0||impressions<0||clicks>impressions)throw Error('M3検索実績の数値が不正です。');
+  if(r.status==='AMBIGUOUS'||r.status==='UNMATCHED'){
+   unassignedClicks+=clicks;unassignedImpressions+=impressions;continue;
+  }
+  const id=String(r.article_id||'').trim();
+  if(!id)throw Error('M3照合済み記事IDがありません。');
+  const a=byId.get(id)||{article_id:id,clicks:0,impressions:0,page_rows:0};
+  a.clicks+=clicks;a.impressions+=impressions;a.page_rows++;byId.set(id,a);
+ }
+ return {format:'S3_M3_PAGE_METRICS_SLICE_V1',counts,articles:[...byId.values()].sort((a,b)=>a.article_id.localeCompare(b.article_id)),unassigned:{clicks:unassignedClicks,impressions:unassignedImpressions},content_action:'NONE',coverage:'PARTIAL_SLICE'};
+}
+function sssM3MetricsSlicePreview(offset){
+ const c=sssConfig_(),batch=sssM3BatchStatus(),stage=sssM3PageStageStatus();
+ if(batch.status!=='COMPLETED'||stage.status!=='COMPLETED')return {status:'NOT_READY',reason:'記事基盤とページ中間索引の両方を完了してください。'};
+ const aSheet=sssM3BatchSheet_(),pSheet=sssM3PageStageSheet_();
+ if(aSheet.getLastRow()>10001||pSheet.getLastRow()>200001)throw Error('分析対象の行数が上限を超えました。');
+ const ar=aSheet.getLastRow()>1?aSheet.getRange(2,1,aSheet.getLastRow()-1,9).getDisplayValues():[];
+ if(ar.length!==batch.processed||ar.some(r=>r[0]!==batch.run_id||r[1]!==c.siteId))throw Error('記事台帳の実行ID・サイトが一致しません。');
+ const start=Number(offset===undefined?0:offset);
+ if(!Number.isSafeInteger(start)||start<0||start>stage.stored)throw Error('開始位置が不正です。');
+ const count=Math.min(400,stage.stored-start),pr=count?pSheet.getRange(start+2,1,count,8).getDisplayValues():[];
+ if(pr.some(r=>r[0]!==stage.run_id||r[1]!==c.siteId))throw Error('ページ索引の実行ID・サイトが一致しません。');
+ const pages=pr.map(r=>({url:r[3],clicks:Number(r[4]),impressions:Number(r[5])}));
+ if(pages.some(p=>!Number.isFinite(p.clicks)||!Number.isFinite(p.impressions)||p.clicks<0||p.impressions<0||p.clicks>p.impressions))throw Error('ページ索引の数値が不正です。');
+ const match=sssM3MatchPageRows_(ar.map(r=>({article_id:r[2],url:r[3]})),pages);
+ const agg=sssM3AggregateMatchSlice_(match);
+ return {status:start+count>=stage.stored?'COMPLETED':'RUNNING',offset:start,next_offset:start+count,total:stage.stored,run_ids:{articles:batch.run_id,pages:stage.run_id},...agg,note:'一部分の実績です。全件の診断・削除・統合・noindexの判定には使用しません。'};
+}
+
+
+// M3 stage 7: append-only, resumable page-metrics journal. Each 400-page
+// slice is committed as one batch with an explicit END marker. An interrupted
+// write fails closed; it never silently replays the slice or double counts.
+const SSS_M3_METRICS_KEY_='SSS_M3_METRICS_JOURNAL_V1';
+const SSS_M3_METRICS_SHEET_='S3_M3_記事別実績中間集計';
+const SSS_M3_METRICS_HEADERS_=['run_id','site_id','batch_start','batch_end','kind','article_id','clicks','impressions','page_rows','match_status'];
+function sssM3MetricsJournalSheet_(){
+ const ss=sssSpreadsheet_();let sh=ss.getSheetByName(SSS_M3_METRICS_SHEET_);
+ if(!sh)sh=ss.insertSheet(SSS_M3_METRICS_SHEET_);
+ const h=sh.getRange(1,1,1,10).getDisplayValues()[0];
+ if(h.some((v,i)=>v!==SSS_M3_METRICS_HEADERS_[i])){
+  if(sh.getLastRow()>1)throw Error('M3実績中間集計の列構成が異なります。自動上書きしません。');
+  sh.getRange(1,1,1,10).setValues([SSS_M3_METRICS_HEADERS_]);
+ }
+ return sh;
+}
+function sssM3MetricsJournalPlan_(state,batch,stage,rowCount,lastRow){
+ if(!state||state.format!=='S3_M3_METRICS_JOURNAL_V1'||state.article_run!==batch.run_id||state.page_run!==stage.run_id||state.site_id!==state.current_site||state.total!==stage.stored)
+  throw Error('M3実績集計の元データが変わりました。再開始してください。');
+ if(!Number.isSafeInteger(state.next_offset)||state.next_offset<0||state.next_offset>state.total||!Number.isSafeInteger(state.written)||state.written<0||rowCount!==state.written+1)
+  throw Error('M3実績集計の進捗と保存行数が一致しません。');
+ if(state.written>0&&(!lastRow||lastRow[0]!==state.run_id||lastRow[1]!==state.site_id||lastRow[4]!=='END'||Number(lastRow[3])!==state.next_offset))
+  throw Error('M3実績集計の最終コミットが一致しません。再実行による二重計上を停止しました。');
+ return {start:state.next_offset,count:Math.min(400,state.total-state.next_offset)};
+}
+function sssM3MetricsJournalStart(){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const c=sssConfig_(),batch=sssM3BatchStatus(),stage=sssM3PageStageStatus();
+  if(batch.status!=='COMPLETED'||stage.status!=='COMPLETED')return {status:'NOT_READY',reason:'記事台帳とページ中間索引の完了が必要です。'};
+  const p=sssProperties_(),raw=p.getProperty(SSS_M3_METRICS_KEY_);
+  if(raw&&JSON.parse(raw).status==='RUNNING')throw Error('実績集計中です。続きから再開してください。');
+  const sh=sssM3MetricsJournalSheet_();if(sh.getLastRow()>1)sh.deleteRows(2,sh.getLastRow()-1);
+  const st={format:'S3_M3_METRICS_JOURNAL_V1',status:'RUNNING',run_id:Utilities.getUuid(),site_id:c.siteId,current_site:c.siteId,article_run:batch.run_id,page_run:stage.run_id,total:stage.stored,next_offset:0,written:0,batches:0};
+  if(st.total===0)st.status='COMPLETED';
+  p.setProperty(SSS_M3_METRICS_KEY_,JSON.stringify(st));
+  return {status:st.status,processed:0,total:st.total,batches:0};
+ }finally{lock.releaseLock();}
+}
+function sssM3MetricsJournalContinue(){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const c=sssConfig_(),p=sssProperties_(),raw=p.getProperty(SSS_M3_METRICS_KEY_);
+  if(!raw)throw Error('実績集計を先に開始してください。');
+  const st=JSON.parse(raw),batch=sssM3BatchStatus(),stage=sssM3PageStageStatus();
+  if(batch.status!=='COMPLETED'||stage.status!=='COMPLETED')throw Error('元データの完了状態が変わりました。');
+  st.current_site=c.siteId;
+  const sh=sssM3MetricsJournalSheet_(),last=st.written?sh.getRange(st.written+1,1,1,10).getDisplayValues()[0]:null;
+  const plan=sssM3MetricsJournalPlan_(st,batch,stage,sh.getLastRow(),last);
+  if(st.status==='COMPLETED')return {status:'COMPLETED',processed:st.next_offset,total:st.total,batches:st.batches};
+  if(st.status!=='RUNNING')throw Error('実績集計の状態が不正です。');
+  const result=sssM3MetricsSlicePreview(st.next_offset);
+  if(result.status==='NOT_READY'||result.offset!==plan.start||result.next_offset!==plan.start+plan.count||result.run_ids.articles!==st.article_run||result.run_ids.pages!==st.page_run)throw Error('実績集計の読み取り範囲が一致しません。');
+  const end=result.next_offset,rows=result.articles.map(a=>[st.run_id,st.site_id,plan.start,end,'ARTICLE',a.article_id,a.clicks,a.impressions,a.page_rows,'ASSIGNED']);
+  rows.push([st.run_id,st.site_id,plan.start,end,'UNASSIGNED','',result.unassigned.clicks,result.unassigned.impressions,0,'UNMATCHED_OR_AMBIGUOUS']);
+  for(const k of ['EXACT','NORMALIZED','AMBIGUOUS','UNMATCHED','INVALID_URL'])rows.push([st.run_id,st.site_id,plan.start,end,'COUNT','',0,0,result.counts[k],k]);
+  rows.push([st.run_id,st.site_id,plan.start,end,'END','',0,0,plan.count,'COMMITTED']);
+  // Commit marker is written last in the same range. On interrupted writes,
+  // the checkpoint and sheet length disagree and the next call stops.
+  sh.getRange(sh.getLastRow()+1,1,rows.length,10).setValues(rows);
+  st.next_offset=end;st.written+=rows.length;st.batches++;
+  if(end===st.total){st.status='COMPLETED';st.completed_at=new Date().toISOString();}
+  p.setProperty(SSS_M3_METRICS_KEY_,JSON.stringify(st));
+  return {status:st.status,processed:end,total:st.total,batches:st.batches,article_rows:result.articles.length,unassigned:result.unassigned,content_action:'NONE'};
+ }finally{lock.releaseLock();}
+}
+function sssM3MetricsJournalStatus(){
+ const raw=sssProperties_().getProperty(SSS_M3_METRICS_KEY_);
+ if(!raw)return {status:'NOT_STARTED'};
+ const st=JSON.parse(raw),c=sssConfig_();
+ if(st.site_id!==c.siteId)return {status:'OTHER_SITE'};
+ return {status:st.status,processed:st.next_offset,total:st.total,batches:st.batches,content_action:'NONE',coverage:st.status==='COMPLETED'?'ALL_STAGED_PAGES':'PARTIAL'};
+}
+
+
+// M3 stage 8: bounded, read-only validation and consolidation of the journal.
+// Does not claim ALL_STAGED_PAGES until every journal row is validated.
+function sssM3ConsolidateJournalRows_(rows,expectedRun,expectedSite,initialOffset){
+ const byId=new Map(),counts={EXACT:0,NORMALIZED:0,AMBIGUOUS:0,UNMATCHED:0,INVALID_URL:0};
+ const unassigned={clicks:0,impressions:0};let pages=0,batches=0,at=0,previousEnd=initialOffset===undefined?0:initialOffset;
+ if(!Number.isSafeInteger(previousEnd)||previousEnd<0)throw Error('M3ジャーナルの開始位置が不正です。');
+ const number=(v)=>{if(v===''||v===null||v===undefined)throw Error('M3集計値が空欄です。');const n=Number(v);if(!Number.isSafeInteger(n)||n<0)throw Error('M3集計値が不正です。');return n;};
+ while(at<rows.length){
+  const first=rows[at],start=number(first[2]),end=number(first[3]);
+  if(start!==previousEnd||end<=start||end-start>400)throw Error('M3ジャーナルのバッチ範囲が不連続です。');
+  let endSeen=false,unassignedSeen=false;const seenCounts=new Set();let batchCount=0;
+  for(;at<rows.length;at++){
+   const r=rows[at];
+   if(r[0]!==expectedRun||r[1]!==expectedSite||number(r[2])!==start||number(r[3])!==end)throw Error('M3ジャーナルの実行ID・バッチが一致しません。');
+   const kind=r[4],clicks=number(r[6]),impressions=number(r[7]),rowCount=number(r[8]);
+   if(clicks>impressions)throw Error('M3ジャーナルのクリック数が表示回数を超えています。');
+   if(kind==='ARTICLE'){
+    const id=String(r[5]||'').trim();if(!id||r[9]!=='ASSIGNED'||rowCount<1)throw Error('M3記事行が不正です。');
+    const v=byId.get(id)||{article_id:id,clicks:0,impressions:0,page_rows:0};
+    v.clicks+=clicks;v.impressions+=impressions;v.page_rows+=rowCount;byId.set(id,v);
+   }else if(kind==='UNASSIGNED'){
+    if(unassignedSeen||r[9]!=='UNMATCHED_OR_AMBIGUOUS'||rowCount!==0)throw Error('M3未帰属行が不正です。');
+    unassignedSeen=true;unassigned.clicks+=clicks;unassigned.impressions+=impressions;
+   }else if(kind==='COUNT'){
+    const k=String(r[9]);if(!(k in counts)||seenCounts.has(k)||clicks!==0||impressions!==0)throw Error('M3照合件数行が不正です。');
+    seenCounts.add(k);counts[k]+=rowCount;batchCount+=rowCount;
+   }else if(kind==='END'){
+    if(r[9]!=='COMMITTED'||clicks!==0||impressions!==0||rowCount!==end-start||!unassignedSeen||seenCounts.size!==5||batchCount!==rowCount)throw Error('M3ジャーナルのコミットが不完全です。');
+    endSeen=true;at++;break;
+   }else throw Error('M3ジャーナルの行種別が不正です。');
+  }
+  if(!endSeen)throw Error('M3ジャーナルのコミット行がありません。');
+  pages+=end-start;previousEnd=end;batches++;
+ }
+ return {format:'S3_M3_JOURNAL_CONSOLIDATION_V1',status:'VALIDATED',processed:pages,batches,
+  articles:[...byId.values()].sort((a,b)=>a.article_id.localeCompare(b.article_id)),counts,unassigned,
+  coverage:'VALIDATED_PREFIX',content_action:'NONE'};
+}
+function sssM3JournalConsolidationPreview(){
+ const c=sssConfig_(),raw=sssProperties_().getProperty(SSS_M3_METRICS_KEY_);
+ if(!raw)return {status:'NOT_READY',reason:'中間集計ジャーナルがありません。'};
+ const st=JSON.parse(raw),batch=sssM3BatchStatus(),stage=sssM3PageStageStatus();
+ if(st.site_id!==c.siteId||st.article_run!==batch.run_id||st.page_run!==stage.run_id||batch.status!=='COMPLETED'||stage.status!=='COMPLETED')throw Error('M3集計の元データが変わりました。');
+ const sh=sssM3MetricsJournalSheet_();
+ if(sh.getLastRow()!==st.written+1)throw Error('M3ジャーナル行数が進捗と一致しません。');
+ if(st.written>10000)return {status:'TOO_LARGE_FOR_PREVIEW',written:st.written,reason:'安全な読取上限を超えています。分割統合が必要です。'};
+ const rows=st.written?sh.getRange(2,1,st.written,10).getDisplayValues():[];
+ const v=sssM3ConsolidateJournalRows_(rows,st.run_id,st.site_id);
+ if(v.processed!==st.next_offset||v.batches!==st.batches)throw Error('M3ジャーナルの検証結果とチェックポイントが一致しません。');
+ const complete=st.status==='COMPLETED'&&v.processed===st.total;
+ return {...v,status:complete?'COMPLETED':'PARTIAL',coverage:complete?'ALL_STAGED_PAGES':'VALIDATED_PREFIX',
+  total:st.total,article_count:v.articles.length,note:'登録済みページのみ。未照合は需要ゼロではなく、記事処置は行いません。'};
+}
+
+
+// M3 stage 9: resumable validation of an arbitrarily long journal, one
+// complete committed batch per invocation. The checkpoint stores only cursor
+// metadata; the cumulative summary is stored in a dedicated S3 sheet.
+const SSS_M3_ROLLUP_KEY_='SSS_M3_ROLLUP_V1';
+const SSS_M3_ROLLUP_SHEET_='S3_M3_記事別実績統合';
+const SSS_M3_ROLLUP_HEADERS_=['run_id','site_id','article_id','clicks','impressions','page_rows'];
+function sssM3RollupSheet_(){
+ const ss=sssSpreadsheet_();let sh=ss.getSheetByName(SSS_M3_ROLLUP_SHEET_);
+ if(!sh)sh=ss.insertSheet(SSS_M3_ROLLUP_SHEET_);
+ const h=sh.getRange(1,1,1,6).getDisplayValues()[0];
+ if(h.some((v,i)=>v!==SSS_M3_ROLLUP_HEADERS_[i])){
+  if(sh.getLastRow()>1)throw Error('M3統合シートの列構成が異なります。');
+  sh.getRange(1,1,1,6).setValues([SSS_M3_ROLLUP_HEADERS_]);
+ }
+ return sh;
+}
+// Pure helper: validate a single complete batch and merge it into the prior
+// article summary. Journal sequence and commit marker are validated upstream.
+function sssM3RollupFold_(previous,rows,run,site,offset){
+ const v=sssM3ConsolidateJournalRows_(rows,run,site,offset);
+ if(v.batches!==1||v.processed<1||v.processed>400)throw Error('M3統合対象は1コミットバッチのみです。');
+ const map=new Map();
+ for(const a of previous){
+  const id=String(a.article_id||'').trim();
+  if(!id||map.has(id))throw Error('M3統合済み記事IDが重複しています。');
+  for(const k of ['clicks','impressions','page_rows'])if(!Number.isSafeInteger(a[k])||a[k]<0)throw Error('M3統合済み数値が不正です。');
+  if(a.clicks>a.impressions)throw Error('M3統合済みクリック数が不正です。');
+  map.set(id,{...a});
+ }
+ for(const a of v.articles){
+  const b=map.get(a.article_id)||{article_id:a.article_id,clicks:0,impressions:0,page_rows:0};
+  for(const k of ['clicks','impressions','page_rows']){
+   b[k]+=a[k];if(!Number.isSafeInteger(b[k]))throw Error('M3統合値が安全な整数範囲を超えています。');
+  }
+  map.set(a.article_id,b);
+ }
+ return {articles:[...map.values()].sort((a,b)=>a.article_id.localeCompare(b.article_id)),
+  pages:v.processed,counts:v.counts,unassigned:v.unassigned};
+}
+function sssM3RollupDigest_(rows){
+ // Deterministic non-cryptographic checksum for detecting partial/stale writes.
+ let h=2166136261;
+ for(const row of rows){const str=JSON.stringify(row);for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}}
+ return String(h>>>0);
+}
+// Canonicalize display-formatted sheet cells to the exact typed rows used
+// when the rollup checksum was persisted. Reject invalid numbers instead of
+// silently treating corrupted cells as zero.
+function sssM3RollupCanonicalRows_(rows){
+ return rows.map(r=>{
+  if(!Array.isArray(r)||r.length!==6)throw Error('M3統合表の列数が不正です。');
+  const out=[String(r[0]),String(r[1]),String(r[2])];
+  for(let i=3;i<6;i++){
+   const raw=r[i];
+   if(typeof raw==='string'&&!/^(0|[1-9]\d*)$/.test(raw))throw Error('M3統合表に不正な数値があります。');
+   const n=Number(raw);
+   if(!Number.isSafeInteger(n)||n<0)throw Error('M3統合表に不正な数値があります。');
+   out.push(n);
+  }
+  if(out[3]>out[4])throw Error('M3統合表のクリック数が表示回数を超えています。');
+  if(out[5]<1)throw Error('M3統合表のページ行数が不正です。');
+  return out;
+ });
+}
+function sssM3RollupStart(){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const c=sssConfig_(),p=sssProperties_(),raw=p.getProperty(SSS_M3_METRICS_KEY_);
+  if(!raw)throw Error('M3実績ジャーナルがありません。');
+  const journal=JSON.parse(raw),batch=sssM3BatchStatus(),stage=sssM3PageStageStatus();
+  if(journal.status!=='COMPLETED'||journal.site_id!==c.siteId||journal.article_run!==batch.run_id||journal.page_run!==stage.run_id||journal.total!==stage.stored)throw Error('検証可能な完了済みジャーナルがありません。');
+  const prior=p.getProperty(SSS_M3_ROLLUP_KEY_);
+  if(prior&&JSON.parse(prior).status==='RUNNING')throw Error('M3統合処理は進行中です。続きから再開してください。');
+  const sh=sssM3RollupSheet_();if(sh.getLastRow()>1)sh.deleteRows(2,sh.getLastRow()-1);
+  const st={format:'S3_M3_ROLLUP_V1',status:journal.written?'RUNNING':'COMPLETED',site_id:c.siteId,journal_run:journal.run_id,
+   journal_written:journal.written,source_total:journal.total,cursor:0,processed:0,batches:0,summary_rows:0,
+   counts:{EXACT:0,NORMALIZED:0,AMBIGUOUS:0,UNMATCHED:0,INVALID_URL:0},unassigned:{clicks:0,impressions:0},summary_digest:sssM3RollupDigest_([])};
+  p.setProperty(SSS_M3_ROLLUP_KEY_,JSON.stringify(st));
+  return {status:st.status,processed:0,total:st.source_total};
+ }finally{lock.releaseLock();}
+}
+function sssM3RollupContinue(){
+ const lock=LockService.getDocumentLock();lock.waitLock(10000);
+ try{
+  const p=sssProperties_(),raw=p.getProperty(SSS_M3_ROLLUP_KEY_);
+  if(!raw)throw Error('M3統合処理を先に開始してください。');
+  const st=JSON.parse(raw),c=sssConfig_(),jr=JSON.parse(p.getProperty(SSS_M3_METRICS_KEY_)||'null');
+  const batch=sssM3BatchStatus(),stage=sssM3PageStageStatus();
+  if(st.format!=='S3_M3_ROLLUP_V1'||st.site_id!==c.siteId||!jr||jr.status!=='COMPLETED'||jr.run_id!==st.journal_run||jr.written!==st.journal_written||jr.total!==st.source_total||jr.article_run!==batch.run_id||jr.page_run!==stage.run_id||stage.status!=='COMPLETED'||batch.status!=='COMPLETED')throw Error('M3統合の元データが変更されました。');
+  const sh=sssM3RollupSheet_(),journal=sssM3MetricsJournalSheet_();
+  if(sh.getLastRow()!==st.summary_rows+1||journal.getLastRow()!==st.journal_written+1)throw Error('M3統合シートまたはジャーナルの行数が進捗と一致しません。');
+  if(st.status==='COMPLETED')return {status:'COMPLETED',processed:st.processed,total:st.source_total,articles:st.summary_rows};
+  if(st.status!=='RUNNING'||st.cursor>=st.journal_written)throw Error('M3統合のカーソルが不正です。');
+  // Journal batch size is <= 400 article rows + 7 metadata rows.
+  const count=Math.min(407,st.journal_written-st.cursor);
+  const slice=journal.getRange(st.cursor+2,1,count,10).getDisplayValues();
+  const endIndex=slice.findIndex(r=>r[4]==='END');
+  if(endIndex<0)throw Error('M3ジャーナルのコミット行が見つかりません。');
+  const one=slice.slice(0,endIndex+1),start=Number(one[0][2]),end=Number(one[0][3]);
+  if(start!==st.processed||end<=start)throw Error('M3統合バッチの処理位置が不連続です。');
+  if(st.summary_rows>5000)throw Error('M3記事別集計が5000件を超えました。安全上限を超えています。');
+  const existing=st.summary_rows?sh.getRange(2,1,st.summary_rows,6).getDisplayValues().map(r=>{
+   if(r[0]!==st.journal_run||r[1]!==st.site_id)throw Error('M3統合済みデータの実行IDが不正です。');
+   return {article_id:r[2],clicks:Number(r[3]),impressions:Number(r[4]),page_rows:Number(r[5])};
+  }):[];
+  const existingData=existing.map(a=>[st.journal_run,st.site_id,a.article_id,a.clicks,a.impressions,a.page_rows]);
+  if(sssM3RollupDigest_(existingData)!==st.summary_digest)throw Error('M3統合シートの内容がチェックポイントと一致しません。');
+  const folded=sssM3RollupFold_(existing,one,st.journal_run,st.site_id,start);
+  if(folded.articles.length>5000)throw Error('M3統合対象の記事数が安全上限を超えました。');
+  // Overwrite only the dedicated S3 rollup. A partial write leaves the old
+  // checkpoint inconsistent with row count or a content digest; fail closed.
+  const data=folded.articles.map(a=>[st.journal_run,st.site_id,a.article_id,a.clicks,a.impressions,a.page_rows]);
+  const old=sh.getLastRow()-1;
+  if(data.length)sh.getRange(2,1,data.length,6).setValues(data);
+  if(old>data.length)sh.getRange(data.length+2,1,old-data.length,6).clearContent();
+  st.cursor+=one.length;st.processed+=folded.pages;st.batches++;st.summary_rows=data.length;st.summary_digest=sssM3RollupDigest_(data);
+  for(const k of Object.keys(st.counts))st.counts[k]+=folded.counts[k];
+  for(const k of ['clicks','impressions'])st.unassigned[k]+=folded.unassigned[k];
+  if(st.cursor===st.journal_written){
+   if(st.processed!==st.source_total||st.batches!==jr.batches)throw Error('M3統合完了数が元ジャーナルと一致しません。');
+   st.status='COMPLETED';
+  }
+  p.setProperty(SSS_M3_ROLLUP_KEY_,JSON.stringify(st));
+  return {status:st.status,processed:st.processed,total:st.source_total,articles:st.summary_rows,batches:st.batches,content_action:'NONE'};
+ }finally{lock.releaseLock();}
+}
+function sssM3RollupStatus(){
+ const raw=sssProperties_().getProperty(SSS_M3_ROLLUP_KEY_);
+ if(!raw)return {status:'NOT_STARTED'};
+ const st=JSON.parse(raw),c=sssConfig_();
+ return st.site_id===c.siteId?{status:st.status,processed:st.processed,total:st.source_total,articles:st.summary_rows,batches:st.batches,coverage:st.status==='COMPLETED'?'ALL_STAGED_PAGES':'PARTIAL',content_action:'NONE'}:{status:'OTHER_SITE'};
+}
+
+
+// M3 stage 10: read-only full article inventory/evidence join. A missing
+// staged GSC page is NOT evidence that a page has no search demand.
+function sssM3ArticleHealthJoin_(inventory,metrics){
+ const byId=new Map(),seen=new Set(),out=[];
+ for(const m of metrics){
+  const id=String(m.article_id||'').trim();
+  if(!id||byId.has(id))throw Error('M3検索実績の記事IDが空欄または重複しています。');
+  for(const k of ['clicks','impressions','page_rows'])if(!Number.isSafeInteger(m[k])||m[k]<0)throw Error('M3検索実績の数値が不正です。');
+  if(m.clicks>m.impressions||m.page_rows<1)throw Error('M3検索実績のクリック数・ページ行数が不正です。');
+  byId.set(id,m);
+ }
+ for(const a of inventory){
+  const id=String(a.article_id||'').trim();
+  if(!id||seen.has(id))throw Error('M3記事台帳の記事IDが空欄または重複しています。');
+  seen.add(id);
+  const m=byId.get(id),urlStatus=String(a.url_status||''),state=String(a.state||'');
+  const identityIssue=!String(a.url||'').trim()||urlStatus!=='VALID';
+  const status=identityIssue?'IDENTITY_REVIEW':m?(m.impressions>0?'OBSERVED_IMPRESSIONS':'MATCHED_ZERO_IMPRESSIONS'):'NO_GSC_URL_MATCH';
+  out.push({article_id:id,url:String(a.url||''),state,clicks:m?m.clicks:null,impressions:m?m.impressions:null,
+   page_rows:m?m.page_rows:0,evidence_status:status,content_action:'NONE'});
+ }
+ const orphan=[...byId.keys()].filter(id=>!seen.has(id));
+ if(orphan.length)throw Error('M3検索実績にSBM記事台帳にない記事IDがあります。');
+ const counts={};for(const r of out)counts[r.evidence_status]=(counts[r.evidence_status]||0)+1;
+ return {format:'S3_M3_ARTICLE_HEALTH_JOIN_V1',status:'VALIDATED',articles:out,article_count:out.length,
+  counts,coverage:'ALL_STAGED_PAGES',content_action:'NONE',limitations:['検索実績なしは検索需要ゼロではありません','記事削除・統合・noindexは判定しません']};
+}
+function sssM3ArticleHealthPreview(){
+ const c=sssConfig_(),p=sssProperties_();
+ const batch=sssM3BatchStatus(),roll=sssM3RollupStatus();
+ const bs=JSON.parse(p.getProperty(SSS_M3_BATCH_KEY_)||'null');
+ const rs=JSON.parse(p.getProperty(SSS_M3_ROLLUP_KEY_)||'null');
+ const jr=JSON.parse(p.getProperty(SSS_M3_METRICS_KEY_)||'null');
+ if(batch.status!=='COMPLETED'||roll.status!=='COMPLETED'||!bs||!rs||!jr)
+  return {status:'NOT_READY',reason:'記事台帳と検索実績の分割統合が完了していません。'};
+ if(bs.site_id!==c.siteId||rs.site_id!==c.siteId||jr.site_id!==c.siteId||rs.journal_run!==jr.run_id||
+    jr.article_run!==bs.run_id||rs.processed!==jr.total||rs.source_total!==jr.total)
+  throw Error('M3記事台帳と検索実績の実行元が一致しません。');
+ if(bs.processed>5000||rs.summary_rows>5000)throw Error('M3記事別照合の安全上限5000件を超えています。');
+ const a=sssM3BatchSheet_(),r=sssM3RollupSheet_();
+ if(a.getLastRow()!==bs.processed+1||r.getLastRow()!==rs.summary_rows+1)
+  throw Error('M3記事台帳または統合表の保存行数が一致しません。');
+ const articleRows=bs.processed?a.getRange(2,1,bs.processed,9).getDisplayValues():[];
+ const metricRows=rs.summary_rows?r.getRange(2,1,rs.summary_rows,6).getDisplayValues():[];
+ if(sssM3RollupDigest_(sssM3RollupCanonicalRows_(metricRows))!==rs.summary_digest)throw Error('M3統合表のチェックサムが一致しません。');
+ const inventory=articleRows.map(x=>{
+  if(x[0]!==bs.run_id||x[1]!==c.siteId)throw Error('M3記事台帳の実行IDが一致しません。');
+  return {article_id:x[2],url:x[3],state:x[5],url_status:x[8]};
+ });
+ const metrics=metricRows.map(x=>{
+  if(x[0]!==rs.journal_run||x[1]!==c.siteId)throw Error('M3統合表の実行IDが一致しません。');
+  return {article_id:x[2],clicks:Number(x[3]),impressions:Number(x[4]),page_rows:Number(x[5])};
+ });
+ const result=sssM3ArticleHealthJoin_(inventory,metrics);
+ return {...result,site_id:c.siteId,article_run:bs.run_id,journal_run:jr.run_id,
+  note:'中間索引に収集されたページに限る。未照合は需要ゼロを意味しない。'};
+}
+
+
+// M3 stage 11: conservative, non-prescriptive review queue.  This is not an
+// article quality score.  No content change, merge or noindex is authorized.
+// SBM states may contain display icons, spacing or explanatory suffixes.
+// Never interpret an unrecognized state as an eligible, untouched article.
+function sssM3ClassifySbmState_(raw){
+ const value=String(raw===null||raw===undefined?'':raw).normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g,'').trim();
+ if(!value)return {kind:'UNKNOWN',label:'(空欄)'};
+ if(/モニタ[ー]?中|改善中|再診処置|治療待ち|処置中/.test(value))return {kind:'ACTIVE',label:value};
+ if(/未着手|完了|管理対象外|統合済み/.test(value))return {kind:'KNOWN',label:value};
+ return {kind:'UNKNOWN',label:value};
+}
+function sssM3HealthReviewTriage_(joined){
+ if(!joined||joined.format!=='S3_M3_ARTICLE_HEALTH_JOIN_V1'||joined.status!=='VALIDATED'||joined.coverage!=='ALL_STAGED_PAGES'||!Array.isArray(joined.articles)||joined.article_count!==joined.articles.length)
+  throw Error('M3記事別照合の検証済み全件データが必要です。');
+ const seen=new Set(),stateCounts={},stateSamples=[],queue=[],counts={DATA_QUALITY:0,SEARCH_REVIEW:0,MONITORING:0,INSUFFICIENT_EVIDENCE:0,OBSERVED_NO_TRIGGER:0,STATE_UNVERIFIED:0};
+ for(const a of joined.articles){
+  const id=String(a.article_id||'').trim(),state=String(a.state||'').trim(),ev=String(a.evidence_status||'');
+  const sbm=sssM3ClassifySbmState_(state);stateCounts[sbm.kind]=(stateCounts[sbm.kind]||0)+1;
+  if(sbm.kind==='UNKNOWN'&&stateSamples.length<10)stateSamples.push({article_id:id,raw_state:state});
+  if(!id||seen.has(id))throw Error('M3記事IDが空欄または重複しています。');
+  seen.add(id);
+  if(!['IDENTITY_REVIEW','NO_GSC_URL_MATCH','MATCHED_ZERO_IMPRESSIONS','OBSERVED_IMPRESSIONS'].includes(ev))throw Error('M3検索実績の判定が不正です。');
+  if(ev==='OBSERVED_IMPRESSIONS'||ev==='MATCHED_ZERO_IMPRESSIONS'){
+   if(!Number.isSafeInteger(a.clicks)||!Number.isSafeInteger(a.impressions)||a.clicks<0||a.impressions<0||a.clicks>a.impressions||!Number.isSafeInteger(a.page_rows)||a.page_rows<1)throw Error('M3検索実績の数値が不正です。');
+   if(ev==='OBSERVED_IMPRESSIONS'&&a.impressions===0||ev==='MATCHED_ZERO_IMPRESSIONS'&&a.impressions!==0)throw Error('M3検索実績の判定と数値が矛盾しています。');
+  }else if(a.clicks!==null||a.impressions!==null)throw Error('未照合記事に検索実績が割り当てられています。');
+  let category,reason,rank;
+  if(ev==='IDENTITY_REVIEW'){
+   category='DATA_QUALITY';reason='URL・記事識別情報の確認が必要';rank=1;
+  }else if(sbm.kind==='ACTIVE'){
+   category='MONITORING';reason='SBMで処理中・経過観察中のため重複依頼を保留';rank=4;
+  }else if(sbm.kind==='UNKNOWN'){
+   category='STATE_UNVERIFIED';reason='SBMの作業状態を識別できないため、改善提案を保留';rank=2;
+  }else if(ev==='NO_GSC_URL_MATCH'||ev==='MATCHED_ZERO_IMPRESSIONS'){
+   category='INSUFFICIENT_EVIDENCE';reason='検索実績の確認不足。需要ゼロとは判定しない';rank=3;
+  }else if(a.impressions>=100&&a.clicks===0){
+   category='SEARCH_REVIEW';reason='表示100回以上・クリック0回のため検索意図と訴求を確認する候補（暫定基準）';rank=2;
+  }else{
+   category='OBSERVED_NO_TRIGGER';reason='現時点で優先確認条件に該当しない';rank=5;
+  }
+  counts[category]++;
+  queue.push({article_id:id,state,evidence_status:ev,category,rank,reason,clicks:a.clicks,impressions:a.impressions,content_action:'NONE'});
+ }
+ queue.sort((a,b)=>a.rank-b.rank||(a.article_id<b.article_id?-1:a.article_id>b.article_id?1:0));
+ return {format:'S3_M3_HEALTH_TRIAGE_V1',status:'PROVISIONAL_REVIEW_ONLY',article_count:queue.length,counts,queue,
+  coverage:'ALL_STAGED_PAGES',state_counts:stateCounts,unrecognized_states:stateSamples,content_action:'NONE',publication_gate:'HOLD',
+  limitations:['表示100回・クリック0回は暫定的な確認候補条件であり改善指示ではありません','未照合・表示0は需要ゼロを意味しません','SBM処理中の記事は重複改善依頼を出しません','記事削除・統合・noindexは決定しません']};
+}
+function sssM3HealthReviewPreview(){
+ const joined=sssM3ArticleHealthPreview();
+ if(joined.status==='NOT_READY')return joined;
+ const r=sssM3HealthReviewTriage_(joined);
+ return {format:r.format,status:r.status,site_id:joined.site_id,article_count:r.article_count,counts:r.counts,
+  review_sample:r.queue.filter(x=>x.category==='DATA_QUALITY'||x.category==='SEARCH_REVIEW'||x.category==='STATE_UNVERIFIED').slice(0,30),
+  state_counts:r.state_counts,unrecognized_states:r.unrecognized_states,
+  review_sample_limit:30,coverage:r.coverage,content_action:'NONE',publication_gate:'HOLD',limitations:r.limitations};
+}
+
+
+// M3 stage 12: one bounded server operation per invocation. The dialog
+// orchestrates successive calls; no long synchronous loop in Apps Script.
+// A missing Collector work table is a STOP, not a reason to unzip Evidence.
+function sssM3PilotPlan_(statuses,sourceAvailable){
+ const steps=[
+  ['ARTICLE_INVENTORY','sssM3BatchStart','sssM3BatchContinue'],
+  ['PAGE_INDEX','sssM3PageStageStart','sssM3PageStageContinue'],
+  ['METRICS_JOURNAL','sssM3MetricsJournalStart','sssM3MetricsJournalContinue'],
+  ['ARTICLE_ROLLUP','sssM3RollupStart','sssM3RollupContinue']];
+ // Never continue a downstream stage when an upstream stage is unfinished.
+ // Such a state indicates stale checkpoints, a partial reset, or manual edits.
+ for(let i=1;i<steps.length;i++){
+  const downstream=statuses[i]||{status:'NOT_STARTED'};
+  if(downstream.status==='RUNNING'||downstream.status==='COMPLETED'){
+   for(let j=0;j<i;j++)if(!statuses[j]||statuses[j].status!=='COMPLETED')
+    return {status:'BLOCKED',stage:steps[i][0],reason:'後続工程が存在しますが、先行工程が完了していません。データを上書きせず停止します。'};
+  }
+ }
+ for(let i=0;i<steps.length;i++){
+  const [stage,start,cont]=steps[i],st=statuses[i]||{status:'NOT_STARTED'};
+  if(st.status==='COMPLETED')continue;
+  if(st.status!=='RUNNING'&&st.status!=='NOT_STARTED')return {status:'BLOCKED',stage,reason:'別サイトまたは不整合のある作業状態です。自動初期化しません。'};
+  if(i===1&&!sourceAvailable)return {status:'BLOCKED',stage,reason:'Collectorの完了済み作業データがありません。ZIPの自動展開は行いません。'};
+  return {status:'READY',stage,method:st.status==='RUNNING'?cont:start};
+ }
+ return {status:'READY',stage:'HEALTH_REVIEW',method:'sssM3HealthReviewPreview'};
+}
+function sssM3PilotStatus(){
+ const c=sssConfig_(),batch=sssM3BatchStatus(),page=sssM3PageStageStatus(),journal=sssM3MetricsJournalStatus(),rollup=sssM3RollupStatus();
+ // Only probe Collector when page materialization is pending. Completed
+ // stages must remain reviewable after Collector has discarded its work table.
+ const needsSource=batch.status==='COMPLETED'&&page.status==='NOT_STARTED';
+ let source={available:true,reason:''};
+ if(needsSource){
+  try{source=sssM3PageStageSource_();}
+  catch(e){source={available:false,reason:'Collector作業データの確認に失敗しました：'+String(e&&e.message||e)};}
+  if(!source.available){
+   const alternative=sssM3CompactFallbackSource_();
+   const ref=sssM1CompactRef_(c),gsc=sssM3GscPlan_(ref);
+   source=alternative.available?{available:true,mode:'COMPACT_ZIP',reason:''}:
+    gsc.available?{available:true,mode:'GSC_REQUERY',reason:gsc.reason}:
+    {available:false,reason:source.reason+' '+alternative.reason+' '+gsc.reason};
+  }
+ }
+ const plan=sssM3PilotPlan_([batch,page,journal,rollup],source.available);
+ return {format:'S3_M3_PILOT_STATUS_V2',site_id:c.siteId,plan,stages:{ARTICLE_INVENTORY:batch,PAGE_INDEX:page,METRICS_JOURNAL:journal,ARTICLE_ROLLUP:rollup},source_available:needsSource?source.available:null,source_mode:needsSource?String(source.mode||'COLLECTOR'):null,source_reason:needsSource?source.reason:'',content_action:'NONE'};
+}
+function sssM3PilotStep(){
+ const before=sssM3PilotStatus(),plan=before.plan;
+ if(plan.status!=='READY')return {status:'BLOCKED',stage:plan.stage,reason:plan.reason,progress:before.stages};
+ const methods={sssM3BatchStart,sssM3BatchContinue,sssM3PageStageStart,sssM3PageStageContinue,sssM3MetricsJournalStart,sssM3MetricsJournalContinue,sssM3RollupStart,sssM3RollupContinue,sssM3HealthReviewPreview};
+ let result;
+ if(plan.stage==='PAGE_INDEX'){
+  const current=sssM3PageStageStatus();
+  if(current.status==='RUNNING'){
+   const raw=sssProperties_().getProperty(SSS_M3_PAGE_STAGE_KEY_);
+   result=raw&&JSON.parse(raw).source_mode==='GSC_REQUERY'?sssM3PageStageContinueGsc_():methods[plan.method]();
+  }else if(plan.method==='sssM3PageStageStart'&&!sssM3PageStageSource_().available){
+   const alternative=sssM3CompactFallbackSource_();
+   result=alternative.available?sssM3PageStageStartCompact_():sssM3PageStageStartGsc_();
+  }else result=methods[plan.method]();
+ }else result=methods[plan.method]();
+ if(!result||typeof result!=='object')return {status:'BLOCKED',stage:plan.stage,reason:'工程の戻り値を確認できません。',content_action:'NONE'};
+ if(plan.stage==='HEALTH_REVIEW'){
+  if(result.format!=='S3_M3_HEALTH_TRIAGE_V1'||result.status!=='PROVISIONAL_REVIEW_ONLY'||result.content_action!=='NONE'||result.publication_gate!=='HOLD')
+   return {status:'BLOCKED',stage:plan.stage,reason:'診断プレビューの検証済み形式を確認できません。公開・改善指示は行いません。',result,content_action:'NONE'};
+  return {status:'COMPLETED',stage:plan.stage,result,content_action:'NONE'};
+ }
+ if(result.status!=='RUNNING'&&result.status!=='COMPLETED')return {status:'BLOCKED',stage:plan.stage,reason:result.reason||'工程が正常終了していません。',result,content_action:'NONE'};
+ return {status:'PROGRESSED',stage:plan.stage,result,content_action:'NONE'};
+}
+// M3 read-only dashboard: validated preview only, no diagnosis persistence or SBM mutation.
+function sssM3DashboardData(){
+ const status=sssM3PilotStatus();
+ if(status.plan.status!=='READY'||status.plan.stage!=='HEALTH_REVIEW')
+  return {status:'NOT_READY',reason:'全工程が完了していません。',content_action:'NONE'};
+ const r=sssM3HealthReviewPreview();
+ if(r.format!=='S3_M3_HEALTH_TRIAGE_V1'||r.status!=='PROVISIONAL_REVIEW_ONLY'||r.publication_gate!=='HOLD'||r.content_action!=='NONE')
+  throw Error('M3診断結果の形式・公開保留条件を確認できません。');
+ const categories=['DATA_QUALITY','SEARCH_REVIEW','MONITORING','INSUFFICIENT_EVIDENCE','OBSERVED_NO_TRIGGER','STATE_UNVERIFIED'];
+ if(!r.counts||categories.some(k=>!Number.isSafeInteger(r.counts[k])||r.counts[k]<0)||categories.reduce((a,k)=>a+r.counts[k],0)!==r.article_count)
+  throw Error('M3診断区分の合計が記事数と一致しません。');
+ return {format:'S3_M3_DASHBOARD_V1',status:'READY',article_count:r.article_count,
+  counts:Object.fromEntries(categories.map(k=>[k,r.counts[k]])),
+  sample:(r.review_sample||[]).slice(0,20).map(x=>({article_id:String(x.article_id||''),category:String(x.category||''),reason:String(x.reason||''),impressions:x.impressions,clicks:x.clicks})),
+  sample_limit:20,state_counts:r.state_counts,unrecognized_states:r.unrecognized_states,coverage:r.coverage,publication_gate:'HOLD',content_action:'NONE',
+  notice:'暫定診断です。検索実績の欠落は需要ゼロを意味しません。記事改善・公開は実行しません。'};
+}
+function sssM3PilotDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>
+ body{font:14px Arial,sans-serif;padding:18px;margin:0;line-height:1.6;color:#202124}h3{margin:0 0 8px;font-size:19px}p{margin:6px 0 14px;color:#555}button{padding:10px 18px;border:1px solid #b8bfc6;border-radius:5px;background:#fff;cursor:pointer}button:disabled{opacity:.5;cursor:default}#run{background:#1765ad;color:#fff;border-color:#1765ad}#stop{margin-left:8px}#status{margin:14px 0 8px;font-weight:bold;min-height:22px}#track{height:10px;background:#e7eaee;border-radius:10px;overflow:hidden}#bar{height:100%;background:#2779b8;width:0%;transition:width .2s}#pct{font-size:12px;color:#555;margin:4px 0 12px}#steps{padding:0;list-style:none;margin:14px 0}#steps li{padding:7px 8px;border-bottom:1px solid #eee}#steps li.current{background:#eaf3fd;font-weight:bold}#steps li.done{color:#216b43}#notice{font-size:12px;color:#666}details{margin-top:12px}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:155px;overflow:auto;background:#f5f6f7;padding:10px;font-size:11px}footer{margin-top:16px;border-top:1px solid #ddd;padding-top:12px}#dashboard{margin-top:14px;padding:12px;border:1px solid #d8dee5;border-radius:6px}#dashboard[hidden]{display:none}.stat{padding:5px 0;border-bottom:1px solid #eee}.stat strong{float:right}#samples{padding-left:20px}#samples li{margin:5px 0}#resultBtn{margin-top:10px}
+ </style><h3>ブログ総合診断</h3><p>開始すると途中経過を表示しながら自動で進みます。SBMとEvidenceは変更しません。</p>
+ <button id="run" onclick="start()">診断を開始・再開</button><button id="stop" onclick="stop()" disabled>停止</button><div id="status" role="status" aria-live="polite">準備状況を確認しています…</div>
+ <div id="track" role="progressbar" aria-label="診断の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="bar"></div></div><div id="pct">進捗を確認中</div>
+ <ol id="steps"><li id="s0">記事台帳を確認</li><li id="s1">検索データを準備</li><li id="s2">検索実績を集計</li><li id="s3">記事別実績を統合</li><li id="s4">診断結果を確認</li></ol>
+ <button id="resultBtn" onclick="loadDashboard()" disabled>診断結果を見る</button><section id="dashboard" hidden aria-live="polite"><h3>ブログの診断概要</h3><div id="summary"></div><h4>優先確認候補（最大20件）</h4><ol id="samples"></ol><p id="disclaimer"></p></section><div id="notice">処理は小分けに実行します。通信エラーや不整合があれば停止します。画面を閉じると自動実行は止まり、保存済みの進捗から再開できます。</div>
+ <details><summary>技術情報（必要な場合のみ）</summary><pre id="out">未取得</pre></details><footer><button onclick="google.script.host.close()">閉じる</button></footer>
+ <script>
+ const names=['ARTICLE_INVENTORY','PAGE_INDEX','METRICS_JOURNAL','ARTICLE_ROLLUP','HEALTH_REVIEW'];
+ let running=false,stopping=false,calls=0,token=0,dashboardReady=false;const MAX_CALLS=250;
+ function el(id){return document.getElementById(id)}
+ function show(x){el('out').textContent=JSON.stringify(x,null,2)}
+ function message(s){el('status').textContent=s}
+ function setButtons(){el('run').disabled=running;el('stop').disabled=!running||stopping;el('resultBtn').disabled=running||!dashboardReady}
+ function stop(){stopping=true;el('stop').disabled=true;message('現在の区間が終わり次第、停止します…')}
+ function halt(s){running=false;stopping=false;token++;setButtons();message(s)}
+ function fail(e){halt('安全停止：'+String(e&&e.message||e)+'。詳細を確認してください。')}
+ function progress(x){
+  if(!x||!x.plan||!x.stages){fail('進捗情報が不正です');return false}
+  show(x);const index=names.indexOf(x.plan.stage),states=names.slice(0,4).map(k=>x.stages[k]||{});
+  let fraction=0;const fractions=states.map((v,i)=>{
+   if(v.status==='COMPLETED')return 1;
+   if(v.status!=='RUNNING')return 0;
+   const total=Number(v.total),done=Number(v.scanned??v.processed??0);
+   return total>0&&Number.isFinite(done)?Math.max(0,Math.min(.99,done/total)):.03;
+  });
+  fraction=(fractions.reduce((a,b)=>a+b,0)+(index===4?0.2:0))/5;
+  const pct=Math.max(0,Math.min(99,Math.round(fraction*100)));
+  el('bar').style.width=pct+'%';el('track').setAttribute('aria-valuenow',String(pct));el('pct').textContent='全体の目安 '+pct+'%（工程ごとの進捗）';
+  names.forEach((name,i)=>{const node=el('s'+i);node.className=i<4&&states[i].status==='COMPLETED'?'done':name===x.plan.stage?'current':'';node.textContent=(i<4&&states[i].status==='COMPLETED'?'✓ ':name===x.plan.stage?'▶ ':'')+['記事台帳を確認','検索データを準備','検索実績を集計','記事別実績を統合','診断結果を確認'][i]});
+  return true;
+ }
+ function loadDashboard(){
+  if(running)return;
+  el('resultBtn').disabled=true;message('診断結果を確認しています…');
+  google.script.run.withSuccessHandler(x=>{
+   show(x);el('resultBtn').disabled=false;
+   if(!x||x.status!=='READY'){message('診断結果はまだ利用できません。');return}
+   const labels={DATA_QUALITY:'記事情報の確認',SEARCH_REVIEW:'検索実績の確認候補',MONITORING:'SBMで処理・観察中',INSUFFICIENT_EVIDENCE:'判断材料が不足',OBSERVED_NO_TRIGGER:'優先条件に非該当',STATE_UNVERIFIED:'SBM作業状態を要確認'};
+   const sum=el('summary');sum.replaceChildren();
+   const title=document.createElement('p');title.textContent='診断対象 '+x.article_count+'記事（暫定判定）';sum.appendChild(title);
+   Object.keys(labels).forEach(k=>{const d=document.createElement('div');d.className='stat';d.textContent=labels[k];const n=document.createElement('strong');n.textContent=String(x.counts[k]??0)+'件';d.appendChild(n);sum.appendChild(d)});
+   const stateNote=document.createElement('p');stateNote.textContent='SBM作業状態の識別：対応中 '+(x.state_counts?.ACTIVE??0)+'件／既知のその他 '+(x.state_counts?.KNOWN??0)+'件／未識別 '+(x.state_counts?.UNKNOWN??0)+'件';sum.appendChild(stateNote);
+   const list=el('samples');list.replaceChildren();(x.sample||[]).forEach(a=>{const li=document.createElement('li');li.textContent=a.article_id+'：'+(labels[a.category]||a.category)+' — '+a.reason;list.appendChild(li)});
+   if(!list.children.length){const li=document.createElement('li');li.textContent='該当候補はありません';list.appendChild(li)}
+   el('disclaimer').textContent=x.notice;el('dashboard').hidden=false;message('診断結果を表示しました。記事の変更は行っていません。');
+  }).withFailureHandler(e=>{el('resultBtn').disabled=false;message('結果表示を停止：'+String(e&&e.message||e))}).sssM3DashboardData();
+ }
+ function poll(t){google.script.run.withSuccessHandler(x=>{
+  if(t!==token)return;if(!progress(x))return;
+  if(x.plan.stage==='HEALTH_REVIEW'&&x.stages.ARTICLE_ROLLUP.status==='COMPLETED'){dashboardReady=true;setButtons()}
+  if(x.plan.status==='BLOCKED'){halt('安全停止：'+(x.plan.reason||'データの確認が必要です'));return}
+  if(stopping){halt('停止しました。続きから再開できます。');return}
+  if(!running){message('準備完了。「診断を開始・再開」を押してください。');return}
+  if(calls>=MAX_CALLS){halt('安全停止：連続実行の上限に達しました。再開すると続きから処理できます。');return}
+  message('診断中：'+['記事台帳','検索データ','検索実績','記事別統合','診断結果'][Math.max(0,names.indexOf(x.plan.stage))]+'を処理しています…');step(t);
+ }).withFailureHandler(e=>{if(t===token)fail(e)}).sssM3PilotStatus()}
+ function step(t){if(!running||stopping){halt('停止しました。続きから再開できます。');return}calls++;
+  google.script.run.withSuccessHandler(x=>{
+   if(t!==token)return;show(x);
+   if(!x||x.status==='BLOCKED'||(x.status!=='PROGRESSED'&&x.status!=='COMPLETED')){halt('安全停止：'+(x&&x.reason||'処理結果を確認できません'));return}
+   if(x.status==='COMPLETED'){
+    el('bar').style.width='100%';el('track').setAttribute('aria-valuenow','100');el('pct').textContent='全工程の処理完了';el('s4').className='done';el('s4').textContent='✓ 診断結果を確認';
+    dashboardReady=true;halt('診断プレビューが完了しました。結果を表示します。');loadDashboard();return;
+   }
+   if(stopping){halt('停止しました。続きから再開できます。');return}
+   poll(t);
+  }).withFailureHandler(e=>{if(t===token)fail(e)}).sssM3PilotStep();
+ }
+ function start(){if(running)return;running=true;stopping=false;calls=0;token++;setButtons();message('保存済みの進捗を確認しています…');poll(token)}
+ poll(token);
+ </script></html>`).setWidth(720).setHeight(690);
+ SpreadsheetApp.getUi().showModalDialog(html,'ブログ総合診断');
+}
+
+
+// M3 stage 13: site-wide QUERY observations, deliberately separate from
+// article/page evidence.  Bounded live GSC query, not a reconstruction of
+// archived query_summary.  No article ownership, volume or SERP conclusions.
+const SSS_M3_SITE_QUERY_LIMIT_=200;
+function sssM3SiteQueryClassify_(response,period,siteId){
+ if(!period||!/^\d{4}-\d{2}-\d{2}$/.test(String(period.start))||!/^\d{4}-\d{2}-\d{2}$/.test(String(period.end))||period.start>period.end||!String(siteId||''))throw Error('検索クエリの対象期間・サイトが不正です。');
+ if(!response||!Array.isArray(response.rows)||response.rows.length>SSS_M3_SITE_QUERY_LIMIT_)throw Error('GSC検索クエリの応答形式または件数が不正です。');
+ const seen=new Set(),items=[];
+ for(const r of response.rows){
+  if(!r||!Array.isArray(r.keys)||r.keys.length!==1)throw Error('GSC検索クエリのキーが不正です。');
+  const q=String(r.keys[0]||'').trim(),key=q.normalize('NFKC').toLowerCase();
+  if(!q||q.length>500||seen.has(key))throw Error('GSC検索クエリが空欄・重複・長すぎます。');seen.add(key);
+  const clicks=Number(r.clicks),impressions=Number(r.impressions),position=Number(r.position);
+  if(!Number.isSafeInteger(clicks)||!Number.isSafeInteger(impressions)||clicks<0||impressions<0||clicks>impressions||!Number.isFinite(position)||position<0)throw Error('GSC検索クエリの実績値が不正です。');
+  items.push({query:q,clicks,impressions,position,signal:impressions>=100&&clicks===0?'CHECK_INTENT':'OBSERVED',ownership:'UNCONFIRMED',content_action:'NONE'});
+ }
+ items.sort((a,b)=>b.impressions-a.impressions||a.query.localeCompare(b.query,'ja'));
+ return {format:'S3_M3_SITE_QUERY_PILOT_V1',status:'PROVISIONAL',site_id:siteId,period:{start:period.start,end:period.end},observation:'LIVE_GSC_REQUERY',coverage:'TOP_QUERY_SAMPLE',sample_limit:SSS_M3_SITE_QUERY_LIMIT_,returned:items.length,queries:items,publication_gate:'HOLD',content_action:'NONE',limitations:['検索クエリはサイト全体の観測値であり、記事IDへ帰属させません','上位最大200件の抜粋です。未掲載の検索語に需要がないとは判定しません','再取得時点の数値は保存済みEvidenceと一致する保証がありません','表示100回・クリック0回は精査の入口であり、新記事・既存記事修正を承認しません']};
+}
+function sssM3SiteQueryPilot(){
+ const c=sssConfig_(),ref=sssM1CompactRef_(c),plan=sssM3GscPlan_(ref);
+ if(!plan.available)return {status:'BLOCKED',reason:plan.reason,content_action:'NONE',publication_gate:'HOLD'};
+ const response=sdscSearchAnalyticsQuery_(c.propertyUri,{startDate:plan.start,endDate:plan.end,type:'web',dataState:'final',dimensions:['query'],rowLimit:SSS_M3_SITE_QUERY_LIMIT_,startRow:0});
+ return sssM3SiteQueryClassify_(response,{start:plan.start,end:plan.end},c.siteId);
+}
+function sssM3SiteQueryDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:18px;line-height:1.6;color:#202124}h3{margin:0 0 8px}p{color:#555}button{padding:9px 16px;border:1px solid #b8bfc6;border-radius:5px;background:white;cursor:pointer}button:disabled{opacity:.5}#run{background:#1765ad;color:white}#status{margin:12px 0;font-weight:bold}table{width:100%;border-collapse:collapse}th,td{padding:7px;border-bottom:1px solid #ddd;text-align:left}td.num{text-align:right}small{color:#666}#scroll{max-height:330px;overflow:auto}footer{border-top:1px solid #ddd;margin-top:14px;padding-top:12px}</style><h3>サイト全体の検索クエリ</h3><p>GSCの検索クエリ上位最大200件を読み取り専用で確認します。既存記事への帰属や新記事作成は決定しません。</p><button id="run" onclick="run()">検索データを確認</button><div id="status" role="status" aria-live="polite">開始待ち</div><div id="meta"></div><div id="scroll"><table><thead><tr><th>検索クエリ</th><th>表示</th><th>クリック</th><th>確認</th></tr></thead><tbody id="rows"></tbody></table></div><p><small>表示100回以上・クリック0回は暫定的な確認対象です。検索意図・競合・既存記事との重複は未検証です。</small></p><footer><button onclick="google.script.host.close()">閉じる</button></footer><script>const e=id=>document.getElementById(id);function run(){e('run').disabled=true;e('status').textContent='GSCから検索データを取得しています…';google.script.run.withSuccessHandler(x=>{e('run').disabled=false;if(!x||x.status!=='PROVISIONAL'){e('status').textContent='安全停止：'+(x&&x.reason||'データを確認できません');return}e('status').textContent='確認完了。記事への変更はありません。';e('meta').textContent='対象期間：'+x.period.start+' ～ '+x.period.end+'／上位'+x.returned+'件（最大200件）';const body=e('rows');body.replaceChildren();x.queries.forEach(r=>{const tr=document.createElement('tr');[r.query,r.impressions,r.clicks,r.signal==='CHECK_INTENT'?'要精査':'観測'].forEach((v,i)=>{const td=document.createElement('td');td.textContent=String(v);if(i===1||i===2)td.className='num';tr.appendChild(td)});body.appendChild(tr)})}).withFailureHandler(err=>{e('run').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3SiteQueryPilot()}</script></html>`).setWidth(780).setHeight(640);
+ SpreadsheetApp.getUi().showModalDialog(html,'サイト全体の検索クエリ（試験）');
+}
+
+
+// M3 stage 14: conservative title-only lexical coverage hints.  This does
+// not establish search intent, article ownership, a content gap, or demand.
+// It deliberately cannot return NEW_ARTICLE or REWRITE decisions.
+function sssM3QueryTokens_(value){
+ const normalized=String(value||'').normalize('NFKC').toLowerCase();
+ const words=normalized.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]+|[a-z0-9]+/gu)||[];
+ const stop=new Set(['とは','方法','やり方','使い方','について','する','できる','こと','とき','場合','おすすめ','完全','ガイド','解説','最新','比較','対応','記事']);
+ return [...new Set(words.filter(x=>x.length>=2&&!stop.has(x)))];
+}
+function sssM3QueryCoverageHints_(queries,articles){
+ if(!Array.isArray(queries)||queries.length>200||!Array.isArray(articles)||articles.length>5000)throw Error('検索語または記事台帳の件数が上限を超えています。');
+ const ids=new Set(),catalog=[];
+ for(const a of articles){
+  const id=String(a.article_id||'').trim(),title=String(a.title||'').trim();
+  if(!id||ids.has(id))throw Error('記事台帳の記事IDが空欄または重複しています。');ids.add(id);
+  catalog.push({article_id:id,title,tokens:sssM3QueryTokens_(title)});
+ }
+ const seen=new Set(),results=[];
+ for(const q of queries){
+  const query=String(q.query||'').trim(),key=query.normalize('NFKC').toLowerCase();
+  if(!query||seen.has(key))throw Error('検索クエリが空欄または重複しています。');seen.add(key);
+  const tokens=sssM3QueryTokens_(query),candidates=[];
+  if(tokens.length){
+   for(const a of catalog){
+    const matched=tokens.filter(t=>a.tokens.some(x=>x===t||x.includes(t)&&t.length>=3||t.includes(x)&&x.length>=3));
+    if(!matched.length)continue;
+    const score=matched.length/tokens.length;
+    candidates.push({article_id:a.article_id,title:a.title,matched_terms:matched.length,query_terms:tokens.length,score:Math.round(score*100)});
+   }
+   candidates.sort((a,b)=>b.score-a.score||b.matched_terms-a.matched_terms||a.article_id.localeCompare(b.article_id));
+  }
+  results.push({query,coverage_hint:!tokens.length?'NO_DISTINCTIVE_TOKENS':candidates.length?'TITLE_SIMILARITY_OBSERVED':'NO_TITLE_SIMILARITY_IN_SAMPLE',candidate_count:candidates.length,candidates:candidates.slice(0,3),ownership:'UNCONFIRMED',intent:'NOT_CHECKED',content_action:'NONE'});
+ }
+ return {format:'S3_M3_QUERY_COVERAGE_HINTS_V1',status:'PROVISIONAL',article_count:catalog.length,query_count:results.length,results,publication_gate:'HOLD',content_action:'NONE',limitations:['記事タイトルの文字列類似だけを確認します。本文・検索意図・SERPは未検証です','類似記事が見つからなくても新記事の機会とは判定しません','類似記事が見つかってもその検索語の実績を記事へ帰属させません']};
+}
+function sssM3SiteQueryCoveragePilot(){
+ const c=sssConfig_(),batch=sssM3BatchStatus();
+ if(batch.status!=='COMPLETED')return {status:'BLOCKED',reason:'SBM記事台帳の取得が完了していません。',content_action:'NONE'};
+ const query=sssM3SiteQueryPilot();
+ if(query.status!=='PROVISIONAL')return query;
+ const sh=sssM3BatchSheet_();
+ if(sh.getLastRow()!==batch.processed+1||batch.processed>5000)throw Error('M3記事台帳の保存行数が一致しません。');
+ const rows=sh.getRange(2,1,batch.processed,9).getDisplayValues();
+ if(rows.some(x=>x[0]!==batch.run_id||x[1]!==c.siteId))throw Error('M3記事台帳に異なる実行結果が混在しています。');
+ const articles=rows.map(x=>({article_id:x[2],title:x[4]}));
+ const hints=sssM3QueryCoverageHints_(query.queries,articles);
+ return {format:'S3_M3_SITE_QUERY_COVERAGE_V1',status:'PROVISIONAL',site_id:c.siteId,period:query.period,observation:query.observation,coverage:query.coverage,queries:query.queries.map((x,i)=>({...x,...hints.results[i]})),article_count:hints.article_count,publication_gate:'HOLD',content_action:'NONE',limitations:hints.limitations};
+}
+function sssM3SiteQueryCoverageDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:18px;line-height:1.6;color:#202124}h3{margin:0 0 8px}p,small{color:#555}button{padding:9px 16px;border:1px solid #b8bfc6;border-radius:5px;background:white;cursor:pointer}button:disabled{opacity:.5}#run{background:#1765ad;color:white}#status{margin:12px 0;font-weight:bold}table{width:100%;border-collapse:collapse}th,td{padding:7px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}td.num{text-align:right}#scroll{max-height:390px;overflow:auto}footer{border-top:1px solid #ddd;margin-top:14px;padding-top:12px}</style><h3>検索語と既存記事の関連候補</h3><p>サイト全体の検索語と記事タイトルを比較します。類似は参考情報であり、新記事・改善・記事への実績帰属は決定しません。</p><button id="run" onclick="run()">関連候補を確認</button><div id="status" role="status" aria-live="polite">開始待ち</div><div id="meta"></div><div id="scroll"><table><thead><tr><th>検索クエリ</th><th>表示</th><th>タイトル類似の候補（最大3件）</th></tr></thead><tbody id="rows"></tbody></table></div><p><small>候補なしは記事不足を意味しません。本文・検索意図・SERPの確認が必要です。</small></p><footer><button onclick="google.script.host.close()">閉じる</button></footer><script>const e=id=>document.getElementById(id);function run(){e('run').disabled=true;e('status').textContent='GSCと記事台帳を確認しています…';google.script.run.withSuccessHandler(x=>{e('run').disabled=false;if(!x||x.status!=='PROVISIONAL'){e('status').textContent='安全停止：'+(x&&x.reason||'データを確認できません');return}e('status').textContent='確認完了。記事の変更はありません。';e('meta').textContent='対象期間：'+x.period.start+' ～ '+x.period.end+'／記事台帳'+x.article_count+'件／検索語'+x.queries.length+'件';const body=e('rows');body.replaceChildren();x.queries.forEach(r=>{const tr=document.createElement('tr');const cells=[r.query,String(r.impressions),r.candidates.length?r.candidates.map(c=>c.article_id+' '+c.title+'（語句一致 '+c.score+'%）').join(' ／ '):'タイトル類似候補なし（記事不足とは未判定）'];cells.forEach((v,i)=>{const td=document.createElement('td');td.textContent=v;if(i===1)td.className='num';tr.appendChild(td)});body.appendChild(tr)})}).withFailureHandler(err=>{e('run').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3SiteQueryCoveragePilot()}</script></html>`).setWidth(850).setHeight(680);
+ SpreadsheetApp.getUi().showModalDialog(html,'検索語と既存記事の関連候補（試験）');
+}
+
+
+// M3 stage 15: bounded, live query x page observations. This is a SAMPLE,
+// not exhaustive coverage. Ownership is verified against the full saved SBM
+// inventory; ambiguous or unmatched URLs remain unassigned. Read-only.
+const SSS_M3_QUERY_PAGE_LIMIT_=250;
+function sssM3QueryPageAnalyze_(response,articles,siteId,period){
+ if(!siteId||!period||!/^(\d{4}-\d{2}-\d{2})$/.test(period.start)||!/^(\d{4}-\d{2}-\d{2})$/.test(period.end)||period.start>period.end)throw Error('対象サイト・期間が不正です。');
+ if(!response||!Array.isArray(response.rows)||response.rows.length>SSS_M3_QUERY_PAGE_LIMIT_||!Array.isArray(articles)||articles.length>5000)throw Error('GSC応答または記事台帳の件数が不正です。');
+ const ids=new Set();for(const a of articles){if(!a||!a.article_id||ids.has(a.article_id))throw Error('記事IDが空欄または重複しています。');ids.add(a.article_id);}
+ const entries=[],keys=new Set();
+ for(const r of response.rows){
+  if(!r||!Array.isArray(r.keys)||r.keys.length!==2)throw Error('検索語×ページのキーが不正です。');
+  const query=String(r.keys[0]||'').trim(),url=String(r.keys[1]||'').trim();
+  if(!query||query.length>500||!/^https?:\/\//i.test(url))throw Error('検索語またはページURLが不正です。');
+  const key=JSON.stringify([query.normalize('NFKC').toLowerCase(),url]);if(keys.has(key))throw Error('検索語×ページの重複行があります。');keys.add(key);
+  const clicks=Number(r.clicks),impressions=Number(r.impressions),position=Number(r.position);
+  if(!Number.isSafeInteger(clicks)||!Number.isSafeInteger(impressions)||clicks<0||impressions<0||clicks>impressions||!Number.isFinite(position)||position<0)throw Error('検索実績の数値が不正です。');
+  entries.push({query,url,clicks,impressions,position});
+ }
+ const matched=sssM3MatchPageRows_(articles,entries.map(x=>({url:x.url,clicks:x.clicks,impressions:x.impressions})));
+ const rows=entries.map((x,i)=>({...x,match_status:matched.rows[i].status,article_id:matched.rows[i].article_id,content_action:'NONE'}));
+ const queries=new Map();
+ for(const r of rows){const key=r.query.normalize('NFKC').toLowerCase();let q=queries.get(key);if(!q){q={query:r.query,sample_rows:0,article_ids:new Set(),unmatched_rows:0,ambiguous_rows:0};queries.set(key,q)}q.sample_rows++;if(r.article_id)q.article_ids.add(r.article_id);if(r.match_status==='UNMATCHED'||r.match_status==='INVALID_URL')q.unmatched_rows++;if(r.match_status==='AMBIGUOUS')q.ambiguous_rows++;}
+ const overview=[...queries.values()].map(q=>({query:q.query,sample_rows:q.sample_rows,observed_article_ids:[...q.article_ids].sort(),unmatched_rows:q.unmatched_rows,ambiguous_rows:q.ambiguous_rows,signal:q.ambiguous_rows?'IDENTITY_REVIEW':q.article_ids.size>1?'MULTIPLE_ARTICLES_OBSERVED':q.article_ids.size===1?'ONE_ARTICLE_OBSERVED':'NO_MATCH_IN_SAMPLE',intent:'NOT_CHECKED',content_action:'NONE'}));
+ return {format:'S3_M3_QUERY_PAGE_PILOT_V1',status:'PROVISIONAL',site_id:siteId,period,observation:'LIVE_GSC_REQUERY',coverage:'TOP_QUERY_PAGE_SAMPLE',sample_limit:SSS_M3_QUERY_PAGE_LIMIT_,returned:rows.length,article_count:articles.length,queries:overview,rows,publication_gate:'HOLD',content_action:'NONE',limitations:['検索語×ページの上位250行だけの抜粋であり全件ではありません','複数記事の観測はカニバリゼーション確定ではありません','該当記事がない場合も新記事の必要性は未判定です','GSC再取得値は保存済みEvidenceと一致する保証がありません']};
+}
+function sssM3QueryPagePilot(){
+ const c=sssConfig_(),batch=sssM3BatchStatus();if(batch.status!=='COMPLETED')return {status:'BLOCKED',reason:'SBM記事台帳の取得が完了していません。'};
+ const ref=sssM1CompactRef_(c),plan=sssM3GscPlan_(ref);if(!plan.available)return {status:'BLOCKED',reason:plan.reason};
+ const sh=sssM3BatchSheet_();if(batch.processed>5000||sh.getLastRow()!==batch.processed+1)throw Error('保存済み記事台帳の行数が一致しません。');
+ const data=sh.getRange(2,1,batch.processed,9).getDisplayValues();if(data.some(r=>r[0]!==batch.run_id||r[1]!==c.siteId))throw Error('保存済み記事台帳のサイト・実行IDが一致しません。');
+ const articles=data.map(r=>({article_id:r[2],url:r[3],title:r[4]}));
+ const response=sdscSearchAnalyticsQuery_(c.propertyUri,{startDate:plan.start,endDate:plan.end,type:'web',dataState:'final',dimensions:['query','page'],rowLimit:SSS_M3_QUERY_PAGE_LIMIT_,startRow:0});
+ return sssM3QueryPageAnalyze_(response,articles,c.siteId,{start:plan.start,end:plan.end});
+}
+function sssM3QueryPageDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:18px;color:#202124;line-height:1.55}h3{margin:0 0 10px}button{padding:9px 15px;border:1px solid #bdc1c6;border-radius:5px;background:white;cursor:pointer}#run{background:#1765ad;color:white}button:disabled{opacity:.5}#status{font-weight:bold;margin:12px 0}table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{text-align:left;padding:10px 6px;border-bottom:1px solid #ddd;overflow-wrap:anywhere;vertical-align:top}th:first-child{width:45%}th:nth-child(2){width:20%}small{color:#555}footer{border-top:1px solid #ddd;margin-top:16px;padding-top:12px}</style><h3>検索語×実績ページの確認</h3><p>GSCの検索語×ページ上位250行を、保存済みの記事台帳と照合します。観測結果は暫定で、記事改善や新記事作成は決定しません。</p><button id="run" onclick="run()">実績ページを確認</button><div id="status" role="status" aria-live="polite">開始待ち</div><div id="meta"></div><table><thead><tr><th>検索語</th><th>記事ID</th><th>確認状態</th></tr></thead><tbody id="rows"></tbody></table><p><small>上位250行の抜粋です。複数記事が観測されても記事競合は未確定です。記事が見つからなくても記事不足とは判断しません。</small></p><details><summary>技術情報</summary><pre id="technical" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details><footer><button onclick="google.script.host.close()">閉じる</button></footer><script>const e=id=>document.getElementById(id);function run(){e('run').disabled=true;e('status').textContent='GSCと記事台帳を照合しています…';google.script.run.withSuccessHandler(x=>{e('run').disabled=false;if(!x||x.status!=='PROVISIONAL'){e('status').textContent='安全停止：'+(x&&x.reason||'確認できません');return}e('status').textContent='確認完了。記事の変更はありません。';e('meta').textContent='対象期間：'+x.period.start+' ～ '+x.period.end+'／取得'+x.returned+'行／対象記事'+x.article_count+'件';const body=e('rows');body.replaceChildren();x.queries.forEach(q=>{const tr=document.createElement('tr');const label=q.signal==='MULTIPLE_ARTICLES_OBSERVED'?'複数記事で観測（競合未判定）':q.signal==='IDENTITY_REVIEW'?'URL照合の確認が必要':q.signal==='ONE_ARTICLE_OBSERVED'?'実績ページを確認':'対応記事は未確認';[q.query,q.observed_article_ids.join('、')||'—',label].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});body.appendChild(tr)});e('technical').textContent=JSON.stringify({coverage:x.coverage,returned:x.returned,limitations:x.limitations},null,2)}).withFailureHandler(err=>{e('run').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3QueryPagePilot()}</script></html>`).setWidth(850).setHeight(680);
+ SpreadsheetApp.getUi().showModalDialog(html,'検索語×実績ページの確認（試験）');
+}
+
+
+// M3 stage 16: evidence-based role REVIEW only. Query-page TOP250 is a
+// non-exhaustive sample, not proof of intent, cannibalization, or gaps.
+function sssM3RoleReviewClassify_(observation){
+ if(!observation||observation.status!=='PROVISIONAL'||observation.format!=='S3_M3_QUERY_PAGE_PILOT_V1'||!Array.isArray(observation.queries)||!Array.isArray(observation.rows)||observation.rows.length>250)throw Error('検索語×ページの観測データが不正です。');
+ const byQuery=new Map();
+ for(const row of observation.rows){
+  const key=String(row.query||'').normalize('NFKC').toLowerCase();
+  if(!key||!Number.isSafeInteger(row.impressions)||row.impressions<0||!Number.isSafeInteger(row.clicks)||row.clicks<0||row.clicks>row.impressions)throw Error('検索語×ページの数値が不正です。');
+  if(!byQuery.has(key))byQuery.set(key,[]);
+  byQuery.get(key).push(row);
+ }
+ const seen=new Set(),results=[];
+ for(const q of observation.queries){
+  const key=String(q.query||'').normalize('NFKC').toLowerCase();
+  if(!key||seen.has(key)||!byQuery.has(key))throw Error('検索語の対応関係が不正です。');seen.add(key);
+  const rows=byQuery.get(key),ids=[...new Set(rows.filter(r=>r.article_id).map(r=>String(r.article_id)))].sort();
+  if(rows.length!==q.sample_rows||ids.join('|')!==q.observed_article_ids.join('|'))throw Error('検索語の集計と実績行が一致しません。');
+  const unresolved=rows.filter(r=>!r.article_id).length;
+  let classification='ONE_ARTICLE_OBSERVED',reason='この抜粋では1記事の実績を確認。検索意図と記事の役割は未確認。';
+  if(q.ambiguous_rows>0){classification='URL_IDENTITY_REVIEW';reason='URL照合が曖昧です。記事の帰属を確定できません。';}
+  else if(ids.length>1){classification='MULTI_ARTICLE_REVIEW';reason='同一検索語で複数記事を観測。競合・役割分離は未判定。';}
+  else if(ids.length===0){classification='NO_MATCH_IN_SAMPLE';reason='抜粋内で記事IDを確認できません。新記事が必要とは限りません。';}
+  else if(unresolved>0){classification='PARTIAL_URL_COVERAGE';reason='記事1件の実績は確認しましたが、未照合ページがあります。';}
+  const matchedRows=rows.filter(r=>r.article_id);
+  results.push({query:q.query,classification,reason,article_ids:ids,sample_rows:rows.length,sample_impressions:rows.reduce((a,r)=>a+r.impressions,0),sample_clicks:rows.reduce((a,r)=>a+r.clicks,0),unresolved_rows:unresolved,action:'REVIEW_ONLY',publication_gate:'HOLD'});
+ }
+ if(seen.size!==byQuery.size)throw Error('検索語の集計に欠落があります。');
+ const counts={};for(const r of results)counts[r.classification]=(counts[r.classification]||0)+1;
+ results.sort((a,b)=>{const pri={URL_IDENTITY_REVIEW:0,MULTI_ARTICLE_REVIEW:1,PARTIAL_URL_COVERAGE:2,ONE_ARTICLE_OBSERVED:3,NO_MATCH_IN_SAMPLE:4};return pri[a.classification]-pri[b.classification]||b.sample_impressions-a.sample_impressions||a.query.localeCompare(b.query,'ja')});
+ return {format:'S3_M3_ROLE_REVIEW_V1',status:'PROVISIONAL',site_id:observation.site_id,period:observation.period,source:'LIVE_GSC_QUERY_PAGE_TOP250',returned:observation.returned,counts,results,publication_gate:'HOLD',content_action:'NONE',limitations:['上位250行の抜粋であり検索語ごとの全ページではありません','表示回数は抜粋行の合計でサイト全体の検索需要ではありません','複数記事の観測は競合確定ではありません','新記事・改善・統合・noindex・公開は決定しません']};
+}
+function sssM3RoleReviewPilot(){
+ const x=sssM3QueryPagePilot();
+ if(!x||x.status!=='PROVISIONAL')return x;
+ return sssM3RoleReviewClassify_(x);
+}
+function sssM3RoleReviewDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;color:#202124;padding:18px;line-height:1.55}h3{margin:0 0 10px}button{padding:9px 14px;border:1px solid #b8bfc6;border-radius:5px;background:white;cursor:pointer}#run{background:#1765ad;color:white}button:disabled{opacity:.5}#status{font-weight:bold;margin:12px 0}table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{padding:9px 6px;text-align:left;border-bottom:1px solid #ddd;overflow-wrap:anywhere;vertical-align:top}th:first-child{width:34%}th:nth-child(2){width:25%}small{color:#555}footer{border-top:1px solid #ddd;margin-top:12px;padding-top:12px}</style><h3>検索語の役割・競合候補</h3><p>実際の検索語×ページ実績をもとに確認候補を整理します。競合や新記事の必要性は確定しません。</p><button id="run" onclick="run()">候補を分析</button><div id="status" role="status" aria-live="polite">開始待ち</div><div id="meta"></div><table><thead><tr><th>検索語</th><th>観測記事</th><th>確認内容</th></tr></thead><tbody id="rows"></tbody></table><p><small>検索語×ページ上位250行の抜粋。候補なしは需要ゼロや記事不足を意味しません。</small></p><details><summary>技術情報</summary><pre id="technical" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details><footer><button onclick="google.script.host.close()">閉じる</button></footer><script>const e=id=>document.getElementById(id);function run(){e('run').disabled=true;e('status').textContent='検索実績を照合しています…';google.script.run.withSuccessHandler(x=>{e('run').disabled=false;if(!x||x.status!=='PROVISIONAL'){e('status').textContent='安全停止：'+(x&&x.reason||'確認できません');return}e('status').textContent='分析完了。記事は変更していません。';e('meta').textContent='対象期間：'+x.period.start+' ～ '+x.period.end+'／実績'+x.returned+'行／検索語'+x.results.length+'件';const body=e('rows');body.replaceChildren();x.results.slice(0,40).forEach(r=>{const tr=document.createElement('tr');[r.query,r.article_ids.join('、')||'—',r.reason].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});body.appendChild(tr)});e('technical').textContent=JSON.stringify({counts:x.counts,limitations:x.limitations},null,2)}).withFailureHandler(err=>{e('run').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3RoleReviewPilot()}</script></html>`).setWidth(850).setHeight(680);
+ SpreadsheetApp.getUi().showModalDialog(html,'検索語の役割・競合候補（試験）');
+}
+
+
+// M3 stage 17: a bounded query-specific page drilldown. GSC query filter is
+// EXACT, one query per invocation, no automatic ZIP extraction or writes.
+const SSS_M3_DEEP_DIVE_LIMIT_=100;
+function sssM3QueryDeepDiveAnalyze_(response,articles,siteId,period,query){
+ const q=String(query||'').trim();
+ if(!q||q.length>500||!siteId||!period||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(period.start)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(period.end)||period.start>period.end)throw Error('検索語・対象期間が不正です。');
+ if(!response||!Array.isArray(response.rows)||response.rows.length>SSS_M3_DEEP_DIVE_LIMIT_||!Array.isArray(articles)||articles.length>5000)throw Error('ページ別実績の応答が不正です。');
+ const urls=new Set(),entries=[];
+ for(const r of response.rows){
+  if(!r||!Array.isArray(r.keys)||r.keys.length!==1)throw Error('ページ別実績のキーが不正です。');
+  const url=String(r.keys[0]||'').trim();
+  if(!/^https?:\/\//i.test(url)||urls.has(url))throw Error('ページURLが不正または重複しています。');urls.add(url);
+  const clicks=Number(r.clicks),impressions=Number(r.impressions),position=Number(r.position);
+  if(!Number.isSafeInteger(clicks)||!Number.isSafeInteger(impressions)||clicks<0||impressions<0||clicks>impressions||!Number.isFinite(position)||position<0)throw Error('ページ実績の数値が不正です。');
+  entries.push({url,clicks,impressions,position});
+ }
+ const matched=sssM3MatchPageRows_(articles,entries.map(x=>({url:x.url,clicks:x.clicks,impressions:x.impressions})));
+ if(!matched||!Array.isArray(matched.rows)||matched.rows.length!==entries.length)throw Error('ページ照合結果が不正です。');
+ const rows=entries.map((r,i)=>({...r,article_id:matched.rows[i].article_id||'',match_status:matched.rows[i].status}));
+ const ids=[...new Set(rows.filter(r=>r.article_id).map(r=>r.article_id))].sort();
+ const unresolved=rows.filter(r=>!r.article_id).length;
+ const classification=rows.some(r=>r.match_status==='AMBIGUOUS')?'URL_IDENTITY_REVIEW':ids.length>1?'MULTI_ARTICLE_REVIEW':unresolved?'PARTIAL_COVERAGE':ids.length===1?'ONE_ARTICLE_OBSERVED':'NO_PAGE_OBSERVED';
+ return {format:'S3_M3_QUERY_DEEP_DIVE_V1',status:'PROVISIONAL',site_id:siteId,period,query:q,source:'LIVE_GSC_EXACT_QUERY_PAGES',returned:rows.length,limit:SSS_M3_DEEP_DIVE_LIMIT_,truncated_possible:rows.length===SSS_M3_DEEP_DIVE_LIMIT_,classification,article_ids:ids,unresolved_rows:unresolved,rows,publication_gate:'HOLD',content_action:'NONE',limitations:['GSCの指定検索語に一致するページ上位100件の取得であり、全ページを保証しません','検索意図の一致・記事競合・新記事の必要性は未確定です','GSC再取得値は保存済みEvidenceと一致する保証がありません']};
+}
+function sssM3QueryDeepDiveCandidates(){
+ const x=sssM3SiteQueryPilot();if(!x||x.status!=='PROVISIONAL')return x;
+ return {status:'PROVISIONAL',period:x.period,queries:x.queries.slice(0,20).map(r=>({query:r.query,impressions:r.impressions})),publication_gate:'HOLD',content_action:'NONE'};
+}
+function sssM3QueryDeepDivePilot(query){
+ const c=sssConfig_(),batch=sssM3BatchStatus();if(batch.status!=='COMPLETED')return {status:'BLOCKED',reason:'記事台帳が未完成です。'};
+ const ref=sssM1CompactRef_(c),plan=sssM3GscPlan_(ref);if(!plan.available)return {status:'BLOCKED',reason:plan.reason};
+ const q=String(query||'').trim();if(!q||q.length>500)throw Error('検索語が不正です。');
+ // Prevent arbitrary cross-site or unobserved queries; verify against a fresh
+ // bounded site-level query response before issuing the exact-match request.
+ const candidates=sssM3QueryDeepDiveCandidates();if(candidates.status!=='PROVISIONAL')return candidates;
+ if(!candidates.queries.some(r=>r.query===q))return {status:'BLOCKED',reason:'上位20件の検索語から選択してください。'};
+ const sh=sssM3BatchSheet_();if(batch.processed>5000||sh.getLastRow()!==batch.processed+1)throw Error('記事台帳の件数が一致しません。');
+ const data=sh.getRange(2,1,batch.processed,9).getDisplayValues();if(data.some(r=>r[0]!==batch.run_id||r[1]!==c.siteId))throw Error('記事台帳のサイト・実行IDが一致しません。');
+ const articles=data.map(r=>({article_id:r[2],url:r[3],title:r[4]}));
+ const response=sdscSearchAnalyticsQuery_(c.propertyUri,{startDate:plan.start,endDate:plan.end,type:'web',dataState:'final',dimensions:['page'],dimensionFilterGroups:[{groupType:'and',filters:[{dimension:'query',operator:'equals',expression:q}]}],rowLimit:SSS_M3_DEEP_DIVE_LIMIT_,startRow:0});
+ return sssM3QueryDeepDiveAnalyze_(response,articles,c.siteId,{start:plan.start,end:plan.end},q);
+}
+function sssM3QueryDeepDiveDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;color:#202124;padding:18px;line-height:1.6}h3{margin:0 0 8px}button,select{padding:9px;border:1px solid #bdc1c6;border-radius:5px}button{cursor:pointer;background:#1765ad;color:white}button:disabled{opacity:.5}select{max-width:100%;width:100%;margin:10px 0}table{width:100%;border-collapse:collapse;table-layout:auto}#rows td:nth-child(3){min-width:230px;font-size:12px;line-height:1.5}#rows td:nth-child(4){min-width:125px}#rows td:first-child{min-width:150px}td,th{border-bottom:1px solid #ddd;text-align:left;padding:9px;overflow-wrap:anywhere}th:first-child{width:30%}#status{font-weight:bold;margin:12px 0}small{color:#555}footer{margin-top:16px;border-top:1px solid #ddd;padding-top:12px}footer button{background:white;color:#222}</style><h3>検索語を個別に深掘り</h3><p>検索需要上位20語から1語を選び、GSCでその検索語のページ別実績を最大100件確認します。競合・統合・新記事作成は決定しません。</p><select id="query" aria-label="分析する検索語" disabled><option>検索語を取得しています…</option></select><button id="run" onclick="run()" disabled>選んだ検索語を分析</button><div id="status" role="status" aria-live="polite">検索語を取得しています…</div><div id="meta"></div><table><thead><tr><th>記事ID</th><th>表示回数</th><th>クリック数</th><th>照合状態</th></tr></thead><tbody id="rows"></tbody></table><p><small>100件に達した場合、ほかのページが存在する可能性があります。検索意図は未検証です。</small></p><details><summary>技術情報</summary><pre id="technical" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details><footer><button onclick="google.script.host.close()">閉じる</button></footer><script>const e=id=>document.getElementById(id);google.script.run.withSuccessHandler(x=>{if(!x||x.status!=='PROVISIONAL'){e('status').textContent='安全停止：'+(x&&x.reason||'検索語を取得できません');return}const sel=e('query');sel.replaceChildren();x.queries.forEach(r=>{const o=document.createElement('option');o.value=r.query;o.textContent=r.query+'（表示 '+r.impressions+'）';sel.appendChild(o)});sel.disabled=!x.queries.length;e('run').disabled=!x.queries.length;e('status').textContent='検索語を選んで分析してください。'}).withFailureHandler(err=>{e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3QueryDeepDiveCandidates();function run(){e('run').disabled=true;e('status').textContent='指定検索語の実績ページを確認しています…';google.script.run.withSuccessHandler(x=>{e('run').disabled=false;if(!x||x.status!=='PROVISIONAL'){e('status').textContent='安全停止：'+(x&&x.reason||'確認できません');return}e('status').textContent='確認完了。記事の変更はありません。';e('meta').textContent='検索語：'+x.query+'／取得'+x.returned+'件'+(x.truncated_possible?'（100件上限・未取得の可能性）':'')+'／観測記事'+x.article_ids.length+'件／分類 '+x.classification;const body=e('rows');body.replaceChildren();x.rows.forEach(r=>{const tr=document.createElement('tr');[r.article_id||'未照合',r.impressions,r.clicks,r.match_status].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.appendChild(td)});body.appendChild(tr)});e('technical').textContent=JSON.stringify({period:x.period,source:x.source,limitations:x.limitations},null,2)}).withFailureHandler(err=>{e('run').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3QueryDeepDivePilot(e('query').value)}</script></html>`).setWidth(820).setHeight(680);
+ SpreadsheetApp.getUi().showModalDialog(html,'検索語を個別に深掘り（試験）');
+}
+
+
+// M3 phase batch: one-click guided review of up to 10 observed queries.
+// Each RPC is bounded to two exact-query GSC requests, with no persistent
+// changes or automatic publication. The client advances after each RPC.
+const SSS_M3_STRATEGY_QUERY_LIMIT_=10;
+const SSS_M3_STRATEGY_BATCH_SIZE_=2;
+function sssM3StrategySelect_(siteQueries){
+ if(!siteQueries||siteQueries.status!=='PROVISIONAL'||!Array.isArray(siteQueries.queries))throw Error('サイト全体の検索需要データが不正です。');
+ const seen=new Set(),selected=[];
+ for(const r of siteQueries.queries){
+  const q=String(r.query||'').trim(),key=q.normalize('NFKC').toLowerCase();
+  if(!q||q.length>500||seen.has(key)||!Number.isSafeInteger(r.impressions)||r.impressions<0)throw Error('検索語の候補が不正です。');
+  seen.add(key);
+  if(selected.length<SSS_M3_STRATEGY_QUERY_LIMIT_)selected.push({query:q,impressions:r.impressions,clicks:r.clicks,position:r.position});
+ }
+ return selected;
+}
+function sssM3StrategyInterpret_(q,deep){
+ if(!deep||deep.status!=='PROVISIONAL'||deep.query!==q.query||deep.content_action!=='NONE'||deep.publication_gate!=='HOLD')throw Error('個別検索語の精査結果が不正です。');
+ let category='EXISTING_ARTICLE_REVIEW',reason='実績記事を確認しました。改善要否は検索意図・記事の役割を確認して判断します。';
+ if(deep.classification==='MULTI_ARTICLE_REVIEW'){category='ROLE_REVIEW';reason='同じ検索語で複数記事の実績を観測。記事競合か役割分担かは未確定です。';}
+ else if(deep.classification==='URL_IDENTITY_REVIEW'||deep.classification==='PARTIAL_COVERAGE'){category='EVIDENCE_REVIEW';reason='URLの帰属または取得範囲が不十分です。';}
+ else if(deep.classification==='NO_PAGE_OBSERVED'){category='OPPORTUNITY_RESEARCH';reason='今回の取得範囲では実績記事が未確認です。新記事が必要とは限りません。';}
+ else if(deep.classification!=='ONE_ARTICLE_OBSERVED')throw Error('検索語の分類が不正です。');
+ if(deep.truncated_possible){category='EVIDENCE_REVIEW';reason='ページ実績が100件の上限に達したため、追加調査が必要です。';}
+ return {query:q.query,impressions:q.impressions,clicks:q.clicks,position:q.position,category,reason,article_ids:deep.article_ids,observed_pages:deep.returned,publication_gate:'HOLD',content_action:'NONE'};
+}
+function sssM3StrategyBatchPilot(offset){
+ if(!Number.isSafeInteger(offset)||offset<0||offset%SSS_M3_STRATEGY_BATCH_SIZE_!==0||offset>=SSS_M3_STRATEGY_QUERY_LIMIT_)throw Error('分析位置が不正です。');
+ const c=sssConfig_(),batch=sssM3BatchStatus();
+ if(batch.status!=='COMPLETED'||batch.processed>5000)return {status:'BLOCKED',reason:'記事台帳が未完成です。'};
+ const ref=sssM1CompactRef_(c),plan=sssM3GscPlan_(ref);
+ if(!plan.available)return {status:'BLOCKED',reason:plan.reason};
+ const site=sssM3SiteQueryPilot();
+ if(!site||site.status!=='PROVISIONAL'||site.site_id!==c.siteId||site.period.start!==plan.start||site.period.end!==plan.end)throw Error('検索需要の対象サイト・期間が一致しません。');
+ const candidates=sssM3StrategySelect_(site);
+ const sh=sssM3BatchSheet_();
+ if(sh.getLastRow()!==batch.processed+1)throw Error('記事台帳の行数が一致しません。');
+ const data=sh.getRange(2,1,batch.processed,9).getDisplayValues();
+ if(data.some(r=>r[0]!==batch.run_id||r[1]!==c.siteId))throw Error('記事台帳のサイト・実行IDが一致しません。');
+ const articles=data.map(r=>({article_id:r[2],url:r[3],title:r[4]}));
+ const results=[];
+ for(const q of candidates.slice(offset,offset+SSS_M3_STRATEGY_BATCH_SIZE_)){
+  const response=sdscSearchAnalyticsQuery_(c.propertyUri,{startDate:plan.start,endDate:plan.end,type:'web',dataState:'final',dimensions:['page'],dimensionFilterGroups:[{groupType:'and',filters:[{dimension:'query',operator:'equals',expression:q.query}]}],rowLimit:SSS_M3_DEEP_DIVE_LIMIT_,startRow:0});
+  const deep=sssM3QueryDeepDiveAnalyze_(response,articles,c.siteId,{start:plan.start,end:plan.end},q.query);
+  results.push(sssM3StrategyInterpret_(q,deep));
+ }
+ return {format:'S3_M3_STRATEGY_BATCH_V1',status:'PROVISIONAL',site_id:c.siteId,period:{start:plan.start,end:plan.end},offset,total:candidates.length,next_offset:offset+results.length,results,publication_gate:'HOLD',content_action:'NONE',limitations:['検索需要上位最大10語の抜粋です','1回の通信で最大2検索語を調査します','実績ページ上位100件の抜粋で、未観測は需要なしを意味しません','新記事・既存記事改善・統合・noindex・公開は決定しません']};
+}
+function sssM3StrategyDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:20px;color:#202124;line-height:1.6}h3{margin:0 0 8px}p,small{color:#555}button{padding:10px 16px;border:1px solid #bdc1c6;border-radius:5px;cursor:pointer;background:#1765ad;color:white}button:disabled{opacity:.5}#status{font-weight:bold;margin:12px 0}progress{width:100%;height:15px}table{width:100%;border-collapse:collapse;table-layout:auto}#rows td:nth-child(3){min-width:230px;font-size:12px;line-height:1.5}#rows td:nth-child(4){min-width:125px}#rows td:first-child{min-width:150px}td,th{border-bottom:1px solid #ddd;padding:9px 6px;text-align:left;overflow-wrap:anywhere;vertical-align:top}th:first-child{width:32%}th:nth-child(2){width:24%}footer{border-top:1px solid #ddd;padding-top:14px;margin-top:16px}footer button{background:white;color:#202124}#stop{background:white;color:#202124}</style><h3>検索戦略をまとめて分析</h3><p>検索需要の上位10語を、実績ページと記事台帳に照合します。2語ずつ自動進行し、改善・公開は実行しません。</p><button id="start" onclick="start()">分析を開始</button> <button id="stop" onclick="stop()" disabled>停止</button><div id="status" role="status" aria-live="polite">開始待ち</div><progress id="bar" max="10" value="0"></progress><div id="meta">0 / 最大10語</div><section id="handoff" hidden><h4>Claudeへ精査を依頼</h4><p>分析結果を確認し、依頼文をコピーしてClaudeへ貼り付けてください。記事変更は行いません。</p><button id="buildPrompt" onclick="buildPrompt()">精査依頼文を作成</button> <button id="copyPrompt" onclick="copyPrompt()" disabled>依頼文をコピー</button><span id="promptStatus" role="status"></span><textarea id="prompt" readonly style="box-sizing:border-box;width:100%;height:180px;resize:vertical" aria-label="Claude精査依頼文"></textarea><h4>Claude回答の確認</h4><textarea id="answer" style="box-sizing:border-box;width:100%;height:140px;resize:vertical" placeholder="ClaudeのJSON回答を貼り付け"></textarea><button id="verifyAnswer" onclick="verifyAnswer()">回答を検証</button><div id="answerStatus" role="status"></div><pre id="verified" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre><div><button id="saveReview" onclick="saveReview()" disabled>検証結果をS3に保存</button><span id="saveStatus" role="status" aria-live="polite"></span></div><p><small>保存先はS3専用シートです。SBM・Evidence・記事は変更しません。保存後の優先度は追加調査の順序であり、処置の承認ではありません。</small></p></section><table><thead><tr><th>検索語</th><th>観測記事</th><th>次の確認</th></tr></thead><tbody id="rows"></tbody></table><p><small>分類は追加調査の振り分けです。新記事・統合・改善を確定しません。</small></p><details><summary>技術情報</summary><pre id="technical" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details><footer><button onclick="google.script.host.close()">閉じる</button></footer><script>function sssM3StrategyLocalPrompt_(payload){
+ if(!payload||payload.format!=='S3_M3_STRATEGY_HANDOFF_INPUT_V1'||typeof payload.site_id!=='string'||!/^[-a-zA-Z0-9_]{6,100}$/.test(payload.site_id)||!payload.period||!/^\\d{4}-\\d{2}-\\d{2}$/.test(payload.period.start)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(payload.period.end)||payload.period.start>payload.period.end||!Array.isArray(payload.results)||payload.results.length<1||payload.results.length>10)throw Error('精査依頼の入力形式が不正です。');
+ const validCategories=new Set(['ROLE_REVIEW','EVIDENCE_REVIEW','EXISTING_ARTICLE_REVIEW','OPPORTUNITY_RESEARCH']);
+ const seen=new Set();const rows=payload.results.map(r=>{
+  const query=String(r.query||'').trim(),key=query.normalize('NFKC').toLowerCase();
+  if(!query||query.length>500||seen.has(key)||!validCategories.has(r.category)||r.publication_gate!=='HOLD'||r.content_action!=='NONE'||!Array.isArray(r.article_ids)||r.article_ids.length>100||!Number.isSafeInteger(r.impressions)||r.impressions<0||!Number.isSafeInteger(r.clicks)||r.clicks<0||r.clicks>r.impressions||!Number.isSafeInteger(r.observed_pages)||r.observed_pages<0||r.observed_pages>100)throw Error('検索語の根拠・保留ゲートが不正です。');
+  seen.add(key);const ids=[...new Set(r.article_ids)];if(ids.length!==r.article_ids.length||ids.some(id=>typeof id!=='string'||!/^A\\d{6}$/.test(id)))throw Error('記事IDの形式・重複が不正です。');
+  if(!['string','undefined'].includes(typeof r.reason)||String(r.reason||'').length>500)throw Error('確認理由が不正です。');
+  return {query,impressions:r.impressions,clicks:r.clicks,observed_pages:r.observed_pages,article_ids:ids,category:r.category,reason:String(r.reason||'')};
+ });
+ const envelope={format:'S3_M3_STRATEGY_CLAUDE_REVIEW_V1',site_id:payload.site_id,period:{start:payload.period.start,end:payload.period.end},source:'LIVE_GSC_EXACT_QUERY_PAGES_TOP100_PER_QUERY',status:'PROVISIONAL',publication_gate:'HOLD',content_action:'NONE',queries:rows,limitations:['GSC再取得値は保存済みEvidenceと同一とは限らない','検索語はサイト上位最大10語であり全検索語ではない','検索語別ページは上位100件まで、欠落は需要ゼロを意味しない','同一検索語で複数記事が観測されてもカニバリゼーションは未確定','タイトル・本文・SERP・検索意図の確認はこのデータに含まれない','SBMで処理中の記事への重複依頼は禁止']};
+ const instruction=[
+  'あなたはS3の検索戦略精査担当です。以下の観測データのみを確定事実として扱い、検索意図・SERP・記事本文を未確認なら推測で補完しないでください。',
+  '【目的】検索語ごとに既存記事の役割確認、競合疑義、追加調査、新記事企画の可能性を整理してください。自動で記事改善・統合・削除・noindex・公開を決定しないでください。',
+  '【重要】記事IDは観測対象であり、記事本文やSBM作業状態を検証した証拠ではありません。未取得の検索語やページを「存在しない」と断定しないでください。',
+  '【回答形式】JSONのみ。{ "format":"S3_M3_STRATEGY_CLAUDE_RESPONSE_V1", "site_id":"...", "publication_gate":"HOLD", "content_action":"NONE", "reviews":[{"query":"...","assessment":"EXISTING_REVIEW|ROLE_REVIEW|NEW_ARTICLE_RESEARCH|EVIDENCE_NEEDED","confidence":"PROVISIONAL|UNCONFIRMED","observed_article_ids":["A000001"],"reason":"根拠と未確認事項","next_evidence":["確認事項"]}] }',
+  '各検索語につき1件のreviewsを返し、site_idとqueryと記事IDは入力から変更しないでください。未確認のSERP順位・検索ボリューム・本文内容・体験談を捏造しないでください。',
+  '【観測データ】',JSON.stringify(envelope,null,2)
+ ];
+ return {format:'S3_M3_STRATEGY_HANDOFF_V1',status:'READY',site_id:payload.site_id,query_count:rows.length,publication_gate:'HOLD',content_action:'NONE',prompt:instruction.join('\\n\\n')};
+}const e=id=>document.getElementById(id);let active=false,offset=0,site='',period='',all=[],verifiedReview=null;function start(){active=true;offset=0;site='';period='';all=[];verifiedReview=null;e('saveReview').disabled=true;e('saveStatus').textContent='';e('handoff').hidden=true;e('prompt').value='';e('rows').replaceChildren();e('start').disabled=true;e('stop').disabled=false;step()}function stop(){active=false;e('status').textContent='停止しました。再開時は先頭から読み取り専用で再分析します。';e('stop').disabled=true;e('start').disabled=false}function fail(msg){active=false;e('status').textContent='安全停止：'+msg;e('start').disabled=false;e('stop').disabled=true}function buildPrompt(){if(active||!site||!all.length||offset!==all.length){e('promptStatus').textContent='分析完了後に作成してください。';return}e('buildPrompt').disabled=true;e('promptStatus').textContent='依頼文を作成しています…';try{const x=sssM3StrategyLocalPrompt_({format:'S3_M3_STRATEGY_HANDOFF_INPUT_V1',site_id:site,period:JSON.parse(period),results:all});if(!x||x.status!=='READY'||x.publication_gate!=='HOLD'||x.content_action!=='NONE'||x.query_count!==all.length)throw Error('依頼文の整合性を確認できません');e('prompt').value=x.prompt;verifiedReview=null;e('saveReview').disabled=true;e('saveStatus').textContent='';e('copyPrompt').disabled=false;e('promptStatus').textContent='依頼文を作成しました。'}catch(err){e('copyPrompt').disabled=true;e('promptStatus').textContent='安全停止：'+String(err&&err.message||err)}finally{e('buildPrompt').disabled=false}}async function copyPrompt(){const v=e('prompt').value;if(!v)return;try{let ok=false;try{if(navigator.clipboard){await navigator.clipboard.writeText(v);ok=true}}catch(err){}if(!ok){e('prompt').focus();e('prompt').select();ok=document.execCommand('copy')}if(!ok)throw Error('copy');e('promptStatus').textContent='コピーしました！'}catch(err){e('promptStatus').textContent='コピーできませんでした。テキストを選択しCtrl+Cでコピーしてください。'}}function sssM3StrategyValidateLocal_(payload,answerText){
+ if(!payload||payload.format!=='S3_M3_STRATEGY_HANDOFF_INPUT_V1'||!Array.isArray(payload.results)||payload.results.length<1||payload.results.length>10||typeof answerText!=='string'||!answerText.trim()||answerText.length>60000)throw Error('回答または分析根拠が不正です。');
+ let a;try{a=JSON.parse(answerText.trim())}catch(err){throw Error('Claude回答はJSON形式で貼り付けてください。')}
+ if(!a||a.format!=='S3_M3_STRATEGY_CLAUDE_RESPONSE_V1'||a.site_id!==payload.site_id||a.publication_gate!=='HOLD'||a.content_action!=='NONE'||!Array.isArray(a.reviews)||a.reviews.length!==payload.results.length)throw Error('回答形式・サイトID・保留ゲート・件数が一致しません。');
+ const expected=new Map(payload.results.map(r=>[r.query,r]));if(expected.size!==payload.results.length)throw Error('観測検索語が重複しています。');
+ const allowed=new Set(['EXISTING_REVIEW','ROLE_REVIEW','NEW_ARTICLE_RESEARCH','EVIDENCE_NEEDED']);const seen=new Set(),reviews=[];
+ for(const r of a.reviews){
+  if(!r||typeof r.query!=='string'||!expected.has(r.query)||seen.has(r.query)||!allowed.has(r.assessment)||!['PROVISIONAL','UNCONFIRMED'].includes(r.confidence)||typeof r.reason!=='string'||!r.reason.trim()||r.reason.length>1500||!Array.isArray(r.next_evidence)||r.next_evidence.length>10||r.next_evidence.some(x=>typeof x!=='string'||!x.trim()||x.length>300)||!Array.isArray(r.observed_article_ids))throw Error('回答の検索語・判断項目が不正です。');
+  const ids=expected.get(r.query).article_ids;if(!Array.isArray(ids)||r.observed_article_ids.length!==ids.length||r.observed_article_ids.some(x=>!ids.includes(x))||new Set(r.observed_article_ids).size!==ids.length)throw Error('回答が観測記事IDを変更しています。');
+  seen.add(r.query);reviews.push({query:r.query,assessment:r.assessment,confidence:r.confidence,reason:r.reason,next_evidence:r.next_evidence,observed_article_ids:ids});
+ }
+ return {format:'S3_M3_STRATEGY_CLAUDE_VERIFIED_V1',status:'REVIEWED',site_id:payload.site_id,review_count:reviews.length,reviews,publication_gate:'HOLD',content_action:'NONE'};
+}
+function verifyAnswer(){if(active||!e('prompt').value||!e('answer').value.trim()){e('answerStatus').textContent='依頼文を作成し、ClaudeのJSON回答を貼り付けてください。';return}e('verifyAnswer').disabled=true;e('answerStatus').textContent='回答を確認しています…';try{const x=sssM3StrategyValidateLocal_({format:'S3_M3_STRATEGY_HANDOFF_INPUT_V1',site_id:site,period:JSON.parse(period),results:all},e('answer').value);verifiedReview=x;e('saveReview').disabled=false;e('saveStatus').textContent='未保存。必要ならS3に保存してください。';e('answerStatus').textContent='形式検証完了（画面内）。記事の処置は実行していません。';e('verified').textContent=x.reviews.map(r=>r.query+'：'+r.assessment+'／'+r.confidence+'／'+r.reason).join('\\n')}catch(err){verifiedReview=null;e('saveReview').disabled=true;e('answerStatus').textContent='安全停止：'+String(err&&err.message||err);e('verified').textContent=''}finally{e('verifyAnswer').disabled=false}}
+function saveReview(){if(active||!verifiedReview||!e('answer').value.trim()){e('saveStatus').textContent='回答の形式検証を完了してください。';return}e('saveReview').disabled=true;e('saveStatus').textContent='S3に保存しています…';const payload={format:'S3_M3_STRATEGY_HANDOFF_INPUT_V1',site_id:site,period:JSON.parse(period),results:all};google.script.run.withSuccessHandler(x=>{e('saveStatus').textContent=x&&x.status==='SAVED'?'S3に保存しました（'+x.count+'件、追加調査待ち）。':x&&x.status==='ALREADY_SAVED'?'保存済みの結果です（重複登録なし）。':'保存結果を確認できません。';e('saveReview').disabled=false}).withFailureHandler(err=>{e('saveStatus').textContent='保存できませんでした：'+String(err&&err.message||err);e('saveReview').disabled=false}).sssM3StrategySaveReview(payload,e('answer').value)}
+function step(){if(!active)return;e('status').textContent='検索実績を確認しています（'+offset+'語処理済み）…';google.script.run.withSuccessHandler(x=>{if(!active)return;if(!x||x.status!=='PROVISIONAL'){fail(x&&x.reason||'確認できません');return}if(x.format!=='S3_M3_STRATEGY_BATCH_V1'||x.offset!==offset||x.next_offset<=offset||x.next_offset>x.total||x.total>10||x.publication_gate!=='HOLD'||x.content_action!=='NONE'){fail('分析区間の整合性が確認できません');return}if(site&&(site!==x.site_id||period!==JSON.stringify(x.period))){fail('サイト・期間が途中で変わりました');return}site=x.site_id;period=JSON.stringify(x.period);x.results.forEach(r=>{all.push(r);const tr=document.createElement('tr');const label=r.category==='ROLE_REVIEW'?'複数記事の役割を確認':r.category==='OPPORTUNITY_RESEARCH'?'新規機会を追加調査':r.category==='EVIDENCE_REVIEW'?'データを再確認':'既存記事の役割を確認';[r.query,r.article_ids.join('、')||'未確認',label].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});e('rows').appendChild(tr)});offset=x.next_offset;e('bar').max=x.total||1;e('bar').value=offset;e('meta').textContent=offset+' / '+x.total+'語';e('technical').textContent=JSON.stringify({site_id:site,period:x.period,limitations:x.limitations},null,2);if(offset>=x.total){active=false;e('status').textContent='分析完了。記事は変更していません。';e('start').disabled=false;e('stop').disabled=true;e('handoff').hidden=false;return}step()}).withFailureHandler(err=>fail(String(err&&err.message||err))).sssM3StrategyBatchPilot(offset)}</script></html>`).setWidth(850).setHeight(680);
+ SpreadsheetApp.getUi().showModalDialog(html,'検索戦略をまとめて分析（試験）');
+}
+
+
+// M3 strategic review handoff: deterministic, read-only Claude request.
+// All user-interface inputs are untrusted; enforce a bounded schema and HOLD.
+function sssM3StrategyHandoffBuild_(payload){
+ if(!payload||payload.format!=='S3_M3_STRATEGY_HANDOFF_INPUT_V1'||typeof payload.site_id!=='string'||!/^[-a-zA-Z0-9_]{6,100}$/.test(payload.site_id)||!payload.period||!/^\d{4}-\d{2}-\d{2}$/.test(payload.period.start)||!/^\d{4}-\d{2}-\d{2}$/.test(payload.period.end)||payload.period.start>payload.period.end||!Array.isArray(payload.results)||payload.results.length<1||payload.results.length>10)throw Error('精査依頼の入力形式が不正です。');
+ const validCategories=new Set(['ROLE_REVIEW','EVIDENCE_REVIEW','EXISTING_ARTICLE_REVIEW','OPPORTUNITY_RESEARCH']);
+ const seen=new Set();const rows=payload.results.map(r=>{
+  const query=String(r.query||'').trim(),key=query.normalize('NFKC').toLowerCase();
+  if(!query||query.length>500||seen.has(key)||!validCategories.has(r.category)||r.publication_gate!=='HOLD'||r.content_action!=='NONE'||!Array.isArray(r.article_ids)||r.article_ids.length>100||!Number.isSafeInteger(r.impressions)||r.impressions<0||!Number.isSafeInteger(r.clicks)||r.clicks<0||r.clicks>r.impressions||!Number.isSafeInteger(r.observed_pages)||r.observed_pages<0||r.observed_pages>100)throw Error('検索語の根拠・保留ゲートが不正です。');
+  seen.add(key);const ids=[...new Set(r.article_ids)];if(ids.length!==r.article_ids.length||ids.some(id=>typeof id!=='string'||!/^A\d{6}$/.test(id)))throw Error('記事IDの形式・重複が不正です。');
+  if(!['string','undefined'].includes(typeof r.reason)||String(r.reason||'').length>500)throw Error('確認理由が不正です。');
+  return {query,impressions:r.impressions,clicks:r.clicks,observed_pages:r.observed_pages,article_ids:ids,category:r.category,reason:String(r.reason||'')};
+ });
+ const envelope={format:'S3_M3_STRATEGY_CLAUDE_REVIEW_V1',site_id:payload.site_id,period:{start:payload.period.start,end:payload.period.end},source:'LIVE_GSC_EXACT_QUERY_PAGES_TOP100_PER_QUERY',status:'PROVISIONAL',publication_gate:'HOLD',content_action:'NONE',queries:rows,limitations:['GSC再取得値は保存済みEvidenceと同一とは限らない','検索語はサイト上位最大10語であり全検索語ではない','検索語別ページは上位100件まで、欠落は需要ゼロを意味しない','同一検索語で複数記事が観測されてもカニバリゼーションは未確定','タイトル・本文・SERP・検索意図の確認はこのデータに含まれない','SBMで処理中の記事への重複依頼は禁止']};
+ const instruction=[
+  'あなたはS3の検索戦略精査担当です。以下の観測データのみを確定事実として扱い、検索意図・SERP・記事本文を未確認なら推測で補完しないでください。',
+  '【目的】検索語ごとに既存記事の役割確認、競合疑義、追加調査、新記事企画の可能性を整理してください。自動で記事改善・統合・削除・noindex・公開を決定しないでください。',
+  '【重要】記事IDは観測対象であり、記事本文やSBM作業状態を検証した証拠ではありません。未取得の検索語やページを「存在しない」と断定しないでください。',
+  '【回答形式】JSONのみ。{ "format":"S3_M3_STRATEGY_CLAUDE_RESPONSE_V1", "site_id":"...", "publication_gate":"HOLD", "content_action":"NONE", "reviews":[{"query":"...","assessment":"EXISTING_REVIEW|ROLE_REVIEW|NEW_ARTICLE_RESEARCH|EVIDENCE_NEEDED","confidence":"PROVISIONAL|UNCONFIRMED","observed_article_ids":["A000001"],"reason":"根拠と未確認事項","next_evidence":["確認事項"]}] }',
+  '各検索語につき1件のreviewsを返し、site_idとqueryと記事IDは入力から変更しないでください。未確認のSERP順位・検索ボリューム・本文内容・体験談を捏造しないでください。',
+  '【観測データ】',JSON.stringify(envelope,null,2)
+ ];
+ return {format:'S3_M3_STRATEGY_HANDOFF_V1',status:'READY',site_id:payload.site_id,query_count:rows.length,publication_gate:'HOLD',content_action:'NONE',prompt:instruction.join('\n\n')};
+}
+
+
+// Verify a pasted Claude JSON response against the exact observed handoff.
+// This is an advisory review only, never an execution authorization.
+function sssM3StrategyHandoffValidate_(payload,answerText){
+ const handoff=sssM3StrategyHandoffBuild_(payload);
+ if(typeof answerText!=='string'||answerText.length>60000)throw Error('Claude回答が空または大きすぎます。');
+ let a;try{a=JSON.parse(answerText.trim());}catch(e){throw Error('Claude回答はJSON形式で貼り付けてください。');}
+ if(!a||a.format!=='S3_M3_STRATEGY_CLAUDE_RESPONSE_V1'||a.site_id!==handoff.site_id||a.publication_gate!=='HOLD'||a.content_action!=='NONE'||!Array.isArray(a.reviews)||a.reviews.length!==payload.results.length)throw Error('Claude回答の形式・サイト・保留ゲートが一致しません。');
+ const allowed=new Set(['EXISTING_REVIEW','ROLE_REVIEW','NEW_ARTICLE_RESEARCH','EVIDENCE_NEEDED']);
+ const expected=new Map(payload.results.map(r=>[r.query,r]));const seen=new Set();const reviews=[];
+ for(const r of a.reviews){
+  if(!r||typeof r.query!=='string'||!expected.has(r.query)||seen.has(r.query)||!allowed.has(r.assessment)||!['PROVISIONAL','UNCONFIRMED'].includes(r.confidence)||typeof r.reason!=='string'||!r.reason.trim()||r.reason.length>1500||!Array.isArray(r.next_evidence)||r.next_evidence.length>10||r.next_evidence.some(x=>typeof x!=='string'||!x.trim()||x.length>300)||!Array.isArray(r.observed_article_ids))throw Error('Claude回答の検索語・判断項目が不正です。');
+  const ids=expected.get(r.query).article_ids;if(r.observed_article_ids.length!==ids.length||r.observed_article_ids.some(x=>!ids.includes(x))||new Set(r.observed_article_ids).size!==ids.length)throw Error('Claude回答が観測記事IDを変更しています。');
+  seen.add(r.query);reviews.push({query:r.query,assessment:r.assessment,confidence:r.confidence,reason:r.reason,next_evidence:r.next_evidence,observed_article_ids:ids});
+ }
+ return {format:'S3_M3_STRATEGY_CLAUDE_VERIFIED_V1',status:'REVIEWED',site_id:handoff.site_id,review_count:reviews.length,reviews,publication_gate:'HOLD',content_action:'NONE',message:'回答形式と観測記事IDを検証しました。SEO判断の正確性は未検証です。'};
+}
+
+// v0.1.154: S3-owned, idempotent, advisory-only strategy review ledger.
+function sssM3StrategyPriority_(review, observed){
+ const n=Array.isArray(review.observed_article_ids)?review.observed_article_ids.length:0;
+ const imp=Number(observed&&observed.impressions)||0;
+ const base=review.assessment==='ROLE_REVIEW'?30:review.assessment==='EVIDENCE_NEEDED'?25:review.assessment==='EXISTING_REVIEW'?15:10;
+ const score=base+Math.min(n,12)*2+Math.min(Math.floor(Math.log10(Math.max(1,imp))*3),18);
+ return {score:score,priority:score>=50?'優先確認':score>=35?'通常確認':'経過確認',routing:'EVIDENCE_REVIEW_ONLY'};
+}
+function sssM3StrategySaveReview(payload,answerText){
+ const validated=sssM3StrategyHandoffValidate_(payload,answerText);
+ const cfg=sssConfig_();
+ if(cfg.siteId!==validated.site_id)throw Error('現在の登録サイトと精査対象サイトが異なります。');
+ if(!payload.period||payload.period.start>payload.period.end)throw Error('対象期間が不正です。');
+ const ss=SpreadsheetApp.getActiveSpreadsheet();if(!ss)throw Error('S3のスプレッドシートが見つかりません。');
+ const lock=LockService.getDocumentLock()||LockService.getScriptLock();
+ if(!lock.tryLock(10000))throw Error('別の保存処理が進行中です。時間をおいて再試行してください。');
+ try{
+  const name='S3_検索戦略精査';
+  const headers=['保存日時','サイトID','期間開始','期間終了','検索語','判定','確信度','優先度','参考点','観測記事ID','理由','追加確認事項','根拠表示回数','根拠クリック数','保存キー','処置状態'];
+  let sh=ss.getSheetByName(name);
+  if(!sh){sh=ss.insertSheet(name);sh.getRange(1,1,1,headers.length).setValues([headers]);sh.setFrozenRows(1);}
+  else if(sh.getLastColumn()<headers.length||sh.getRange(1,1,1,headers.length).getValues()[0].some((v,i)=>v!==headers[i]))throw Error('S3の保存シートの列構成が異なります。自動上書きしません。');
+  const canonical=JSON.stringify({site_id:validated.site_id,period:payload.period,reviews:validated.reviews});
+  const hash=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,canonical).map(x=>('0'+(x&255).toString(16)).slice(-2)).join('');
+  const key='S3STRAT_'+hash;
+  const last=sh.getLastRow();
+  if(last>1&&sh.getRange(2,15,last-1,1).getValues().some(r=>r[0]===key))return {status:'ALREADY_SAVED',count:validated.review_count,publication_gate:'HOLD',content_action:'NONE'};
+  const byQuery=new Map(payload.results.map(r=>[r.query,r]));
+  const now=new Date();
+  const rows=validated.reviews.map(r=>{
+   const observed=byQuery.get(r.query);const p=sssM3StrategyPriority_(r,observed);
+   return [now,validated.site_id,payload.period.start,payload.period.end,r.query,r.assessment,r.confidence,p.priority,p.score,r.observed_article_ids.join(', '),r.reason,r.next_evidence.join(' / '),Number(observed.impressions)||0,Number(observed.clicks)||0,key,'追加調査待ち'];
+  });
+  sh.getRange(last+1,1,rows.length,headers.length).setValues(rows);
+  return {status:'SAVED',count:rows.length,publication_gate:'HOLD',content_action:'NONE'};
+ }finally{lock.releaseLock();}
+}
+
+
+// v0.1.155: read-only routing preflight. The S3 inventory is a snapshot,
+// never proof of the current SBM state. No referrals are issued here.
+function sssM3StrategyRoutingAnalyze_(ledger, inventory, siteId){
+ if(!Array.isArray(ledger)||ledger.length>10000||!Array.isArray(inventory)||inventory.length>10001||!siteId)throw Error('照合データの形式が不正です。');
+ const byId=new Map(),duplicates=new Set();
+ for(const r of inventory){
+  if(!r||r[1]!==siteId||!/^A\d{6}$/.test(String(r[2]||'')))continue;
+  const id=r[2];if(byId.has(id))duplicates.add(id);else byId.set(id,{state:String(r[5]||'').trim(),title:String(r[4]||'')});
+ }
+ const byQuery=new Map();
+ for(const r of ledger){
+  if(!r||r[1]!==siteId)continue;
+  const query=String(r[4]||'').trim(),assessment=String(r[5]||''),ids=String(r[9]||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!query||!['ROLE_REVIEW','EXISTING_REVIEW','EVIDENCE_NEEDED','NEW_ARTICLE_RESEARCH'].includes(assessment)||ids.some(id=>!/^A\d{6}$/.test(id))||r[15]!=='追加調査待ち')continue;
+  const period=String(r[2]||'')+' / '+String(r[3]||'');
+  const key=period+'|'+query;
+  // Prefer the latest saved record for the same query and period.
+  const states=ids.map(id=>({id,state:duplicates.has(id)?'台帳重複':byId.has(id)?byId.get(id).state:'台帳未照合'}));
+  const blocked=states.filter(x=>!['未着手','完了'].includes(x.state));
+  const status=!ids.length?'記事未確認':blocked.length?'SBM状態の再確認が必要':'SBM最新状態の確認待ち';
+  byQuery.set(key,{query,period,assessment,priority:String(r[7]||''),article_ids:ids,states,status,action:'EVIDENCE_REVIEW_ONLY'});
+ }
+ const items=[...byQuery.values()].sort((a,b)=>({優先確認:0,通常確認:1,経過確認:2}[a.priority]??3)-({優先確認:0,通常確認:1,経過確認:2}[b.priority]??3));
+ return {format:'S3_M3_STRATEGY_ROUTING_PREFLIGHT_V1',status:'PROVISIONAL',site_id:siteId,count:items.length,items:items.slice(0,100),truncated:items.length>100,publication_gate:'HOLD',content_action:'NONE',limitations:['記事状態はS3に保存したSBM台帳の取得時点の情報であり最新状態を保証しません','SBMで処理中・モニター中・再診中の記事への紹介状は発行しません','この結果は追加調査の候補であり改善・新記事・統合を決定しません']};
+}
+function sssM3StrategyRoutingPreview(){
+ const c=sssConfig_(),ss=SpreadsheetApp.getActiveSpreadsheet(),sh=ss.getSheetByName('S3_検索戦略精査');
+ if(!sh||sh.getLastRow()<2)return {status:'BLOCKED',reason:'保存済みの検索戦略精査がありません。先にClaude回答を検証して保存してください。'};
+ const batch=sssM3BatchStatus();if(batch.status!=='COMPLETED')return {status:'BLOCKED',reason:'記事台帳の取得が完了していません。'};
+ const inv=ss.getSheetByName(SSS_M3_BATCH_SHEET_);
+ if(!inv||inv.getLastRow()!==batch.processed+1||batch.processed>5000)throw Error('記事台帳の整合性が確認できません。');
+ const head=inv.getRange(1,1,1,9).getDisplayValues()[0];if(head.some((v,i)=>v!==SSS_M3_BATCH_HEADERS_[i]))throw Error('記事台帳の列構成が不正です。');
+ const rows=inv.getRange(2,1,batch.processed,9).getDisplayValues();
+ if(rows.some(r=>r[0]!==batch.run_id||r[1]!==c.siteId))throw Error('記事台帳のサイト・実行IDが一致しません。');
+ const expected=['保存日時','サイトID','期間開始','期間終了','検索語','判定','確信度','優先度','参考点','観測記事ID','理由','追加確認事項','根拠表示回数','根拠クリック数','保存キー','処置状態'];
+ if(sh.getLastColumn()<16||sh.getRange(1,1,1,16).getDisplayValues()[0].some((v,i)=>v!==expected[i]))throw Error('検索戦略精査シートの列構成が不正です。');
+ const ledger=sh.getRange(2,1,Math.min(sh.getLastRow()-1,10000),16).getDisplayValues();
+ const result=sssM3StrategyRoutingAnalyze_(ledger,rows,c.siteId);result.inventory_run_id=batch.run_id;result.inventory_snapshot='SBM台帳取得時点';return result;
+}
+// v0.1.156: independently re-read the connected SBM at review time.
+// This is a live read-only preflight, not a lock on SBM or permission to issue a referral.
+function sssM3StrategyLiveStates_(siteId, candidateIds, managerRows){
+ if(!siteId||!Array.isArray(candidateIds)||candidateIds.length>1000||!Array.isArray(managerRows)||managerRows.length>10001)throw Error('SBM最新状態の照合範囲が不正です。');
+ const targets=new Set(candidateIds);
+ if([...targets].some(id=>!/^A\d{6}$/.test(id)))throw Error('対象記事IDが不正です。');
+ const states=new Map(),duplicates=new Set();
+ for(const row of managerRows){
+  const id=String(row.article_id||'').trim();if(!targets.has(id))continue;
+  if(states.has(id))duplicates.add(id);
+  else states.set(id,String(row.state||'').trim());
+ }
+ return Object.fromEntries([...targets].map(id=>[id,duplicates.has(id)?'台帳重複':states.has(id)?states.get(id):'SBM未照合']));
+}
+function sssM3StrategyLiveApply_(result, live, checkedAt){
+ if(!result||result.format!=='S3_M3_STRATEGY_ROUTING_PREFLIGHT_V1'||!live||typeof live!=='object')throw Error('照合結果が不正です。');
+ const items=result.items.map(item=>{
+  const states=item.article_ids.map(id=>({id,state:Object.prototype.hasOwnProperty.call(live,id)?live[id]:'SBM未照合'}));
+  const blocking=states.filter(s=>!['未着手','完了'].includes(s.state));
+  const researchStatus=!states.length?'観測記事なし（調査保留）':'読み取り専用調査可（処置は保留）';
+  return Object.assign({},item,{states,status:researchStatus,action:'EVIDENCE_REVIEW_ONLY',treatment_blocked:blocking.length>0||!states.length,blocked_article_ids:blocking.map(x=>x.id)});
+ });
+ return Object.assign({},result,{items,live_checked_at:checkedAt,inventory_snapshot:'参考情報のみ',limitations:['表示状態は確認時に接続先SBMから読み取ったものです。直後に変更される可能性があります','紹介状発行時にはSBMの最新状態を再検証してください','SBMで処理中・不明・重複・未照合でも読み取り専用の追加調査のみ可能です。改善・統合・新記事・紹介状は保留します']});
+}
+function sssM3StrategyRoutingLivePreview(){
+ const c=sssConfig_(),base=sssM3StrategyRoutingPreview();
+ if(!base||base.status!=='PROVISIONAL')return base;
+ const connection=sssM1FindManagers_();
+ if(!connection.complete||connection.candidates.length!==1)throw Error('SBM連携先を一意に確認できません。安全停止しました。');
+ const managerId=connection.candidates[0].id;
+ sssCheckManagerIdentityForSetup_(managerId,c);
+ const sh=SpreadsheetApp.openById(managerId).getSheetByName('記事管理');
+ if(!sh||sh.getLastRow()<1||sh.getLastRow()>10001)throw Error('SBM記事台帳の行数が不正です。');
+ const values=sh.getRange(1,1,sh.getLastRow(),sh.getLastColumn()).getDisplayValues();
+ const articles=sssM1Articles_(values);
+ const ids=[...new Set(base.items.flatMap(x=>x.article_ids))];
+ const live=sssM3StrategyLiveStates_(c.siteId,ids,articles);
+ const out=sssM3StrategyLiveApply_(base,live,new Date().toISOString());
+ out.sbm_manager_id=managerId;
+ out.research_plan=sssM3StrategyResearchPlan_(out,5);
+ out.research_prompt=sssM3StrategyResearchPrompt_(out.research_plan);
+ return out;
+}
+
+// v0.1.157: build an evidence-only, bounded shortlist from the *live* SBM guard.
+// A prior saved review is not a diagnosis, and no item may authorize a referral.
+function sssM3StrategyResearchPlan_(liveResult, maxItems){
+ if(!liveResult||liveResult.format!=='S3_M3_STRATEGY_ROUTING_PREFLIGHT_V1'||liveResult.status!=='PROVISIONAL'||!liveResult.live_checked_at||liveResult.publication_gate!=='HOLD'||liveResult.content_action!=='NONE')throw Error('SBM最新照合済みの結果が必要です。');
+ const limit=Number(maxItems)||5;if(!Number.isInteger(limit)||limit<1||limit>10)throw Error('調査件数の上限が不正です。');
+ if(!Array.isArray(liveResult.items)||liveResult.items.length>100)throw Error('候補件数が不正です。');
+ const seen=new Set(),eligible=[],held=[];
+ for(const item of liveResult.items){
+  if(!item||typeof item.query!=='string'||!item.query.trim()||seen.has(item.query))continue;
+  seen.add(item.query);
+  const ids=item.article_ids||[],states=item.states||[];
+  const consistent=Array.isArray(ids)&&Array.isArray(states)&&ids.length===states.length&&ids.every((id,i)=>/^A\d{6}$/.test(id)&&states[i]&&states[i].id===id);
+  const researchable=consistent&&ids.length>0;
+  const blocked=states.filter(x=>!['未着手','完了'].includes(x.state)).map(x=>x.id);
+  const permitted=['ROLE_REVIEW','EXISTING_REVIEW','EVIDENCE_NEEDED','NEW_ARTICLE_RESEARCH'].includes(item.assessment);
+  const record={query:item.query,assessment:item.assessment,priority:item.priority,observed_article_ids:ids.slice(),sbm_states:states.map(x=>({id:x.id,state:x.state})),next_step:'READ_ONLY_SEARCH_INTENT_AND_ARTICLE_EVIDENCE_REVIEW',treatment_blocked:true,blocked_article_ids:blocked,decision:'HOLD'};
+  if(researchable&&permitted&&item.action==='EVIDENCE_REVIEW_ONLY')eligible.push(record);
+  else held.push({query:item.query,reason:!consistent?'記事IDと状態の照合不整合':!ids.length?'観測記事がありません':'確認区分が未承認'});
+ }
+ const rank={'優先確認':0,'通常確認':1,'経過確認':2};
+ eligible.sort((a,b)=>(rank[a.priority]??3)-(rank[b.priority]??3));
+ const selected=eligible.slice(0,limit);
+ return {format:'S3_M3_STRATEGY_RESEARCH_PLAN_V1',site_id:liveResult.site_id,checked_at:liveResult.live_checked_at,selected,eligible_count:eligible.length,held_count:held.length,held:held.slice(0,20),truncated:eligible.length>limit,publication_gate:'HOLD',content_action:'NONE',limitations:['SBM状態は照合時点の値であり、その後変更される可能性があります。処理中の記事も読み取り専用の調査のみ対象とします','検索意図・SERP・記事本文は未確認です','追加調査専用であり改善・統合・新記事・紹介状の決定ではありません']};
+}
+function sssM3StrategyResearchPrompt_(plan){
+ if(!plan||plan.format!=='S3_M3_STRATEGY_RESEARCH_PLAN_V1'||plan.publication_gate!=='HOLD'||plan.content_action!=='NONE'||!Array.isArray(plan.selected)||plan.selected.length>10)throw Error('調査計画の安全条件が不正です。');
+ const data={format:plan.format,site_id:plan.site_id,checked_at:plan.checked_at,selected:plan.selected,limitations:plan.limitations,publication_gate:'HOLD',content_action:'NONE'};
+ return ['あなたはS3の検索戦略追加調査担当です。以下の観測情報のみを確定事実とし、検索意図・SERP・本文・検索順位・SBMの現在状態を推測で補わないでください。','検索語ごとに、記事の役割を検証するために必要な追加根拠と確認順序を提案してください。根拠が足りない場合は保留してください。','記事改善・統合・削除・noindex・新記事・紹介状・公開の決定は禁止します。SBM作業状態は確認時点の参考情報であり、処置直前に再確認が必要です。','回答はJSONのみ。format=S3_M3_STRATEGY_RESEARCH_RESPONSE_V1、site_id、publication_gate=HOLD、content_action=NONE、reviews配列（query、observed_article_ids、evidence_needed配列、reason、decision=HOLD）を含め、検索語と記事IDを改変しないでください。','【追加調査対象（S3の確認時点）】',JSON.stringify(data,null,2)].join('\n\n');
+}
+function sssM3StrategyRoutingDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;color:#202124;padding:20px;line-height:1.6}button{padding:10px 16px;background:#1765ad;color:#fff;border:0;border-radius:5px;cursor:pointer}button:disabled{opacity:.5}table{width:100%;border-collapse:collapse;table-layout:auto}#rows td:nth-child(3){min-width:230px;font-size:12px;line-height:1.5}#rows td:nth-child(4){min-width:125px}#rows td:first-child{min-width:150px}td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left;overflow-wrap:anywhere}th:first-child{width:24%}th:nth-child(2){width:18%}footer{margin-top:20px;border-top:1px solid #ddd;padding-top:12px}footer button{background:white;color:#222;border:1px solid #bbb}</style><h3>保存済み検索戦略とSBM状態を照合</h3><p>保存した精査結果と接続先SBMの現在の作業状態を読み取り専用で照合します。改善・統合・紹介状発行は行いません。</p><button id="run" onclick="run()">保存済み候補を確認</button><p id="status" role="status">開始待ち</p><table><thead><tr><th>検索語</th><th>優先度・判定</th><th>観測記事と台帳状態</th><th>次の対応</th></tr></thead><tbody id="rows"></tbody></table><p id="note"></p><section id="research" hidden><h4>追加調査の候補（最大5件）</h4><p>SBMで処理中の記事も読み取り専用の追加調査は可能です。改善・統合・新記事・紹介状発行は全件保留します。検索意図・本文・SERPは未確認です。</p><div id="researchSummary"></div><button id="buildResearch" onclick="buildResearch()">Claude追加調査依頼文を作成</button> <button id="copyResearch" onclick="copyResearch()" disabled>依頼文をコピー</button><p id="researchStatus" role="status"></p><textarea id="researchPrompt" readonly style="box-sizing:border-box;width:100%;height:200px;resize:vertical"></textarea><h4>Claude追加調査回答の確認</h4><p>JSON回答を貼り付けると画面内で形式と対象記事を照合します。検証後も記事処置は行いません。</p><textarea id="researchAnswer" style="box-sizing:border-box;width:100%;height:160px;resize:vertical" placeholder="ClaudeのJSON回答を貼り付け"></textarea><div><button id="verifyResearch" onclick="verifyResearch()">追加調査回答を検証</button> <span id="researchVerifyStatus" role="status" aria-live="polite"></span> <button id="saveResearch" onclick="saveResearch()" disabled>検証結果をS3に保存</button></div><pre id="researchVerified" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></section><footer><button onclick="google.script.host.close()">閉じる</button></footer><script>const e=id=>document.getElementById(id);let lastPlan=null;let researchVerified=false;function verifyResearch(){researchVerified=false;e('saveResearch').disabled=true;const status=e('researchVerifyStatus');e('researchVerified').textContent='';try{if(!lastPlan||!lastPlan.plan)throw Error('SBM照合からやり直してください。');const plan=lastPlan.plan;const raw=e('researchAnswer').value.trim();if(!raw||raw.length>150000)throw Error('回答が空、または長すぎます。');const x=JSON.parse(raw);if(!x||x.format!=='S3_M3_STRATEGY_RESEARCH_RESPONSE_V1'||x.site_id!==plan.site_id||x.publication_gate!=='HOLD'||x.content_action!=='NONE'||!Array.isArray(x.reviews)||x.reviews.length!==plan.selected.length)throw Error('形式・サイト・安全条件・件数が一致しません。');const expected=new Map(plan.selected.map(r=>[r.query,r]));if(expected.size!==plan.selected.length)throw Error('検索語が重複しています。');const seen=new Set();for(const r of x.reviews){if(!r||!expected.has(r.query)||seen.has(r.query)||r.decision!=='HOLD'||!Array.isArray(r.observed_article_ids)||!Array.isArray(r.evidence_needed)||r.evidence_needed.length<1||r.evidence_needed.length>20||r.evidence_needed.some(v=>typeof v!=='string'||!v.trim()||v.length>500)||typeof r.reason!=='string'||!r.reason.trim()||r.reason.length>2000)throw Error('検索語・追加根拠・保留判定が不正です。');const ids=expected.get(r.query).observed_article_ids;if(ids.length!==r.observed_article_ids.length||ids.some((v,i)=>v!==r.observed_article_ids[i]))throw Error('記事IDが一致しません。');seen.add(r.query)}status.textContent='形式検証完了（'+x.reviews.length+'件）。すべて追加調査待ちです。';researchVerified=true;e('saveResearch').disabled=false;e('researchVerified').textContent=x.reviews.map(r=>r.query+'：'+r.evidence_needed.join('／')).join('\\n')}catch(err){status.textContent='安全停止：'+String(err&&err.message||err)}}function saveResearch(){if(!researchVerified||!lastPlan||!lastPlan.plan)return;const b=e('saveResearch');b.disabled=true;e('researchVerifyStatus').textContent='SBMを再照合してS3に保存しています…';google.script.run.withSuccessHandler(x=>{e('researchVerifyStatus').textContent=x.status==='SAVED'?'S3に保存しました（'+x.count+'件）':x.status==='ALREADY_SAVED'?'同じ調査結果は保存済みです。':'保存結果を確認してください。';}).withFailureHandler(err=>{e('researchVerifyStatus').textContent='安全停止：'+String(err&&err.message||err);b.disabled=false;}).sssM3ResearchSave(lastPlan.plan,e('researchAnswer').value.trim())}function buildResearch(){if(!lastPlan)return;e('researchPrompt').value=lastPlan.prompt;e('copyResearch').disabled=false;e('researchStatus').textContent='追加調査依頼文を作成しました。'}function copyResearch(){const t=e('researchPrompt');t.focus();t.select();const ok=document.execCommand('copy');e('researchStatus').textContent=ok?'コピーしました！':'コピーできません。Ctrl+Cでコピーしてください。'}function run(){researchVerified=false;e('saveResearch').disabled=true;lastPlan=null;e('research').hidden=true;e('run').disabled=true;e('status').textContent='保存済みデータを照合しています…';google.script.run.withSuccessHandler(x=>{e('run').disabled=false;if(!x||x.status!=='PROVISIONAL'){e('status').textContent='安全停止：'+(x&&x.reason||'結果を確認できません');return}e('status').textContent='SBM照合完了：'+x.count+'件（記事変更なし）';e('note').textContent=x.limitations.join('／');if(x.research_plan&&x.research_plan.format==='S3_M3_STRATEGY_RESEARCH_PLAN_V1'&&x.research_plan.publication_gate==='HOLD'&&x.research_plan.content_action==='NONE'){lastPlan={prompt:x.research_prompt,plan:x.research_plan};e('research').hidden=false;e('researchAnswer').value='';e('researchVerifyStatus').textContent='';e('researchVerified').textContent='';e('researchSummary').textContent='読み取り専用の追加調査候補 '+x.research_plan.selected.length+'件／調査対象外 '+x.research_plan.held_count+'件。処置は全件保留。';e('researchPrompt').value='';e('copyResearch').disabled=true;}const b=e('rows');b.replaceChildren();x.items.forEach(r=>{const tr=document.createElement('tr');[r.query,r.priority+'／'+r.assessment,r.states.map(s=>s.id+'：'+s.state).join('、')||'観測記事なし',r.status].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});b.appendChild(tr)})}).withFailureHandler(err=>{e('run').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3StrategyRoutingLivePreview()}</script></html>`).setWidth(900).setHeight(650);
+ SpreadsheetApp.getUi().showModalDialog(html,'保存済み検索戦略の照合（試験）');
+}
+
+
+// v0.1.158: strict evidence-only research response acceptance. Never a treatment decision.
+function sssM3StrategyResearchValidate_(plan, answerText){
+ if(!plan||plan.format!=='S3_M3_STRATEGY_RESEARCH_PLAN_V1'||plan.publication_gate!=='HOLD'||plan.content_action!=='NONE'||!Array.isArray(plan.selected)||plan.selected.length>10)throw Error('調査計画の安全条件が不正です。');
+ if(typeof answerText!=='string'||!answerText.trim()||answerText.length>150000)throw Error('Claude回答の文字数が不正です。');
+ let x;try{x=JSON.parse(answerText.trim())}catch(e){throw Error('Claude回答はJSONのみで貼り付けてください。')}
+ if(!x||x.format!=='S3_M3_STRATEGY_RESEARCH_RESPONSE_V1'||x.site_id!==plan.site_id||x.publication_gate!=='HOLD'||x.content_action!=='NONE'||!Array.isArray(x.reviews)||x.reviews.length!==plan.selected.length)throw Error('回答形式・サイト・安全条件・件数が一致しません。');
+ const expected=new Map(plan.selected.map(r=>[r.query,r]));if(expected.size!==plan.selected.length)throw Error('調査対象の検索語が重複しています。');
+ const seen=new Set();const reviews=[];
+ for(const r of x.reviews){
+  if(!r||typeof r.query!=='string'||!expected.has(r.query)||seen.has(r.query)||r.decision!=='HOLD'||!Array.isArray(r.observed_article_ids)||!Array.isArray(r.evidence_needed)||r.evidence_needed.length<1||r.evidence_needed.length>20||r.evidence_needed.some(v=>typeof v!=='string'||!v.trim()||v.length>500)||typeof r.reason!=='string'||!r.reason.trim()||r.reason.length>2000)throw Error('検索語・保留判定・追加確認事項が不正です。');
+  const ids=expected.get(r.query).observed_article_ids;
+  if(r.observed_article_ids.length!==ids.length||r.observed_article_ids.some((v,i)=>v!==ids[i]))throw Error('観測記事IDが調査計画と一致しません。');
+  seen.add(r.query);reviews.push({query:r.query,observed_article_ids:ids.slice(),evidence_needed:r.evidence_needed.slice(),reason:r.reason,decision:'HOLD'});
+ }
+ return {format:'S3_M3_STRATEGY_RESEARCH_VALIDATED_V1',site_id:plan.site_id,checked_at:plan.checked_at,count:reviews.length,reviews,publication_gate:'HOLD',content_action:'NONE',status:'VALIDATED_EVIDENCE_ONLY'};
+}
+
+
+// v0.1.160: S3-only research evidence ledger. No SBM writes or treatment.
+function sssM3ResearchSave_(plan,answerText,livePlan){
+ const verified=sssM3StrategyResearchValidate_(plan,answerText);
+ const cfg=sssConfig_();
+ if(verified.site_id!==cfg.siteId)throw Error('現在のサイトと追加調査対象が一致しません。');
+ if(!livePlan||livePlan.format!=='S3_M3_STRATEGY_RESEARCH_PLAN_V1'||livePlan.site_id!==plan.site_id||livePlan.publication_gate!=='HOLD'||livePlan.content_action!=='NONE'||!Array.isArray(livePlan.selected))throw Error('SBM再照合の結果が不正です。');
+ // Compare semantic values, not JSON serialization of client-supplied objects.
+ // HtmlService RPC may preserve extra properties or normalize undefined fields.
+ const changes=[];
+ const original=plan.selected, current=livePlan.selected;
+ if(original.length!==current.length)changes.push('候補件数：'+original.length+' → '+current.length);
+ for(let i=0;i<original.length;i++){
+  const a=original[i],b=current[i];
+  if(!a||!b||a.query!==b.query){changes.push('検索語の一致を確認できません（'+(a&&a.query||i)+'）');continue;}
+  if(!Array.isArray(a.observed_article_ids)||!Array.isArray(b.observed_article_ids)||!Array.isArray(a.sbm_states)||!Array.isArray(b.sbm_states)){
+   changes.push(a.query+'：記事または状態の配列が不正');continue;
+  }
+  if(a.observed_article_ids.length!==b.observed_article_ids.length||a.sbm_states.length!==a.observed_article_ids.length||b.sbm_states.length!==b.observed_article_ids.length){
+   changes.push(a.query+'：記事数・状態数が不一致');continue;
+  }
+  for(let j=0;j<a.observed_article_ids.length;j++){
+   const id=a.observed_article_ids[j], liveId=b.observed_article_ids[j];
+   const before=a.sbm_states[j],after=b.sbm_states[j];
+   if(id!==liveId||!before||!after||before.id!==id||after.id!==id){changes.push(a.query+'：記事IDの一致を確認できません（'+id+'）');continue;}
+   if(typeof before.state!=='string'||typeof after.state!=='string'||before.state!==after.state)changes.push(id+'：'+String(before.state)+' → '+String(after.state));
+  }
+ }
+ if(changes.length)throw Error('SBM記事状態または調査対象が変更されました（'+changes.slice(0,6).join('、')+'）。保存せず停止しました。再照合してください。');
+ const canonical=p=>JSON.stringify(p.selected.map(x=>[x.query,x.observed_article_ids,x.sbm_states.map(y=>[y.id,y.state])]));
+ const ss=SpreadsheetApp.getActiveSpreadsheet();if(!ss)throw Error('S3のシートが見つかりません。');
+ const lock=LockService.getDocumentLock()||LockService.getScriptLock();
+ if(!lock.tryLock(10000))throw Error('別の保存処理が実行中です。');
+ try{
+  const name='S3_追加調査記録';
+  const headers=['保存日時','サイトID','SBM確認日時','検索語','観測記事ID','追加確認事項','保留理由','判定','保存キー'];
+  let sh=ss.getSheetByName(name);
+  if(!sh){sh=ss.insertSheet(name);sh.getRange(1,1,1,headers.length).setValues([headers]);sh.setFrozenRows(1);}
+  else if(sh.getLastColumn()<headers.length||sh.getRange(1,1,1,headers.length).getValues()[0].some((v,i)=>v!==headers[i]))throw Error('追加調査記録の列構成が一致しません。上書きしません。');
+  const digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify({site:verified.site_id,plan:canonical(plan),reviews:verified.reviews}));
+  const key='S3RESEARCH_'+digest.map(x=>('0'+(x&255).toString(16)).slice(-2)).join('');
+  const last=sh.getLastRow();
+  if(last>1&&sh.getRange(2,9,last-1,1).getValues().some(r=>r[0]===key))return {status:'ALREADY_SAVED',count:verified.count,publication_gate:'HOLD',content_action:'NONE'};
+  const now=new Date();const rows=verified.reviews.map(r=>[now,verified.site_id,livePlan.checked_at,r.query,r.observed_article_ids.join(', '),r.evidence_needed.join(' / '),r.reason,'追加根拠待ち',key]);
+  if(rows.length)sh.getRange(last+1,1,rows.length,headers.length).setValues(rows);
+  return {status:'SAVED',count:rows.length,publication_gate:'HOLD',content_action:'NONE'};
+ }finally{lock.releaseLock();}
+}
+// v0.1.163: recheck the *selected articles*, not a rebuilt and possibly reordered shortlist.
+// The research shortlist is a snapshot; only the live SBM article states are mutable.
+function sssM3ResearchRecheck_(plan){
+ if(!plan||plan.format!=='S3_M3_STRATEGY_RESEARCH_PLAN_V1'||!Array.isArray(plan.selected)||plan.selected.length<1||plan.selected.length>10||plan.publication_gate!=='HOLD'||plan.content_action!=='NONE')throw Error('追加調査計画の安全条件が不正です。');
+ const cfg=sssConfig_();if(plan.site_id!==cfg.siteId)throw Error('対象サイトが一致しません。');
+ const connection=sssM1FindManagers_();
+ if(!connection.complete||connection.candidates.length!==1)throw Error('SBM連携先を一意に確認できません。');
+ const managerId=connection.candidates[0].id;
+ sssCheckManagerIdentityForSetup_(managerId,cfg);
+ const sh=SpreadsheetApp.openById(managerId).getSheetByName('記事管理');
+ if(!sh||sh.getLastRow()<1||sh.getLastRow()>10001)throw Error('SBM記事台帳の行数が不正です。');
+ const articles=sssM1Articles_(sh.getRange(1,1,sh.getLastRow(),sh.getLastColumn()).getDisplayValues());
+ const ids=[...new Set(plan.selected.flatMap(x=>x.observed_article_ids))];
+ const live=sssM3StrategyLiveStates_(cfg.siteId,ids,articles);
+ const selected=plan.selected.map(x=>Object.assign({},x,{sbm_states:x.observed_article_ids.map(id=>({id,state:live[id]}))}));
+ return Object.assign({},plan,{selected,checked_at:new Date().toISOString()});
+}
+function sssM3ResearchSave(plan,answerText){
+ // Verify the answer first; never write until the live SBM guard passes.
+ sssM3StrategyResearchValidate_(plan,answerText);
+ const livePlan=sssM3ResearchRecheck_(plan);
+ return sssM3ResearchSave_(plan,answerText,livePlan);
+}
+
+
+
+// v0.1.164: Read-only, bounded evidence acquisition. A research plan is NOT a treatment authorization.
+// One exact query per RPC to stay within Apps Script quotas. No writes to SBM, Evidence, or articles.
+function sssM3ResearchEvidenceCandidates(){
+ const c=sssConfig_(),ss=SpreadsheetApp.getActiveSpreadsheet(),sh=ss&&ss.getSheetByName('S3_追加調査記録');
+ if(!sh||sh.getLastRow()<2)return {status:'BLOCKED',reason:'保存済みの追加調査回答がありません。',queries:[]};
+ const expected=['保存日時','サイトID','SBM確認日時','検索語','観測記事ID','追加確認事項','保留理由','判定','保存キー'];
+ if(sh.getLastColumn()<9||sh.getRange(1,1,1,9).getDisplayValues()[0].some((v,i)=>v!==expected[i]))throw Error('追加調査記録の列構成が一致しません。');
+ const count=Math.min(500,sh.getLastRow()-1),rows=sh.getRange(sh.getLastRow()-count+1,1,count,9).getDisplayValues(),seen=new Set(),queries=[];
+ for(let i=rows.length-1;i>=0;i--){const r=rows[i];if(r[1]!==c.siteId||r[7]!=='追加根拠待ち')continue;const q=String(r[3]||'').trim();if(!q||q.length>500||seen.has(q))continue;seen.add(q);queries.push({query:q,article_ids:String(r[4]||'').split(/\s*,\s*/).filter(Boolean)});if(queries.length>=20)break;}
+ return {status:'PROVISIONAL',site_id:c.siteId,queries,publication_gate:'HOLD',content_action:'NONE',limitations:['保存済み追加調査の最新500行から最大20語を表示','検索意図・記事競合・SERP・本文は未確認']};
+}
+function sssM3ResearchEvidenceCollect(query){
+ const q=String(query||'').trim();if(!q||q.length>500)throw Error('検索語が不正です。');
+ const candidates=sssM3ResearchEvidenceCandidates();if(candidates.status!=='PROVISIONAL'||!candidates.queries.some(x=>x.query===q))throw Error('保存済み追加調査の検索語ではありません。');
+ const c=sssConfig_(),batch=sssM3BatchStatus();if(batch.status!=='COMPLETED')return {status:'BLOCKED',reason:'S3記事台帳が未完成です。'};
+ const ref=sssM1CompactRef_(c),period=sssM3GscPlan_(ref);if(!period.available)return {status:'BLOCKED',reason:period.reason};
+ const sh=sssM3BatchSheet_();if(batch.processed>5000||sh.getLastRow()!==batch.processed+1)throw Error('記事台帳の件数が一致しません。');
+ const data=sh.getRange(2,1,batch.processed,9).getDisplayValues();if(data.some(r=>r[0]!==batch.run_id||r[1]!==c.siteId))throw Error('記事台帳のサイト・実行IDが一致しません。');
+ const articles=data.map(r=>({article_id:r[2],url:r[3],title:r[4]}));
+ const response=sdscSearchAnalyticsQuery_(c.propertyUri,{startDate:period.start,endDate:period.end,type:'web',dataState:'final',dimensions:['page'],dimensionFilterGroups:[{groupType:'and',filters:[{dimension:'query',operator:'equals',expression:q}]}],rowLimit:100,startRow:0});
+ const result=sssM3QueryDeepDiveAnalyze_(response,articles,c.siteId,{start:period.start,end:period.end},q);
+ const requested=candidates.queries.find(x=>x.query===q).article_ids;
+ const perArticle=requested.map(id=>{const matching=result.rows.filter(r=>r.article_id===id);return {article_id:id,observed_pages:matching.length,impressions:matching.reduce((a,r)=>a+r.impressions,0),clicks:matching.reduce((a,r)=>a+r.clicks,0),position:matching.length?matching.reduce((a,r)=>a+r.position*r.impressions,0)/Math.max(1,matching.reduce((a,r)=>a+r.impressions,0)):null,coverage:matching.length?'OBSERVED_IN_TOP100':'NOT_OBSERVED_IN_SAMPLE'};});
+ return {format:'S3_M3_RESEARCH_EVIDENCE_V1',status:'PROVISIONAL',site_id:c.siteId,query:q,period:result.period,source:result.source,returned:result.returned,truncated_possible:result.truncated_possible,classification:result.classification,requested_article_ids:requested,per_article:perArticle,unmatched_pages:result.unresolved_rows,other_observed_article_ids:result.article_ids.filter(id=>!requested.includes(id)),publication_gate:'HOLD',content_action:'NONE',limitations:['検索語に完全一致するGSCページ上位100件のみ。未観測はゼロ実績を意味しません','掲載順位はページ行の表示回数加重平均による参考値で、検索語全体の順位ではありません','本文・SERP・改善履歴はこの段階では取得していません','GSCの期間と数値は再取得時点のものです']};
+}
+function sssM3ResearchEvidenceDialog(initialQuery){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:20px;line-height:1.6;color:#202124}button,select{padding:9px;border-radius:5px;border:1px solid #bbb}button{background:#1765ad;color:white;cursor:pointer}button:disabled{opacity:.5}select{width:100%;box-sizing:border-box;margin:12px 0}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #ddd;padding:8px;text-align:left}details{margin-top:12px}footer{margin-top:18px;border-top:1px solid #ddd;padding-top:12px}footer button{background:white;color:#333}</style><h3>追加調査の証拠を自動収集（試験）</h3><p>保存済みの調査対象から検索語を選択し、GSCのページ別実績を読み取り専用で取得します。1回につき1検索語、最大100ページです。</p><select id="query" disabled><option>保存済み候補を取得中…</option></select><button id="run" onclick="run(false)" disabled>GSC証拠を取得</button><button type="button" id="fresh" onclick="run(true)" disabled>GSCを再取得</button><p id="status" role="status">開始待ち</p><div id="summary"></div><table><thead><tr><th>記事ID</th><th>表示</th><th>クリック</th><th>観測</th></tr></thead><tbody id="rows"></tbody></table><details><summary>未確認事項・技術情報</summary><pre id="technical" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details><p>取得結果は画面表示のみ。記事・SBM・Evidence・S3保存済み調査記録を変更しません。</p><footer><button type="button" onclick="backToOverview()">総合診断へ戻る</button><button onclick="google.script.host.close()">閉じる</button></footer><script>const desiredQuery=${JSON.stringify(String(initialQuery||''))};const e=id=>document.getElementById(id);google.script.run.withSuccessHandler(x=>{if(!x||x.status!=='PROVISIONAL'){e('status').textContent='安全停止：'+(x&&x.reason||'候補なし');return}const sel=e('query');sel.replaceChildren();x.queries.forEach(r=>{const o=document.createElement('option');o.value=r.query;o.textContent=r.query;sel.appendChild(o)});if(desiredQuery&&Array.from(sel.options).some(o=>o.value===desiredQuery))sel.value=desiredQuery;sel.disabled=!x.queries.length;e('run').disabled=!x.queries.length;e('status').textContent='保存済み候補 '+x.queries.length+'件。検索語を選んでください。'}).withFailureHandler(err=>{e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3ResearchEvidenceCandidates();function run(force){e('run').disabled=true;e('status').textContent='GSCを照合しています…';google.script.run.withSuccessHandler(x=>{e('run').disabled=false;if(!x||x.status!=='PROVISIONAL'){e('status').textContent='安全停止：'+(x&&x.reason||'取得不可');return}e('status').textContent='取得完了（読み取り専用）／'+(x.cache_notice||'');e('summary').textContent='期間：'+x.period.start+' ～ '+x.period.end+'／取得ページ：'+x.returned+'件'+(x.truncated_possible?'（100件上限）':'');const b=e('rows');b.replaceChildren();x.per_article.forEach(r=>{const tr=document.createElement('tr');[r.article_id,r.impressions,r.clicks,r.coverage==='OBSERVED_IN_TOP100'?'観測あり':'上位100件に未観測'].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);tr.appendChild(td)});b.appendChild(tr)});e('technical').textContent=JSON.stringify({unmatched_pages:x.unmatched_pages,other_observed_article_ids:x.other_observed_article_ids,limitations:x.limitations},null,2)}).withFailureHandler(err=>{e('run').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3ResearchEvidenceCached(e('query').value,!!force)}function backToOverview(){e('status').textContent='総合診断へ戻ります…';google.script.run.withSuccessHandler(()=>google.script.host.close()).withFailureHandler(err=>e('status').textContent='戻れません：'+String(err&&err.message||err)).sssM3IntegratedDialog()}</script></html>`).setWidth(820).setHeight(650);
+ SpreadsheetApp.getUi().showModalDialog(html,'追加調査の証拠を自動収集（試験）');
+}
+
+
+
+// v0.1.165. Read-only, two equal-ish non-overlapping calendar windows.
+// This is a comparison of observed page rows, NOT proof of ranking rotation or improvement causality.
+function sssM3TimelinePeriods_(start,end){
+ const a=Date.parse(start+'T00:00:00Z'),b=Date.parse(end+'T00:00:00Z');
+ if(!Number.isFinite(a)||!Number.isFinite(b)||b<a||b-a>400*86400000)throw Error('比較期間が不正です。');
+ const n=Math.floor((b-a)/86400000)+1;if(n<2)throw Error('比較には2日以上必要です。');
+ const fmt=t=>new Date(t).toISOString().slice(0,10),first=Math.floor(n/2);
+ return [{start,end:fmt(a+(first-1)*86400000)},{start:fmt(a+first*86400000),end}];
+}
+function sssM3TimelineSummarize_(response,articles,siteId,period,query){
+ const x=sssM3QueryDeepDiveAnalyze_(response,articles,siteId,period,query);
+ const ids=new Map();
+ for(const r of x.rows){if(!r.article_id)continue;const old=ids.get(r.article_id)||{article_id:r.article_id,impressions:0,clicks:0,observed_pages:0};old.impressions+=Number(r.impressions)||0;old.clicks+=Number(r.clicks)||0;old.observed_pages++;ids.set(r.article_id,old);}
+ return {period,returned:x.returned,truncated_possible:x.truncated_possible,articles:[...ids.values()],unmatched_pages:x.unresolved_rows};
+}
+function sssM3ResearchTimelineAnalyze_(first,second,requested){
+ const m1=new Map(first.articles.map(r=>[r.article_id,r])),m2=new Map(second.articles.map(r=>[r.article_id,r]));
+ return requested.map(id=>{const a=m1.get(id),b=m2.get(id);return {article_id:id,first:a||null,second:b||null,observed_first:!!a,observed_second:!!b,observation_change:!a&&b?'後半のみ観測':a&&!b?'前半のみ観測':a&&b?'両期間で観測':'両期間とも標本未観測'};});
+}
+function sssM3ResearchHistoryRead_(siteId,articleIds){
+ const c=sssConfig_();if(c.siteId!==siteId)throw Error('サイトIDが一致しません。');
+ const conn=sssM1FindManagers_();if(!conn.complete||conn.candidates.length!==1)return {status:'UNAVAILABLE',reason:'SBM連携先が一意ではありません。',events:[]};
+ const id=conn.candidates[0].id;sssCheckManagerIdentityForSetup_(id,c);
+ const sh=SpreadsheetApp.openById(id).getSheetByName('改善履歴');
+ if(!sh||sh.getLastRow()<2)return {status:'UNAVAILABLE',reason:'改善履歴シートにデータがありません。',events:[]};
+ if(sh.getLastRow()>10001||sh.getLastColumn()>120)throw Error('改善履歴の読み取り範囲が上限を超えています。');
+ const heads=sh.getRange(1,1,1,sh.getLastColumn()).getDisplayValues()[0].map(v=>String(v).trim());
+ const idCol=heads.findIndex(h=>['記事ID','article_id','articleId','ArticleID'].includes(h));
+ const dateCol=heads.findIndex(h=>['改善日','改善日時','completed_at','実施日','登録日時'].includes(h));
+ if(idCol<0||dateCol<0)return {status:'UNAVAILABLE',reason:'記事ID列または改善日列を特定できません。',events:[],detected_headers:heads.filter(Boolean).slice(0,20)};
+ const rows=sh.getRange(2,1,sh.getLastRow()-1,Math.max(idCol,dateCol)+1).getDisplayValues(),targets=new Set(articleIds),events=[];
+ for(const r of rows){const id=String(r[idCol]||'').trim();if(!targets.has(id))continue;const date=String(r[dateCol]||'').trim();if(date)events.push({article_id:id,date_raw:date});if(events.length>=300)break;}
+ return {status:'READ_ONLY',events,source:'SBM改善履歴',date_semantics:'列名からの推定。日付の意味は個別確認が必要',truncated:events.length>=300};
+}
+function sssM3ResearchTimelineCollect(query){
+ const q=String(query||'').trim();const candidates=sssM3ResearchEvidenceCandidates();
+ if(candidates.status!=='PROVISIONAL')throw Error('保存済み調査候補を取得できません。');
+ const target=candidates.queries.find(x=>x.query===q);if(!target)throw Error('保存済み調査対象外です。');
+ const c=sssConfig_(),batch=sssM3BatchStatus();if(batch.status!=='COMPLETED'||batch.processed>5000)throw Error('S3記事台帳が未完成です。');
+ const ref=sssM1CompactRef_(c),period=sssM3GscPlan_(ref);if(!period.available)throw Error(period.reason||'GSC期間を取得できません。');
+ const windows=sssM3TimelinePeriods_(period.start,period.end);
+ const sh=sssM3BatchSheet_();if(sh.getLastRow()!==batch.processed+1)throw Error('記事台帳の件数が一致しません。');
+ const rows=sh.getRange(2,1,batch.processed,9).getDisplayValues();if(rows.some(r=>r[0]!==batch.run_id||r[1]!==c.siteId))throw Error('記事台帳のサイト・実行IDが一致しません。');
+ const articles=rows.map(r=>({article_id:r[2],url:r[3],title:r[4]}));
+ const results=windows.map(w=>{const response=sdscSearchAnalyticsQuery_(c.propertyUri,{startDate:w.start,endDate:w.end,type:'web',dataState:'final',dimensions:['page'],dimensionFilterGroups:[{groupType:'and',filters:[{dimension:'query',operator:'equals',expression:q}]}],rowLimit:100,startRow:0});return sssM3TimelineSummarize_(response,articles,c.siteId,w,q);});
+ let history;try{history=sssM3ResearchHistoryRead_(c.siteId,target.article_ids);}catch(err){history={status:'UNAVAILABLE',reason:String(err&&err.message||err),events:[]};}
+ return {format:'S3_M3_RESEARCH_TIMELINE_V1',status:'PROVISIONAL',site_id:c.siteId,query:q,windows:results,per_article:sssM3ResearchTimelineAnalyze_(results[0],results[1],target.article_ids),sbm_history:history,publication_gate:'HOLD',content_action:'NONE',limitations:['2期間は日数で二分した比較で、改善日を境にした因果分析ではありません','各期間のGSC検索語完全一致ページ上位100件。未観測はゼロ実績ではありません','記事の入れ替わりはこの集計だけでは証明できません','改善履歴の日時は記録列の値であり公開・改善完了日と一致する保証はありません','記事本文・SERPは未取得。記事処置なし']};
+}
+function sssM3ResearchTimelineDialog(initialQuery){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:20px;line-height:1.5}select{width:100%;padding:8px}button{padding:9px;margin:10px 0;background:#1765ad;color:white;border:0;border-radius:4px}button:disabled{opacity:.5}table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}details{margin-top:14px}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h3>期間別GSC・SBM履歴を照合（試験）</h3><p>保存済み追加調査から1検索語を選択します。GSCを前半・後半に分けて読み取り専用で比較します。</p><select id="q" disabled><option>候補を取得中…</option></select><button id="go" onclick="run(false)" disabled>期間別証拠を取得</button><button type="button" id="fresh" onclick="run(true)" disabled>GSCを再取得</button><p id="status">開始待ち</p><p id="period"></p><table><thead><tr><th>記事ID</th><th>前半 表示/クリック</th><th>後半 表示/クリック</th><th>観測</th></tr></thead><tbody id="rows"></tbody></table><details><summary>SBM改善履歴（読み取り専用）</summary><pre id="history"></pre></details><details><summary>未確認事項・取得上限</summary><pre id="limits"></pre></details><p>改善効果や記事競合は確定しません。記事・SBM・Evidence・S3記録への書き込みはありません。</p><button type="button" onclick="backToOverview()">総合診断へ戻る</button><button onclick="google.script.host.close()">閉じる</button><script>const desiredQuery=${JSON.stringify(String(initialQuery||''))};const e=id=>document.getElementById(id);google.script.run.withSuccessHandler(x=>{if(!x||x.status!=='PROVISIONAL'){e('status').textContent='候補なし';return}e('q').replaceChildren();x.queries.forEach(r=>{const o=document.createElement('option');o.value=r.query;o.textContent=r.query;e('q').appendChild(o)});if(desiredQuery&&Array.from(e('q').options).some(o=>o.value===desiredQuery))e('q').value=desiredQuery;e('q').disabled=false;e('go').disabled=false;e('fresh').disabled=false;e('status').textContent='候補 '+x.queries.length+'件'}).withFailureHandler(err=>e('status').textContent=String(err&&err.message||err)).sssM3ResearchEvidenceCandidates();function run(force){e('go').disabled=true;e('status').textContent='2期間のGSCとSBM履歴を確認しています…';google.script.run.withSuccessHandler(x=>{e('go').disabled=false;if(!x||x.status!=='PROVISIONAL'){e('status').textContent='取得不可';return}e('status').textContent='取得完了（読み取り専用）／'+(x.cache_notice||'');e('period').textContent=x.windows.map(w=>w.period.start+'～'+w.period.end+'（'+w.returned+'ページ）').join(' ／ ');e('rows').replaceChildren();x.per_article.forEach(r=>{const tr=document.createElement('tr');[r.article_id,r.first?r.first.impressions+' / '+r.first.clicks:'未観測',r.second?r.second.impressions+' / '+r.second.clicks:'未観測',r.observation_change].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});e('rows').appendChild(tr)});e('history').textContent=JSON.stringify(x.sbm_history,null,2);e('limits').textContent=x.limitations.join(' ／ ')}).withFailureHandler(err=>{e('go').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3ResearchTimelineCached(e('q').value,!!force)}function backToOverview(){e('status').textContent='総合診断へ戻ります…';google.script.run.withSuccessHandler(()=>google.script.host.close()).withFailureHandler(err=>e('status').textContent='戻れません：'+String(err&&err.message||err)).sssM3IntegratedDialog()}</script></html>`).setWidth(850).setHeight(650);
+ SpreadsheetApp.getUi().showModalDialog(html,'期間別GSC・SBM履歴を照合（試験）');
+}
+
+
+// v0.1.167: an integrated READ-ONLY evidence package. No article-body or SERP claims.
+// Metadata comes from the completed S3 batch; historical dates remain unverified.
+function sssM3EvidencePackageAssemble_(timeline, metadata){
+ if(!timeline||timeline.format!=='S3_M3_RESEARCH_TIMELINE_V1'||timeline.status!=='PROVISIONAL'||timeline.publication_gate!=='HOLD'||timeline.content_action!=='NONE')throw Error('証拠データの安全条件が不正です。');
+ if(!Array.isArray(timeline.per_article)||timeline.per_article.length>100||!Array.isArray(metadata))throw Error('記事台帳の形式が不正です。');
+ const map=new Map(metadata.map(a=>[a.article_id,a]));
+ const events=timeline.sbm_history&&Array.isArray(timeline.sbm_history.events)?timeline.sbm_history.events:[];
+ const articles=timeline.per_article.map(r=>{
+  const m=map.get(r.article_id)||null;
+  return {article_id:r.article_id,title:m?m.title:'',url:m?m.url:'',metadata_status:m?'S3_BATCH_SNAPSHOT':'UNAVAILABLE',first:r.first||null,second:r.second||null,observation_change:r.observation_change,history_dates:events.filter(e=>e.article_id===r.article_id).map(e=>e.date_raw),history_date_semantics:'UNVERIFIED',body_status:'NOT_FETCHED',serp_status:'NOT_FETCHED'};
+ });
+ return {format:'S3_M3_EVIDENCE_PACKAGE_V1',status:'PROVISIONAL',site_id:timeline.site_id,query:timeline.query,windows:timeline.windows.map(w=>({period:w.period,returned:w.returned,truncated_possible:w.truncated_possible})),history_status:timeline.sbm_history?timeline.sbm_history.status:'UNAVAILABLE',history_date_semantics:'UNVERIFIED',articles,publication_gate:'HOLD',content_action:'NONE',limitations:['GSC各期間上位100ページ。未観測はゼロを意味しません','改善履歴の日付は意味未確定で、改善効果の因果関係を示しません','記事タイトルとURLはS3台帳の取得時点の情報です','本文とSERPは未取得。検索意図・競合・記事の役割は未確定です','記事・SBM・Evidence・保存済み調査記録への書き込みは行いません']};
+}
+function sssM3EvidencePackageCollect(query){
+ const timeline=sssM3ResearchTimelineCollect(query);
+ const cfg=sssConfig_(),batch=sssM3BatchStatus();
+ if(batch.status!=='COMPLETED'||batch.processed>5000)throw Error('S3記事台帳が未完成です。');
+ const sh=sssM3BatchSheet_();
+ if(sh.getLastRow()!==batch.processed+1)throw Error('記事台帳の件数が一致しません。');
+ const rows=sh.getRange(2,1,batch.processed,5).getDisplayValues();
+ if(rows.some(r=>r[0]!==batch.run_id||r[1]!==cfg.siteId))throw Error('記事台帳のサイト・実行IDが一致しません。');
+ return sssM3EvidencePackageAssemble_(timeline,rows.map(r=>({article_id:r[2],url:r[3],title:r[4]})));
+}
+function sssM3EvidencePackageDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:18px;line-height:1.5;color:#222}select{width:100%;padding:8px}button{padding:9px;margin:10px 0;background:#1765ad;color:white;border:0;border-radius:4px}button:disabled{opacity:.5}table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}details{margin-top:10px}summary{cursor:pointer}small{color:#666}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{overflow-wrap:anywhere}</style><h3>追加調査の証拠を統合確認（試験）</h3><p>期間別GSC・SBM履歴・S3記事台帳を読み取り専用で照合します。本文とSERPは未取得です。</p><select id="q" disabled><option>候補を取得中…</option></select><button id="go" disabled onclick="run()">証拠パッケージを作成</button><p id="status">開始待ち</p><p id="period"></p><table><thead><tr><th>記事</th><th>前半 表示/クリック</th><th>後半 表示/クリック</th><th>履歴日付（意味未確認）</th></tr></thead><tbody id="rows"></tbody></table><details><summary>未取得の証拠・安全条件</summary><pre id="limits"></pre></details><button onclick="google.script.host.close()">閉じる</button><script>const e=id=>document.getElementById(id);google.script.run.withSuccessHandler(x=>{if(!x||x.status!=='PROVISIONAL'){e('status').textContent='候補なし';return}e('q').replaceChildren();x.queries.forEach(r=>{const o=document.createElement('option');o.value=r.query;o.textContent=r.query;e('q').appendChild(o)});e('q').disabled=false;e('go').disabled=false;e('status').textContent='候補 '+x.queries.length+'件'}).withFailureHandler(err=>e('status').textContent=String(err&&err.message||err)).sssM3ResearchEvidenceCandidates();function run(){e('go').disabled=true;e('status').textContent='GSC・SBM履歴・記事台帳を照合しています…';google.script.run.withSuccessHandler(x=>{e('go').disabled=false;if(!x||x.status!=='PROVISIONAL'){e('status').textContent='取得不可';return}e('status').textContent='統合完了（読み取り専用）／'+x.articles.length+'記事／履歴：'+x.history_status;e('period').textContent=x.windows.map(w=>w.period.start+'～'+w.period.end).join(' ／ ');e('rows').replaceChildren();x.articles.forEach(r=>{const tr=document.createElement('tr');const vals=[r.article_id+' ／ '+(r.title||'タイトル未取得'),r.first?r.first.impressions+' / '+r.first.clicks:'未観測',r.second?r.second.impressions+' / '+r.second.clicks:'未観測',r.history_dates.length?r.history_dates.join('、'):'記録なし'];vals.forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});e('rows').appendChild(tr)});e('limits').textContent=x.limitations.join('\\n')} ).withFailureHandler(err=>{e('go').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3EvidencePackageCollect(e('q').value)}</script></html>`).setWidth(900).setHeight(660);
+ SpreadsheetApp.getUi().showModalDialog(html,'追加調査の証拠を統合確認（試験）');
+}
+
+
+
+// v0.1.168: bounded, public-URL-only evidence; one article per request.
+// Does not claim that stripped HTML is a full or current editorial source.
+function sssM3BodyEvidenceExtract_(html){
+ const input=String(html||'').slice(0,400000);
+ const body=(input.match(/<article\b[^>]*>([\s\S]*?)<\/article\s*>/i)||[])[1]||'';
+ const scope=body||((input.match(/<main\b[^>]*>([\s\S]*?)<\/main\s*>/i)||[])[1]||'');
+ if(!scope)return {status:'UNAVAILABLE',reason:'article/main領域を特定できません。',headings:[],excerpt:''};
+ const decode=x=>String(x).replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g,m=>({'&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"','&#39;':"'",'&nbsp;':' '}[m]||m)).replace(/&#(\d+);/g,(_,n)=>String.fromCharCode(Number(n)));
+ const clean=x=>decode(String(x).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ')).replace(/\s+/g,' ').trim();
+ const headings=[...scope.matchAll(/<h([23])\b[^>]*>([\s\S]*?)<\/h\1\s*>/gi)].slice(0,35).map(m=>({level:'H'+m[1],text:clean(m[2]).slice(0,180)})).filter(x=>x.text);
+ const excerpt=clean(scope).slice(0,3500);
+ return {status:excerpt?'EXTRACTED_PARTIAL':'UNAVAILABLE',headings,excerpt,reason:excerpt?'':'本文テキストを抽出できません。'};
+}
+function sssM3BodyEvidenceFetchFromArticle_(q,id,a){
+ const cfg=sssConfig_();const base=String(cfg.propertyUri||'').match(/^https:\/\/([^\/:?#]+)/i);const url=String(a.url||'').match(/^https:\/\/([^\/:?#]+)(\/entry\/[^?#]*)$/i);
+ if(!base||!url||url[1].toLowerCase()!==base[1].toLowerCase())throw Error('公開記事URLが登録サイトと一致しません。');
+ const response=UrlFetchApp.fetch(String(a.url),{muteHttpExceptions:true,followRedirects:false,validateHttpsCertificates:true,headers:{'User-Agent':'SIMS-S3-ReadOnly-Evidence/0.1.169'}});
+ const code=response.getResponseCode();if(code!==200)return {status:'UNAVAILABLE',reason:'HTTP '+code,article_id:id,url:a.url,publication_gate:'HOLD',content_action:'NONE'};
+ const headers=response.getHeaders();const ct=String(headers['Content-Type']||headers['content-type']||'').toLowerCase();
+ if(!ct.includes('text/html'))return {status:'UNAVAILABLE',reason:'HTML以外の応答です。',article_id:id,url:a.url,publication_gate:'HOLD',content_action:'NONE'};
+ const raw=response.getContentText();if(raw.length>400000) return {status:'UNAVAILABLE',reason:'HTMLがサイズ上限を超えています。',article_id:id,url:a.url,publication_gate:'HOLD',content_action:'NONE'};
+ const extracted=sssM3BodyEvidenceExtract_(raw);
+ return {format:'S3_M3_BODY_EVIDENCE_V1',article_id:id,url:a.url,query:q,fetch_status:extracted.status,reason:extracted.reason,headings:extracted.headings,excerpt:extracted.excerpt,scope:'PUBLIC_HTML_PARTIAL',publication_gate:'HOLD',content_action:'NONE',limitations:['公開HTMLのarticle/mainから抽出した部分テキストです。全文の網羅性・最新性は保証しません。','検索結果SERPは未取得です。','取得した内容はS3・SBM・Evidenceへ保存しません。']};
+}
+function sssM3BodyEvidenceFetch(query,articleId){
+ const q=String(query||'').trim(),id=String(articleId||'').trim();
+ if(!/^A\d{6}$/.test(id))throw Error('記事IDの形式が不正です。');
+ const pkg=sssM3EvidencePackageCollect(q);
+ const a=pkg.articles.find(x=>x.article_id===id);
+ if(!a)throw Error('選択した記事は証拠パッケージにありません。');
+ return sssM3BodyEvidenceFetchFromArticle_(q,id,a);
+}
+function sssM3BodyEvidenceDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:20px;line-height:1.5}select{width:100%;padding:9px;margin:6px 0}button{padding:9px;background:#1765ad;color:white;border:0;border-radius:4px;margin:8px 8px 8px 0}button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:300px;overflow:auto;background:#f6f7f8;padding:12px}small{color:#555}</style><h3>記事本文の証拠を確認（試験）</h3><p>保存済み調査対象の記事を1件ずつ公開URLから読み取り専用で取得します。記事の処置は行いません。</p><label>検索語<select id="q" disabled><option>候補を取得中…</option></select></label><label>記事<select id="a" disabled><option>検索語を選択してください</option></select></label><button id="go" disabled onclick="run()">公開本文の証拠を取得</button><button id="copy" disabled onclick="copyPrompt()">Claude精査依頼文をコピー</button><p id="status">開始待ち</p><pre id="out"></pre><small>取得テキストは最大3,500文字、H2/H3は最大35件。SERP・本文全文は未検証です。SBM・Evidence・記事は変更しません。</small><script>const e=id=>document.getElementById(id);let pkg=null,body=null;function load(){e('a').disabled=true;e('go').disabled=true;e('status').textContent='記事候補を確認しています…';google.script.run.withSuccessHandler(x=>{pkg=x;e('a').replaceChildren();(x.articles||[]).forEach(r=>{let o=document.createElement('option');o.value=r.article_id;o.textContent=r.article_id+' ／ '+(r.title||'タイトル未取得');e('a').appendChild(o)});e('a').disabled=false;e('go').disabled=false;e('status').textContent='記事を選択してください'}).withFailureHandler(err=>e('status').textContent=String(err.message||err)).sssM3EvidencePackageCollect(e('q').value)}google.script.run.withSuccessHandler(x=>{e('q').replaceChildren();(x.queries||[]).forEach(r=>{let o=document.createElement('option');o.value=r.query;o.textContent=r.query;e('q').appendChild(o)});if(!x.queries||!x.queries.length){e('status').textContent='候補なし';return}e('q').disabled=false;e('q').onchange=load;load()}).withFailureHandler(err=>e('status').textContent=String(err.message||err)).sssM3ResearchEvidenceCandidates();function run(){e('go').disabled=true;e('copy').disabled=true;e('status').textContent='公開HTMLを確認しています…';google.script.run.withSuccessHandler(x=>{e('go').disabled=false;body=x;e('out').textContent=JSON.stringify(x,null,2);e('status').textContent=x.fetch_status==='EXTRACTED_PARTIAL'?'部分本文の取得完了（読み取り専用）':'取得不可：'+(x.reason||'不明');e('copy').disabled=x.fetch_status!=='EXTRACTED_PARTIAL'}).withFailureHandler(err=>{e('go').disabled=false;e('status').textContent='取得停止：'+String(err.message||err)}).sssM3BodyEvidenceFetch(e('q').value,e('a').value)}function copyPrompt(){if(!pkg||!body)return;const prompt='次の検索語・記事について、検索意図と記事の役割を暫定的に評価してください。記事の変更・統合・公開を指示せず、不足する証拠を明記してください。SERP未取得、履歴日付の意味未確定、本文は部分抽出です。\\n\\n'+JSON.stringify({format:'S3_M3_BODY_REVIEW_INPUT_V1',query:pkg.query,article:pkg.articles.find(x=>x.article_id===body.article_id),body_evidence:body,publication_gate:'HOLD',content_action:'NONE'},null,2);navigator.clipboard.writeText(prompt).then(()=>e('status').textContent='Claude精査依頼文をコピーしました').catch(()=>e('status').textContent='コピーできません。ブラウザの権限を確認してください。')}</script></html>`).setWidth(900).setHeight(670);
+ SpreadsheetApp.getUi().showModalDialog(html,'記事本文の証拠を確認（試験）');
+}
+
+
+// v0.1.169: bounded sequential body evidence comparison. One GSC/SBM package
+// per batch; each public HTML fetch is read-only and fail-closed per article.
+function sssM3BodyComparePlan_(pkg,ids){
+ if(!pkg||pkg.format!=='S3_M3_EVIDENCE_PACKAGE_V1'||pkg.publication_gate!=='HOLD'||pkg.content_action!=='NONE'||!Array.isArray(pkg.articles))throw Error('証拠パッケージの安全条件が不正です。');
+ if(!Array.isArray(ids)||ids.length<2||ids.length>3||new Set(ids).size!==ids.length||ids.some(id=>!/^A\d{6}$/.test(id)))throw Error('比較記事は異なる2〜3件を指定してください。');
+ const selected=ids.map(id=>pkg.articles.find(a=>a.article_id===id));
+ if(selected.some(a=>!a))throw Error('記事IDが調査対象に含まれていません。');
+ return selected;
+}
+function sssM3BodyCompareCollect(query,ids){
+ const pkg=sssM3EvidencePackageCollect(query);
+ const selected=sssM3BodyComparePlan_(pkg,ids);
+ const bodies=selected.map(a=>{
+  try{return sssM3BodyEvidenceFetchFromArticle_(pkg.query,a.article_id,a)}
+  catch(err){return {format:'S3_M3_BODY_EVIDENCE_V1',article_id:a.article_id,url:a.url,query:pkg.query,fetch_status:'UNAVAILABLE',reason:String(err&&err.message||err).slice(0,250),headings:[],excerpt:'',publication_gate:'HOLD',content_action:'NONE'};}
+ });
+ return {format:'S3_M3_BODY_COMPARISON_V1',query:pkg.query,site_id:pkg.site_id,articles:selected.map((a,i)=>({article_id:a.article_id,title:a.title,url:a.url,first:a.first,second:a.second,history_dates:a.history_dates,body:bodies[i]})),limitations:['公開HTMLの部分抽出です。目次や関連記事が混入する可能性があります。','検索結果SERPと本文全文は未確認です。','SBM履歴日付の意味は未確定です。','複数記事の表示は競合・統合の証明ではありません。'],publication_gate:'HOLD',content_action:'NONE',status:'PROVISIONAL'};
+}
+function sssM3BodyCompareDialog(initialQuery){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:18px;line-height:1.5}select{width:100%;padding:8px;margin:6px 0}button{padding:9px;background:#1765ad;color:white;border:0;border-radius:4px;margin:8px 6px 8px 0}button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:340px;overflow:auto;background:#f6f7f8;padding:10px}small{color:#555}</style><h3>複数記事の本文を比較（試験）</h3><p>同じ検索語で観測された2〜3記事を、GSC・SBM履歴・公開HTMLの部分本文で読み取り専用比較します。</p><label>検索語<select id="q" disabled><option>候補を取得中…</option></select></label><label>記事1<select id="a" disabled></select></label><label>記事2<select id="b" disabled></select></label><label>記事3（任意）<select id="c" disabled></select></label><button id="go" disabled onclick="run()">比較証拠を取得</button><button id="copy" disabled onclick="copyPrompt()">Claude比較依頼文をコピー</button><p id="status">候補を読み込みます…</p><pre id="out"></pre><hr><h4>Claudeの記事役割判定を検証（処置なし）</h4><p>比較依頼文をClaudeに渡し、指定形式のJSON回答を貼り付けます。検証結果は画面内のみです。</p><textarea id="review" rows="9" style="width:100%;box-sizing:border-box" placeholder="ClaudeのJSON回答を貼り付け"></textarea><button id="check" onclick="checkReview()">役割判定を検証</button><button id="save" disabled onclick="saveReview()">検証済み判定をS3へ保存</button><pre id="reviewOut"></pre><button type="button" onclick="backToOverview()">総合診断へ戻る</button><p><small>最大3記事。本文は部分抽出、SERP未取得、改善履歴日付の意味未確定。記事・SBM・Evidenceへの書き込みはしません。</small><script>
+const desiredQuery=${JSON.stringify(String(initialQuery||''))};const e=id=>document.getElementById(id);let result=null,verified=null;e('review').addEventListener('input',()=>{verified=null;e('save').disabled=true});function load(){['a','b','c','go','copy'].forEach(id=>e(id).disabled=true);e('status').textContent='記事候補を取得しています…';google.script.run.withSuccessHandler(x=>{const rows=x.articles||[];['a','b','c'].forEach((id,j)=>{const el=e(id);el.replaceChildren();if(j===2){const o=document.createElement('option');o.value='';o.textContent='選択しない';el.appendChild(o)}rows.forEach(r=>{const o=document.createElement('option');o.value=r.article_id;o.textContent=r.article_id+' ／ '+(r.title||'タイトル未取得');el.appendChild(o)});el.disabled=false});if(rows.length>1){e('b').selectedIndex=1;e('go').disabled=false;e('status').textContent='2〜3記事を選んでください'}else e('status').textContent='比較対象が2記事未満です'}).withFailureHandler(err=>e('status').textContent='候補取得失敗：'+String(err.message||err)).sssM3EvidencePackageCollect(e('q').value)}google.script.run.withSuccessHandler(x=>{e('q').replaceChildren();(x.queries||[]).forEach(r=>{const o=document.createElement('option');o.value=r.query;o.textContent=r.query;e('q').appendChild(o)});if(!x.queries||!x.queries.length){e('status').textContent='候補なし';return}e('q').disabled=false;if(desiredQuery&&Array.from(e('q').options).some(o=>o.value===desiredQuery))e('q').value=desiredQuery;e('q').onchange=load;load()}).withFailureHandler(err=>e('status').textContent='候補取得失敗：'+String(err.message||err)).sssM3ResearchEvidenceCandidates();function run(){verified=null;e('save').disabled=true;const ids=[e('a').value,e('b').value,e('c').value].filter(Boolean);if(new Set(ids).size!==ids.length||ids.length<2){e('status').textContent='異なる2〜3記事を選択してください';return}e('go').disabled=true;e('copy').disabled=true;e('status').textContent='公開本文を取得しています…';google.script.run.withSuccessHandler(x=>{result=x;e('out').textContent=JSON.stringify(x,null,2);e('status').textContent='比較証拠の取得完了（'+x.articles.length+'記事・読み取り専用）';e('go').disabled=false;e('copy').disabled=false}).withFailureHandler(err=>{e('go').disabled=false;e('status').textContent='取得停止：'+String(err.message||err)}).sssM3BodyCompareCollect(e('q').value,ids)}function copyPrompt(){if(!result)return;const prompt='次の複数記事について、検索語に対する記事の役割を証拠ベースで比較してください。SERP未取得、本文は部分抽出、履歴日付の意味未確定です。競合・統合を確定せず、記事の変更・統合・公開は指示しないでください。回答はJSONのみ。形式は {\"format\":\"S3_M3_ROLE_REVIEW_V1\",\"site_id\":\"（証拠と同一）\",\"query\":\"（証拠と同一）\",\"publication_gate\":\"HOLD\",\"content_action\":\"NONE\",\"reviews\":[{\"article_id\":\"A000000\",\"role\":\"GENERAL|SPECIALIST|OVERLAP_SUSPECTED|EVIDENCE_NEEDED\",\"confidence\":\"PROVISIONAL|UNCONFIRMED\",\"reason\":\"根拠と制約\",\"next_evidence\":[\"追加確認\"]}]}。reviewsは比較した全記事を1回ずつ含め、根拠が不十分ならEVIDENCE_NEEDEDを選んでください。\\n\\n'+JSON.stringify(result,null,2);navigator.clipboard.writeText(prompt).then(()=>e('status').textContent='Claude比較依頼文をコピーしました').catch(()=>e('status').textContent='コピーに失敗しました')}function checkReview(){verified=null;e('save').disabled=true;const out=e('reviewOut');out.textContent='';try{if(!result||!Array.isArray(result.articles))throw Error('先に比較証拠を取得してください');let raw=e('review').value.trim();if(raw.startsWith(String.fromCharCode(96,96,96)))raw=raw.replace(/^\x60{3}(?:json)?\s*/i,'').replace(/\s*\x60{3}$/,'');const r=JSON.parse(raw);if(!r||r.format!=='S3_M3_ROLE_REVIEW_V1'||r.publication_gate!=='HOLD'||r.content_action!=='NONE'||r.site_id!==result.site_id||r.query!==result.query)throw Error('形式・サイト・検索語・安全条件が一致しません');const ids=result.articles.map(a=>a.article_id);if(!Array.isArray(r.reviews)||r.reviews.length!==ids.length)throw Error('記事数が一致しません');const seen=new Set();for(const v of r.reviews){if(!v||!ids.includes(v.article_id)||seen.has(v.article_id))throw Error('対象外または重複の記事IDです');seen.add(v.article_id);if(!['GENERAL','SPECIALIST','OVERLAP_SUSPECTED','EVIDENCE_NEEDED'].includes(v.role)||!['PROVISIONAL','UNCONFIRMED'].includes(v.confidence)||typeof v.reason!=='string'||!v.reason.trim()||!Array.isArray(v.next_evidence)||!v.next_evidence.every(x=>typeof x==='string'))throw Error('役割・確信度・根拠・追加確認の形式が不正です')}verified=r;e('save').disabled=false;out.textContent='形式検証OK（'+ids.length+'記事）。暫定判定のみ。保存・記事処置は行いません。\\n'+r.reviews.map(v=>v.article_id+'：'+v.role+'／'+v.confidence+'／'+v.reason).join('\\n')}catch(err){out.textContent='安全停止：'+String(err.message||err)}}function saveReview(){if(!verified||!result)return;e('save').disabled=true;e('reviewOut').textContent='S3専用台帳へ保存しています…';google.script.run.withSuccessHandler(x=>{e('reviewOut').textContent=(x.status==='SAVED'?'S3へ保存しました':'保存済みです')+'（'+x.count+'記事）。処置は保留。';}).withFailureHandler(err=>{e('save').disabled=false;e('reviewOut').textContent='安全停止：'+String(err&&err.message||err)}).sssM3RoleLedgerSave(verified,result)}function backToOverview(){e('status').textContent='総合診断へ戻ります…';google.script.run.withSuccessHandler(()=>google.script.host.close()).withFailureHandler(err=>e('status').textContent='戻れません：'+String(err&&err.message||err)).sssM3IntegratedDialog()}</script></html>`).setWidth(940).setHeight(700);
+ SpreadsheetApp.getUi().showModalDialog(html,'複数記事の本文を比較（試験）');
+}
+
+
+// v0.1.171: S3-only provisional role ledger. Never authorizes SBM action.
+function sssM3RoleLedgerValidate_(review, comparison, allowedIds){
+ if(!review||review.format!=='S3_M3_ROLE_REVIEW_V1'||review.publication_gate!=='HOLD'||review.content_action!=='NONE'||!comparison||comparison.format!=='S3_M3_BODY_COMPARISON_V1'||comparison.publication_gate!=='HOLD'||comparison.content_action!=='NONE'||review.site_id!==comparison.site_id||review.query!==comparison.query)throw Error('比較証拠と回答の安全条件が一致しません。');
+ const ids=(comparison.articles||[]).map(a=>a.article_id);
+ if(ids.length<2||ids.length>3||new Set(ids).size!==ids.length||!Array.isArray(review.reviews)||review.reviews.length!==ids.length)throw Error('比較記事の件数が不正です。');
+ if(!Array.isArray(allowedIds)||ids.some(id=>!allowedIds.includes(id)))throw Error('保存済み調査候補と記事IDが一致しません。');
+ const seen=new Set();
+ const reviews=review.reviews.map(v=>{
+  if(!v||!ids.includes(v.article_id)||seen.has(v.article_id))throw Error('回答の記事IDが不正です。');seen.add(v.article_id);
+  if(!['GENERAL','SPECIALIST','OVERLAP_SUSPECTED','EVIDENCE_NEEDED'].includes(v.role)||!['PROVISIONAL','UNCONFIRMED'].includes(v.confidence)||typeof v.reason!=='string'||!v.reason.trim()||v.reason.length>5000||!Array.isArray(v.next_evidence)||v.next_evidence.length>20||v.next_evidence.some(x=>typeof x!=='string'||x.length>1000))throw Error('回答の判定・根拠が不正です。');
+  return {article_id:v.article_id,role:v.role,confidence:v.confidence,reason:v.reason,next_evidence:v.next_evidence};
+ });
+ return {site_id:review.site_id,query:review.query,reviews,article_ids:ids,publication_gate:'HOLD',content_action:'NONE'};
+}
+function sssM3RoleLedgerSheet_(){
+ const ss=SpreadsheetApp.getActiveSpreadsheet();if(!ss)throw Error('S3のスプレッドシートがありません。');
+ const name='S3_M3_記事役割判定',heads=['保存日時','サイトID','検索語','記事ID','役割','確信度','根拠','追加証拠','安全判定','保存キー'];
+ let sh=ss.getSheetByName(name);
+ if(!sh){sh=ss.insertSheet(name);sh.getRange(1,1,1,heads.length).setValues([heads]);sh.setFrozenRows(1);}
+ if(sh.getLastColumn()<heads.length||sh.getRange(1,1,1,heads.length).getDisplayValues()[0].some((x,i)=>x!==heads[i]))throw Error('役割判定シートの列定義が一致しません。');
+ return sh;
+}
+function sssM3RoleLedgerSave(review,comparison){
+ const cfg=sssConfig_();if(!review||review.site_id!==cfg.siteId)throw Error('サイトIDが一致しません。');
+ // The comparison is untrusted client input. Verify the candidate and S3 inventory anew.
+ const candidates=sssM3ResearchEvidenceCandidates();const candidate=candidates.queries&&candidates.queries.find(x=>x.query===review.query);
+ if(candidates.status!=='PROVISIONAL'||!candidate)throw Error('保存済み調査候補が変更されました。');
+ const normalized=sssM3RoleLedgerValidate_(review,comparison,candidate.article_ids);
+ const batch=sssM3BatchStatus();if(batch.status!=='COMPLETED'||batch.processed>5000)throw Error('S3記事台帳が未完成です。');
+ const inventory=sssM3BatchSheet_();if(inventory.getLastRow()!==batch.processed+1)throw Error('S3記事台帳が変更されました。');
+ const rows=inventory.getRange(2,1,batch.processed,5).getDisplayValues(),map=new Map();
+ for(const row of rows){if(row[0]!==batch.run_id||row[1]!==cfg.siteId)throw Error('記事台帳のサイト・実行IDが一致しません。');map.set(row[2],{url:row[3],title:row[4]});}
+ for(const a of comparison.articles){const actual=map.get(a.article_id);if(!actual||actual.url!==a.url||actual.title!==a.title)throw Error('記事台帳の内容が比較時点と一致しません。');}
+ // No SBM status snapshot is interpreted as permission. This is evidence-only.
+ const sh=sssM3RoleLedgerSheet_(),key=cfg.siteId+'|'+normalized.query+'|'+normalized.article_ids.slice().sort().join(',');
+ const lock=LockService.getDocumentLock();if(!lock||!lock.tryLock(20000))throw Error('保存ロックを取得できません。');
+ try{
+  const n=sh.getLastRow();if(n>10001)throw Error('役割判定の保存上限に達しました。');
+  if(n>1){const existing=sh.getRange(2,10,n-1,1).getDisplayValues().flat();if(existing.includes(key))return {status:'ALREADY_SAVED',count:normalized.reviews.length,publication_gate:'HOLD',content_action:'NONE'};}
+  const at=new Date().toISOString();const records=normalized.reviews.map(v=>[at,cfg.siteId,normalized.query,v.article_id,v.role,v.confidence,v.reason,JSON.stringify(v.next_evidence),'HOLD / NONE / PROVISIONAL',key]);
+  sh.getRange(n+1,1,records.length,10).setValues(records);
+  return {status:'SAVED',count:records.length,publication_gate:'HOLD',content_action:'NONE',sbm_status:'NOT_RECHECKED_READ_ONLY_ONLY'};
+ }finally{lock.releaseLock();}
+}
+function sssM3RoleLedgerPreview(){
+ const cfg=sssConfig_(),sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('S3_M3_記事役割判定');
+ if(!sh||sh.getLastRow()<2)return {status:'EMPTY',items:[],publication_gate:'HOLD',content_action:'NONE'};
+ const n=Math.min(sh.getLastRow()-1,300),rows=sh.getRange(sh.getLastRow()-n+1,1,n,10).getDisplayValues();
+ return {status:'PROVISIONAL',items:rows.filter(r=>r[1]===cfg.siteId).map(r=>({saved_at:r[0],query:r[2],article_id:r[3],role:r[4],confidence:r[5],decision:'HOLD'})),publication_gate:'HOLD',content_action:'NONE'};
+}
+
+
+// v0.1.172: read-only, fail-closed recheck of provisional role records.
+// A saved Claude role never authorizes a treatment or a referral.
+function sssM3RoleLiveJoin_(saved, states, checkedAt){
+ if(!saved||saved.status!=='PROVISIONAL'||saved.publication_gate!=='HOLD'||saved.content_action!=='NONE'||!Array.isArray(saved.items)||saved.items.length>300)throw Error('保存済み判定が不正です。');
+ if(!states||typeof states!=='object'||!checkedAt)throw Error('SBM最新状態を確認できません。');
+ const roles=['GENERAL','SPECIALIST','OVERLAP_SUSPECTED','EVIDENCE_NEEDED'], seen=new Set(), items=[];
+ for(const x of saved.items){
+  if(!x||!/^A\d{6}$/.test(x.article_id)||!x.query||!roles.includes(x.role)||!['PROVISIONAL','UNCONFIRMED'].includes(x.confidence))throw Error('保存済み役割判定の列が不正です。');
+  const key=x.query+'|'+x.article_id;if(seen.has(key))throw Error('同一検索語・記事IDの判定が重複しています。');seen.add(key);
+  const raw=Object.prototype.hasOwnProperty.call(states,x.article_id)?String(states[x.article_id]):'SBM未照合';
+  const classified=sssM3ClassifySbmState_(raw);
+  // UNKNOWN and ACTIVE always hold; KNOWN is also only research-eligible, never actionable.
+  const review=classified.kind==='ACTIVE'?'SBM処理中：追加調査のみ':classified.kind==='UNKNOWN'?'状態不明：安全保留':'読み取り専用調査可';
+  items.push({query:x.query,article_id:x.article_id,role:x.role,confidence:x.confidence,sbm_state:raw,review_status:review,publication_gate:'HOLD',content_action:'NONE'});
+ }
+ const counts={ACTIVE:0,UNKNOWN:0,KNOWN:0};for(const x of items)counts[sssM3ClassifySbmState_(x.sbm_state).kind]++;
+ return {format:'S3_M3_ROLE_LIVE_PREFLIGHT_V1',status:'PROVISIONAL',checked_at:checkedAt,counts,items,publication_gate:'HOLD',content_action:'NONE',limitations:['SBM状態は確認時点の値です。直後に変化する可能性があります。','保存済みのClaude判定は暫定的な調査結果です。SERP・全文・履歴日付の意味は未確定です。','改善・統合・新規記事・紹介状の発行は行いません。']};
+}
+function sssM3RoleLivePreview(){
+ const cfg=sssConfig_(),saved=sssM3RoleLedgerPreview();
+ if(saved.status==='EMPTY')return {format:'S3_M3_ROLE_LIVE_PREFLIGHT_V1',status:'EMPTY',items:[],publication_gate:'HOLD',content_action:'NONE'};
+ const connection=sssM1FindManagers_();
+ if(!connection.complete||connection.candidates.length!==1)throw Error('SBM連携先を一意に確認できません。');
+ const managerId=connection.candidates[0].id;sssCheckManagerIdentityForSetup_(managerId,cfg);
+ const sh=SpreadsheetApp.openById(managerId).getSheetByName('記事管理');
+ if(!sh||sh.getLastRow()<2||sh.getLastRow()>10001||sh.getLastColumn()>100)throw Error('SBM記事台帳の範囲が不正です。');
+ const values=sh.getRange(1,1,sh.getLastRow(),sh.getLastColumn()).getDisplayValues();
+ const articles=sssM1Articles_(values),ids=[...new Set(saved.items.map(x=>x.article_id))];
+ const states=sssM3StrategyLiveStates_(cfg.siteId,ids,articles);
+ return sssM3RoleLiveJoin_(saved,states,new Date().toISOString());
+}
+function sssM3RoleLiveDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;padding:18px;line-height:1.6;color:#222}button{background:#1765ad;color:white;border:0;border-radius:5px;padding:10px 16px}button:disabled{opacity:.5}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;text-align:left;padding:9px;vertical-align:top;overflow-wrap:anywhere}small{color:#555}</style><h3>保存済み記事役割とSBM状態を照合（試験）</h3><p>保存済み暫定判定とSBM記事管理の最新状態を読み取り専用で照合します。処置・紹介状は発行しません。</p><button id="go" onclick="run()">最新状態を照合</button><p id="status" role="status">開始待ち</p><p id="summary"></p><table><thead><tr><th>検索語・記事</th><th>役割</th><th>SBM状態</th><th>調査の扱い</th></tr></thead><tbody id="rows"></tbody></table><p><small id="limits"></small></p><button onclick="google.script.host.close()">閉じる</button><script>const e=id=>document.getElementById(id);function run(){e('go').disabled=true;e('status').textContent='SBMの最新状態を照合しています…';google.script.run.withSuccessHandler(x=>{e('go').disabled=false;e('rows').replaceChildren();if(!x||x.publication_gate!=='HOLD'||x.content_action!=='NONE'){e('status').textContent='安全停止：結果が不正です';return}if(x.status==='EMPTY'){e('status').textContent='保存済み判定がありません';return}if(x.status!=='PROVISIONAL'){e('status').textContent='安全停止：照合できません';return}e('status').textContent='照合完了（'+x.items.length+'記事・処置なし）';e('summary').textContent='SBM処理中 '+x.counts.ACTIVE+'件／状態不明 '+x.counts.UNKNOWN+'件／その他 '+x.counts.KNOWN+'件';x.items.forEach(r=>{const tr=document.createElement('tr');[r.query+' / '+r.article_id,r.role+' / '+r.confidence,r.sbm_state,r.review_status].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});e('rows').appendChild(tr)});e('limits').textContent=x.limitations.join('／')}).withFailureHandler(err=>{e('go').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3RoleLivePreview()}</script></html>`).setWidth(900).setHeight(680);
+ SpreadsheetApp.getUi().showModalDialog(html,'保存済み記事役割とSBM状態を照合（試験）');
+}
+
+
+
+/** v0.1.174: read-only M3 summary + saved roles, independently fail-closed. */
+function sssM3IntegratedJoin_(dashboard, roles) {
+ if (!roles || roles.publication_gate!=='HOLD' || roles.content_action!=='NONE' || !['EMPTY','PROVISIONAL'].includes(roles.status)) throw Error('記事役割の安全条件を確認できません。');
+ if (!dashboard || dashboard.content_action!=='NONE' || !['NOT_READY','READY'].includes(dashboard.status)) throw Error('総合診断の安全条件を確認できません。');
+ if (dashboard.status==='READY' && (dashboard.publication_gate!=='HOLD'||!Number.isSafeInteger(dashboard.article_count)||dashboard.article_count<0)) throw Error('総合診断の公開保留条件を確認できません。');
+ const entries=roles.status==='EMPTY'?[]:roles.items;
+ if (!Array.isArray(entries)||entries.length>300) throw Error('役割照合件数が不正です。');
+ const counts={ACTIVE:0,UNKNOWN:0,KNOWN:0};
+ const rows=entries.map(r=>{
+  if(!r||!/^A\d{6}$/.test(r.article_id)||!['GENERAL','SPECIALIST','OVERLAP_SUSPECTED','EVIDENCE_NEEDED'].includes(r.role)||!['PROVISIONAL','UNCONFIRMED'].includes(r.confidence)||r.publication_gate!=='HOLD'||r.content_action!=='NONE')throw Error('役割照合結果が不正です。');
+  const kind=sssM3ClassifySbmState_(r.sbm_state).kind;
+  counts[kind]++;
+  return {query:r.query,article_id:r.article_id,role:r.role,confidence:r.confidence,sbm_state:r.sbm_state,review_status:r.review_status,kind};
+ });
+ const priorities=sssM3ResearchPriorities_(rows);
+ const researchGaps=sssM3ResearchGaps_(rows);
+ return {format:'S3_M3_INTEGRATED_OVERVIEW_V1',status:'READ_ONLY',diagnosis_status:dashboard.status,article_count:dashboard.status==='READY'?dashboard.article_count:null,diagnosis_counts:dashboard.status==='READY'?dashboard.counts:null,diagnosis_reason:dashboard.status==='NOT_READY'?dashboard.reason:'',role_count:rows.length,role_counts:counts,roles:rows,priorities:priorities,priority_scope:'SAVED_ROLE_REVIEWS_ONLY',research_gaps:researchGaps,checked_at:roles.checked_at||'',publication_gate:'HOLD',content_action:'NONE',notice:'診断と役割は暫定評価です。SBM状態は取得時点の値です。記事処置・紹介状発行は行いません。'};
+}
+function sssM3IntegratedPreview(){
+ // The overall diagnostic can be unfinished; role recheck remains independently useful.
+ const dashboard=sssM3DashboardData();
+ const roles=sssM3RoleLivePreview();
+ return sssM3IntegratedJoin_(dashboard,roles);
+}
+function sssM3IntegratedDialog(){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;color:#202124;padding:20px;line-height:1.65}h3{margin-top:0}.lead{font-size:17px;font-weight:600;line-height:1.6}.kpis{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.kpi{background:#f6f7f9;border-radius:7px;padding:12px 16px;min-width:115px}.kpi b{display:block;font-size:22px}.section{border-top:1px solid #dadce0;padding-top:12px;margin-top:16px}details>summary{cursor:pointer;font-weight:600;padding:8px 0}button{background:#1765ad;color:white;border:0;border-radius:5px;padding:10px 16px;cursor:pointer}button:disabled{opacity:.5}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #ddd;padding:8px;overflow-wrap:anywhere}#summary{background:#f6f7f9;padding:12px;margin:12px 0}small{color:#555}footer{margin-top:18px}</style><p>総合診断の集計と、保存済み記事役割のSBM最新状態を一画面で確認します。読み取り専用です。</p><button id="run" onclick="run()">総合診断を開始</button><p id="status" role="status" aria-live="polite">開始待ち</p><section id="diagnosisReader" hidden aria-live="polite"><h4>今回の診断結果</h4><p id="diagnosisHeadline" class="lead"></p><div id="diagnosisKpis" class="kpis"></div><p id="diagnosisExplanation"></p><h4>サイト全体の成長推移</h4><p id="growthTrend">GSCの検証済みデータを照合します。</p><h4>優先調査候補（収益順位ではありません）</h4><div id="growthPriorities"></div><h4>見つかった課題</h4><p id="diagnosisIssues"></p><h4>成長機会の評価</h4><p id="diagnosisOpportunity"></p><h4>S3が次に行うこと</h4><p id="diagnosisNext"></p><p><small id="diagnosisSafety"></small></p></section><div id="readerNext" hidden><p id="readerNextStatus" role="status"></p></div><details class="section" id="technicalDetails"><summary>診断の根拠・記事別の詳細を表示</summary><section id="summary" hidden></section><h4>追加調査の優先順位</h4><p><small>優先順位は調査の順序です。改善の承認やSEO効果の予測ではありません。</small></p><table><thead><tr><th>順番</th><th>検索語・記事</th><th>調査テーマ</th><th>安全条件</th></tr></thead><tbody id="priority"></tbody></table><h4>調査進捗（保存済み判定ベース）</h4><p id="progress">未確認</p><h4>検索語別・未確認証拠の整理</h4><p><small>保存済み役割から作成した確認リストです。証拠取得完了やSEO判断を意味しません。</small></p><div id="gaps"></div><button type="button" id="copyGaps" onclick="copyGaps()" disabled>調査リストをコピー</button><p id="copyStatus" role="status"></p><h4>必要な追加調査</h4><p><small>不足証拠をまとめて確認します。SBMへの処置は行いません。</small></p><div id="next" hidden></div><p id="nextstatus" role="status" aria-live="polite"></p><h4>Claude精査の保存履歴</h4><p><small>保存履歴の集計です。最新の判断・改善優先順位ではありません。下段の従来役割とは別の暫定記録です。SBMの状態は下表で別途確認します。</small></p><p id="reviewStatus" role="status">未確認</p><div id="savedReviews"></div><h4>最新精査とSBM状態による調査順序</h4><p><small>調査順序であり改善優先順位ではありません。処置は保留です。</small></p><p id="latestStatus">未確認</p><div id="latestReviews"></div><h4>過去の暫定役割（参考）</h4><p><small>下表は従来の役割台帳です。新しいClaude精査の EVIDENCE_NEEDED は上の保存履歴に記録されますが、この表を自動上書きしません。双方が異なる場合、最新精査の不足証拠を優先して確認し、役割は確定しません。</small></p><table><thead><tr><th>検索語・記事</th><th>役割</th><th>SBM状態</th><th>扱い</th></tr></thead><tbody id="rows"></tbody></table><p><small id="note"></small></p></details><footer><button onclick="google.script.host.close()">閉じる</button></footer><script>const e=id=>document.getElementById(id);let selectedQuery='';let researchPackage=null;function copyGaps(){if(!researchPackage)return;const t=JSON.stringify(researchPackage,null,2);const box=document.createElement('textarea');box.value=t;box.style.position='fixed';box.style.left='-9999px';document.body.appendChild(box);box.select();const ok=document.execCommand('copy');box.remove();e('copyStatus').textContent=ok?'コピーしました！':'コピーできません。'}function run(){e('run').disabled=true;e('status').textContent='総合診断とSBM状態を確認中…';e('rows').replaceChildren();e('priority').replaceChildren();selectedQuery='';researchPackage=null;e('copyGaps').disabled=true;e('gaps').replaceChildren();e('copyStatus').textContent='';e('nextstatus').textContent='';e('summary').hidden=true;e('diagnosisReader').hidden=true;e('readerNext').hidden=true;e('next').hidden=true;google.script.run.withSuccessHandler(x=>{e('run').disabled=false;if(!x||x.format!=='S3_M3_INTEGRATED_OVERVIEW_V1'||x.status!=='READ_ONLY'||x.publication_gate!=='HOLD'||x.content_action!=='NONE'){e('status').textContent='安全停止：結果が不正です';return}e('status').textContent='統合確認完了（役割 '+x.role_count+'記事・処置なし）';e('latestStatus').textContent='最新精査とSBM状態を照合中…';e('latestReviews').replaceChildren();google.script.run.withSuccessHandler(v=>{if(!v||!['EMPTY','PROVISIONAL'].includes(v.status)||v.publication_gate!=='HOLD'||v.content_action!=='NONE'||!Array.isArray(v.items)){e('latestStatus').textContent='安全停止：照合結果が不正です';return}e('latestStatus').textContent=v.status==='EMPTY'?'精査対象なし':'検索語 '+v.items.length+'件（SBM状態は照合時点）';v.items.forEach((r,i)=>{const p=document.createElement('p');p.textContent=(i+1)+'. '+r.query+'／'+r.stage+'／重複疑い '+r.overlap_suspected+'件／SBM処理中 '+r.sbm_active+'件／状態不明 '+r.sbm_unknown+'件';e('latestReviews').appendChild(p)})}).withFailureHandler(err=>{e('latestStatus').textContent='安全停止：'+String(err&&err.message||err)}).sssM3ReviewLivePriority();e('reviewStatus').textContent='精査記録を読み込み中…';e('savedReviews').replaceChildren();google.script.run.withSuccessHandler(v=>{if(!v||!['EMPTY','PROVISIONAL'].includes(v.status)||v.publication_gate!=='HOLD'||v.content_action!=='NONE'||!Array.isArray(v.items)){e('reviewStatus').textContent='精査記録の安全条件が不一致です';return}e('reviewStatus').textContent=v.status==='EMPTY'?'保存済み精査記録はありません':'保存済み精査記録 '+v.items.length+'検索語（最大30件、履歴の一部）';v.items.forEach(r=>{const d=document.createElement('details');const h=document.createElement('summary');h.textContent=r.query+'／保存記録 '+r.count+'行';d.appendChild(h);const t=document.createElement('p');t.textContent='保存日時（表示値）：'+r.saved_at+'／役割内訳：'+Object.entries(r.roles).map(v=>v[0]+' '+v[1]).join('、')+'。重複保存・過去の精査を含む可能性があります。';d.appendChild(t);e('savedReviews').appendChild(d)})}).withFailureHandler(err=>{e('reviewStatus').textContent='精査記録を確認できません：'+String(err&&err.message||err)}).sssM3ResearchReviewSavedSummary();e('diagnosisReader').hidden=false;e('growthTrend').textContent='GSC推移を照合中…';e('growthPriorities').textContent='調査候補を照合中…';google.script.run.withSuccessHandler(g=>{if(!g||g.format!=='S3_GROWTH_STRATEGY_V1'||g.publication_gate!=='HOLD'||g.content_action!=='NONE'){e('growthTrend').textContent='成長分析の安全条件を確認できません';return}const s=g.site_growth;const fmt=n=>Number(n).toLocaleString('ja-JP');const pct=n=>n===null?'比較不可':(n*100).toFixed(1)+'%';e('growthTrend').textContent=s.status==='READY'?'GSC対象期間：'+s.period.start+' ～ '+s.period.end+'。直近30日：'+(s.last30.status==='READY'?'クリック '+fmt(s.last30.current.clicks)+'（前期比 '+pct(s.last30.clicks_change)+'）、表示 '+fmt(s.last30.current.impressions)+'（前期比 '+pct(s.last30.impressions_change)+'）':'比較期間不足')+'。収益額は未推定。':'成長推移は未判定：'+s.reason;const target=e('growthPriorities');target.replaceChildren();(g.research_priorities||[]).slice(0,5).forEach(r=>{const p=document.createElement('p');p.textContent=r.rank+'位：'+r.query+' ／ '+r.reason+'。'+(r.already_reviewed?'既存精査を再利用。':'追加証拠を確認。');target.appendChild(p)});if(!(g.research_priorities||[]).length)target.textContent='保存済み役割から調査候補は見つかりません。';const note=document.createElement('small');note.textContent='表示順は不足証拠の調査順です。収益改善の実行順ではありません。';target.appendChild(note);e('diagnosisOpportunity').textContent=g.revenue_ranking_reason;e('diagnosisNext').textContent=g.next_action;}).withFailureHandler(err=>{e('growthTrend').textContent='成長分析を取得できません：'+String(err&&err.message||err)}).sssGrowthStrategyPreview();const dc=x.diagnosis_counts||{};const n=x.article_count||0;const monitor=Number(dc.MONITORING||0),review=Number(dc.SEARCH_REVIEW||0),noTrigger=Number(dc.OBSERVED_NO_TRIGGER||0);const ready=x.diagnosis_status==='READY';e('diagnosisHeadline').textContent=ready?'今回の診断では、'+review+'記事に検索面の追加確認が必要です。':'サイト全体の診断データが不足しています。';const cards=[['診断対象',n],['検索面の要確認',review],['モニタリング区分',monitor]];e('diagnosisKpis').replaceChildren();cards.forEach(k=>{const d=document.createElement('div');d.className='kpi';const b=document.createElement('b');b.textContent=String(k[1]);const c=document.createElement('small');c.textContent=k[0];d.append(b,c);e('diagnosisKpis').appendChild(d)});e('diagnosisExplanation').textContent=ready?'今回の判定条件では'+noTrigger+'記事に改善トリガーが見つかりませんでした。ただし「問題なし」を意味しません。'+monitor+'記事はモニタリング区分です。':'診断できない理由：'+String(x.diagnosis_reason||'データ不足');e('diagnosisIssues').textContent=review?'検索意図・記事の役割を確認すべき記事が'+review+'件あります。複数の記事が同じ検索語で表示されても、それだけで競合とは断定できません。':'今回の条件では検索面の追加確認対象はありません。ただし未検出の課題がないことは保証しません。';e('diagnosisOpportunity').textContent='ブログ全体の成長率、検索需要の未開拓領域、収益改善余地は今回の分類結果だけでは判定できません。GSC推移や検索需要などを別途照合する必要があります。';e('diagnosisNext').textContent=review?'S3が不足証拠を調べ、記事の役割を整理します。調査対象はS3が優先順位付けします。':'現在の診断結果を保存し、GSC推移などの成長分析を追加します。';e('diagnosisSafety').textContent='安全条件：記事の修正・統合・公開は行いません。SBM処理中の記事は調査のみです。';e('summary').hidden=false;e('progress').textContent='保存済み記事役割 '+x.role_count+'件／追加証拠は未確定。GSCの短期キャッシュは調査画面で確認できます。';e('next').hidden=x.role_count===0;e('readerNext').hidden=x.role_count===0;if(x.research_gaps&&x.research_gaps.format==='S3_M3_RESEARCH_GAPS_V1'&&x.research_gaps.publication_gate==='HOLD'&&x.research_gaps.content_action==='NONE'&&Array.isArray(x.research_gaps.items)){researchPackage=x.research_gaps;e('copyGaps').disabled=x.research_gaps.items.length===0;const p=document.createElement('p');p.textContent='検索語 '+x.research_gaps.query_count+'件／役割 '+x.research_gaps.article_count+'記事。すべて追加証拠待ち。';e('gaps').appendChild(p);x.research_gaps.items.forEach(g=>{const d=document.createElement('details');const h=document.createElement('summary');h.textContent=g.query+'（'+g.article_count+'記事・'+g.stage+'）';d.appendChild(h);const para=document.createElement('p');para.textContent='記事 '+g.article_ids.join('、')+'／'+g.safety;d.appendChild(para);const ul=document.createElement('ul');g.checks.forEach(c=>{const li=document.createElement('li');li.textContent=c;ul.appendChild(li)});d.appendChild(ul);e('gaps').appendChild(d)})}else{e('gaps').textContent='調査状況を確認できません。'}e('summary').textContent=x.diagnosis_status==='READY'?'総合診断：'+x.article_count+'記事／区分 '+Object.entries(x.diagnosis_counts).map(v=>v[0]+' '+v[1]).join('、'):'総合診断：未完了（'+x.diagnosis_reason+'）。役割の照合結果は表示できます。';x.priorities.forEach((r,i)=>{const tr=document.createElement('tr');[String(i+1),r.query+' / '+r.article_id,r.research_topic,r.safety].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});tr.style.cursor='pointer';tr.title='この検索語を追加調査に指定';tr.onclick=()=>{selectedQuery=r.query;Array.from(e('priority').children).forEach(row=>row.style.background='');tr.style.background='#e8f0fe';e('nextstatus').textContent='調査対象：'+selectedQuery};e('priority').appendChild(tr)});if(x.priorities.length){selectedQuery=x.priorities[0].query;e('priority').firstElementChild.style.background='#e8f0fe';e('nextstatus').textContent='調査対象：'+selectedQuery}e('note').textContent='SBM処理中 '+x.role_counts.ACTIVE+'件／状態不明 '+x.role_counts.UNKNOWN+'件／その他 '+x.role_counts.KNOWN+'件。'+x.notice;x.roles.forEach(r=>{const tr=document.createElement('tr');[r.query+' / '+r.article_id,r.role+' / '+r.confidence,r.sbm_state,r.review_status].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});e('rows').appendChild(tr)})}).withFailureHandler(err=>{e('run').disabled=false;e('status').textContent='安全停止：'+String(err&&err.message||err)}).sssM3IntegratedPreview()}function openResearch(kind){if(!['evidence','timeline','comparison','workspace'].includes(kind))return;const buttons=[...e('next').querySelectorAll('button'),...e('readerNext').querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);e('nextstatus').textContent='追加調査画面を開いています…';e('readerNextStatus').textContent='追加調査画面を開いています…';google.script.run.withSuccessHandler(()=>{google.script.host.close()}).withFailureHandler(err=>{buttons.forEach(b=>b.disabled=false);e('nextstatus').textContent='画面を開けません：'+String(err&&err.message||err);e('readerNextStatus').textContent=e('nextstatus').textContent}).sssM3IntegratedOpenResearch(kind,selectedQuery)}</script>`).setWidth(960).setHeight(700);
+ SpreadsheetApp.getUi().showModalDialog(html,'ブログ総合診断');
+}
+
+
+
+/** v0.1.179: deterministic, read-only research gaps from SAVED roles only. */
+function sssM3ResearchGaps_(roles){
+ if(!Array.isArray(roles)||roles.length>300)throw Error('役割調査件数が不正です。');
+ const grouped=new Map(), seen=new Set();
+ roles.forEach(r=>{
+  if(!r||typeof r.query!=='string'||!r.query.trim()||r.query.length>500||!/^A\d{6}$/.test(r.article_id)||!['GENERAL','SPECIALIST','OVERLAP_SUSPECTED','EVIDENCE_NEEDED'].includes(r.role)||!['PROVISIONAL','UNCONFIRMED'].includes(r.confidence)||!['ACTIVE','UNKNOWN','KNOWN'].includes(r.kind))throw Error('記事役割の安全条件が不正です。');
+  const query=r.query.trim(),key=query+'\u0000'+r.article_id;
+  if(seen.has(key))throw Error('同一記事の役割が重複しています。');seen.add(key);
+  if(!grouped.has(query))grouped.set(query,[]);grouped.get(query).push(r);
+ });
+ const items=[...grouped].map(([query,rows])=>{
+  const ids=rows.map(r=>r.article_id).sort(),rolesSeen=[...new Set(rows.map(r=>r.role))];
+  const overlaps=rows.filter(r=>r.role==='OVERLAP_SUSPECTED').map(r=>r.article_id);
+  const active=rows.filter(r=>r.kind==='ACTIVE').map(r=>r.article_id);
+  const unknown=rows.filter(r=>r.kind==='UNKNOWN').map(r=>r.article_id);
+  const checks=['検索語×記事別のGSC実績と期間を確認','実SERPの検索意図を日時付きで確認','記事本文の重複範囲・固有範囲を確認','内部リンクとcanonical・インデックスを確認','SBM最新状態と改善履歴の意味を再確認'];
+  if(rows.length===1)checks[2]='当該記事の本文・検索意図を照合（競合は未判定）';
+  if(overlaps.length)checks.unshift('重複疑い記事の本文と専門性を優先比較');
+  const safety=active.length||unknown.length?'SBM処理中・状態不明を含むため記事処置は禁止':'証拠不足のため記事処置は禁止';
+  return {query,article_ids:ids,article_count:rows.length,roles:rolesSeen,overlap_suspected_ids:overlaps,active_article_ids:active,unknown_article_ids:unknown,checks,stage:'ADDITIONAL_EVIDENCE_REQUIRED',safety,publication_gate:'HOLD',content_action:'NONE'};
+ });
+ items.sort((a,b)=>Number(b.overlap_suspected_ids.length>0)-Number(a.overlap_suspected_ids.length>0)||b.article_count-a.article_count||a.query.localeCompare(b.query,'ja'));
+ return {format:'S3_M3_RESEARCH_GAPS_V1',source:'SAVED_ROLE_REVIEWS_ONLY',status:'PROVISIONAL',publication_gate:'HOLD',content_action:'NONE',query_count:items.length,article_count:roles.length,items,limitations:['役割は暫定。GSC短期キャッシュの有無は完了判定に使用しない','SERP・全文・検索意図の検証完了を意味しない','記事の修正・統合・新記事作成は行わない']};
+}
+/** v0.1.175: evidence-first research ordering, never a treatment recommendation. */
+function sssM3ResearchPriorities_(rows){
+ if(!Array.isArray(rows)||rows.length>300)throw Error('追加調査の入力件数が不正です。');
+ const seen=new Set();
+ return rows.map(r=>{
+  if(!r||!/^A\d{6}$/.test(r.article_id)||typeof r.query!=='string'||!r.query.trim()||!['GENERAL','SPECIALIST','OVERLAP_SUSPECTED','EVIDENCE_NEEDED'].includes(r.role)||!['PROVISIONAL','UNCONFIRMED'].includes(r.confidence)||!['ACTIVE','UNKNOWN','KNOWN'].includes(r.kind))throw Error('追加調査の対象が不正です。');
+  const key=r.query.trim()+'\u0000'+r.article_id;
+  if(seen.has(key))throw Error('追加調査の対象が重複しています。');seen.add(key);
+  const topic=r.role==='OVERLAP_SUSPECTED'?'本文の重複範囲・検索意図・SERPを照合':r.role==='EVIDENCE_NEEDED'?'不足する検索意図・本文・SERPを収集':r.role==='GENERAL'?'総合記事としての対象範囲と内部リンクを確認':'専門記事の固有範囲と流入検索語を確認';
+  // Unknown or actively managed articles are still read-only research targets.
+  const safety=r.kind==='ACTIVE'?'SBM処理中：調査のみ／処置保留':r.kind==='UNKNOWN'?'状態不明：調査のみ／処置保留':'調査のみ／処置保留';
+  const weight={OVERLAP_SUSPECTED:0,EVIDENCE_NEEDED:1,GENERAL:2,SPECIALIST:3}[r.role];
+  return {query:r.query,article_id:r.article_id,role:r.role,confidence:r.confidence,kind:r.kind,research_topic:topic,safety:safety,sort_weight:weight};
+ }).sort((a,b)=>a.sort_weight-b.sort_weight||a.query.localeCompare(b.query,'ja')||a.article_id.localeCompare(b.article_id)).map(({sort_weight,...r})=>r);
+}
+
+/** v0.1.176: navigation only; explicit user click, no automatic article actions. */
+
+/** v0.1.178: short-lived read-only evidence cache. Never caches SBM status or decisions. */
+function sssM3EvidenceCacheKey_(kind,siteId,query,period){
+ if(!['evidence','timeline'].includes(kind)||!siteId||!query||!period||!/^\d{4}-\d{2}-\d{2}$/.test(period.start)||!/^\d{4}-\d{2}-\d{2}$/.test(period.end))throw Error('証拠キャッシュの識別情報が不正です。');
+ const raw=kind+'|'+siteId+'|'+query+'|'+period.start+'|'+period.end;
+ const bytes=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,raw);
+ return 'S3M3_'+bytes.map(b=>('0'+(b&255).toString(16)).slice(-2)).join('');
+}
+function sssM3EvidenceCacheRead_(kind,siteId,query,period){
+ const key=sssM3EvidenceCacheKey_(kind,siteId,query,period),raw=CacheService.getScriptCache().get(key);
+ if(!raw)return null;
+ try{const x=JSON.parse(raw);if(x.kind!==kind||x.site_id!==siteId||x.query!==query||x.period.start!==period.start||x.period.end!==period.end||!x.payload||x.payload.publication_gate!=='HOLD'||x.payload.content_action!=='NONE')return null;return x.payload;}catch(_){return null;}
+}
+function sssM3EvidenceCachePut_(kind,siteId,query,period,payload){
+ if(!payload||payload.publication_gate!=='HOLD'||payload.content_action!=='NONE')return false;
+ const value=JSON.stringify({kind,site_id:siteId,query,period,payload});
+ if(value.length>85000)return false;
+ try{CacheService.getScriptCache().put(sssM3EvidenceCacheKey_(kind,siteId,query,period),value,600);return true;}catch(_){return false;}
+}
+function sssM3ResearchEvidenceCached(query,forceRefresh){
+ const q=String(query||'').trim(),c=sssConfig_(),ref=sssM1CompactRef_(c),period=sssM3GscPlan_(ref);
+ if(!period.available)throw Error(period.reason||'GSC期間を取得できません。');
+ // Always revalidate candidate and source before using a cache hit.
+ const candidates=sssM3ResearchEvidenceCandidates();if(candidates.status!=='PROVISIONAL'||!candidates.queries.some(x=>x.query===q))throw Error('保存済み調査候補に存在しません。');
+ const cached=!forceRefresh&&sssM3EvidenceCacheRead_('evidence',c.siteId,q,period);
+ if(cached)return Object.assign({},cached,{cache_status:'REUSED',cache_notice:'10分以内のGSC証拠を再利用。最新値が必要なら再取得してください。'});
+ const x=sssM3ResearchEvidenceCollect(q);if(x.site_id!==c.siteId||x.query!==q||x.period.start!==period.start||x.period.end!==period.end)throw Error('証拠の期間・サイトが一致しません。');
+ sssM3EvidenceCachePut_('evidence',c.siteId,q,period,x);
+ return Object.assign({},x,{cache_status:'LIVE',cache_notice:'GSCから取得。10分間のみ再利用可能です。'});
+}
+function sssM3ResearchTimelineCached(query,forceRefresh){
+ const q=String(query||'').trim(),c=sssConfig_(),ref=sssM1CompactRef_(c),period=sssM3GscPlan_(ref);
+ if(!period.available)throw Error(period.reason||'GSC期間を取得できません。');
+ const candidates=sssM3ResearchEvidenceCandidates();if(candidates.status!=='PROVISIONAL'||!candidates.queries.some(x=>x.query===q))throw Error('保存済み調査候補に存在しません。');
+ // The history is not guaranteed current: do not cache it; only GSC evidence is cached.
+ const cached=!forceRefresh&&sssM3EvidenceCacheRead_('timeline',c.siteId,q,period);
+ if(cached){const history=sssM3ResearchHistoryRead_(c.siteId,cached.per_article.map(x=>x.article_id));return Object.assign({},cached,{sbm_history:history,cache_status:'REUSED',cache_notice:'GSCは10分以内の値を再利用。SBM履歴は再取得しました。'});}
+ const x=sssM3ResearchTimelineCollect(q);
+ if(x.site_id!==c.siteId||x.query!==q||x.windows[0].period.start!==period.start||x.windows[1].period.end!==period.end)throw Error('期間・サイトが一致しません。');
+ const copy=Object.assign({},x);delete copy.sbm_history;
+ sssM3EvidenceCachePut_('timeline',c.siteId,q,period,copy);
+ return Object.assign({},x,{cache_status:'LIVE',cache_notice:'GSC・SBM履歴を取得しました。'});
+}
+function sssM3IntegratedResearchRoute_(kind){
+ const routes={evidence:'sssM3ResearchEvidenceDialog',timeline:'sssM3ResearchTimelineDialog',comparison:'sssM3BodyCompareDialog',workspace:'sssM3ResearchWorkspaceDialog'};
+ if(!Object.prototype.hasOwnProperty.call(routes,kind))throw Error('追加調査の画面指定が不正です。');
+ return routes[kind];
+}
+function sssM3IntegratedOpenResearch(kind,query){
+ const q=String(query||'').trim();if(q.length>500)throw Error('検索語が長すぎます。');
+ if(q){const c=sssM3ResearchEvidenceCandidates();if(c.status!=='PROVISIONAL'||!c.queries.some(r=>r.query===q))throw Error('保存済み調査候補にない検索語です。再度総合診断してください。');}
+ const name=sssM3IntegratedResearchRoute_(kind);
+ // No write operation is called. The target dialog still validates its own evidence.
+ if(name==='sssM3ResearchEvidenceDialog')sssM3ResearchEvidenceDialog(q);
+ else if(name==='sssM3ResearchTimelineDialog')sssM3ResearchTimelineDialog(q);
+ else if(name==='sssM3BodyCompareDialog')sssM3BodyCompareDialog(q);
+ else if(name==='sssM3ResearchWorkspaceDialog')sssM3ResearchWorkspaceDialog(q);
+ return {status:'OPENED',content_action:'NONE'};
+}
+
+
+/** v0.1.180: read-only, sequential research workflow. The client owns progression; each RPC is bounded. */
+function sssM3ResearchWorkspacePlan_(candidate,query){
+ if(!candidate||candidate.status!=='PROVISIONAL'||candidate.publication_gate!=='HOLD'||candidate.content_action!=='NONE'||!Array.isArray(candidate.queries))throw Error('保存済み調査候補の安全条件が不正です。');
+ const q=String(query||'').trim(),r=candidate.queries.find(x=>x.query===q);
+ if(!q||q.length>500||!r||!Array.isArray(r.article_ids)||r.article_ids.some(id=>!/^A\d{6}$/.test(id)))throw Error('検索語・記事IDが保存済み候補と一致しません。');
+ const ids=[...new Set(r.article_ids)];
+ return {format:'S3_M3_RESEARCH_WORKSPACE_PLAN_V1',query:q,site_id:candidate.site_id,article_ids:ids,compare_ids:ids.slice(0,3),steps:['GSC_EXACT_QUERY','GSC_PERIOD_AND_SBM_HISTORY',...(ids.length>=2?['PUBLIC_BODY_PARTIAL']:[])],publication_gate:'HOLD',content_action:'NONE',status:'PROVISIONAL'};
+}
+function sssM3ResearchWorkspacePlan(query){return sssM3ResearchWorkspacePlan_(sssM3ResearchEvidenceCandidates(),query);}
+function sssM3ResearchWorkspaceDialog(initialQuery){
+ const html=HtmlService.createHtmlOutput(`<!doctype html><html lang="ja"><meta charset="utf-8"><style>body{font:14px Arial,sans-serif;color:#202124;padding:20px;line-height:1.6}button{background:#1765ad;color:white;border:0;border-radius:5px;padding:9px 14px;cursor:pointer;margin-right:8px}button:disabled{opacity:.5}select{width:100%;padding:8px;box-sizing:border-box}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto;background:#f5f6f8;padding:12px}li{margin:8px 0}footer{border-top:1px solid #ddd;margin-top:16px;padding-top:12px}footer button{background:white;color:#222;border:1px solid #bbb}</style><h3>追加調査</h3><p>GSC実績・期間別実績とSBM履歴・公開HTMLの部分本文を順番に読み取り専用で確認します。各工程は個別に終了し、途中失敗でも取得済み結果を表示します。</p><label>検索語<select id="query" disabled><option>候補を読み込み中…</option></select></label><p><button id="run" disabled>不足証拠を収集・確認</button><button id="copy" disabled style="display:none">結果JSONをコピー</button><button id="audit" disabled style="display:none">証拠の充足状況を確認</button><button id="prompt" disabled>Claude精査依頼文をコピー</button></p><p id="status" role="status">開始待ち</p><ol id="steps"></ol><details><summary>証拠の監査結果（詳細）</summary><pre id="auditResult"></pre></details><section id="reviewSection" hidden><h4>Claude精査結果の検証（処置なし）</h4><textarea id="reviewJson" style="width:100%;height:130px;box-sizing:border-box" placeholder="Claude回答JSONを貼り付け"></textarea><p><button id="verifyReview">回答を検証する</button><button id="saveReview" disabled>検証済み結果を保存</button></p><details><summary>検証結果（詳細）</summary><pre id="reviewResult"></pre></details></section><details><summary>収集データ（詳細）</summary><pre id="result"></pre></details><p><small>収集結果は画面内に保持します。検証後に保存ボタンを押した場合のみS3専用精査台帳へ暫定結果を記録します。記事・SBM・Evidenceは変更しません。検索意図・SERP・全文は未確認です。処置は常にHOLDです。</small></p><footer><button id="back">総合診断へ戻る</button><button onclick="google.script.host.close()">閉じる</button></footer><script>const desired=${JSON.stringify(String(initialQuery||''))};const e=id=>document.getElementById(id);let report=null;let audit=null;let busy=false;let verifiedReview=null;function note(t){const li=document.createElement('li');li.textContent=t;e('steps').appendChild(li)}function fail(msg){busy=false;e('run').disabled=false;e('status').textContent='安全停止：'+msg;show()}function show(){if(!report)return;e('result').textContent=JSON.stringify(report,null,2);e('copy').disabled=false;e('audit').disabled=false}google.script.run.withSuccessHandler(x=>{if(!x||x.status!=='PROVISIONAL'||x.publication_gate!=='HOLD'||x.content_action!=='NONE'){fail('保存済み候補を確認できません');return}const sel=e('query');sel.replaceChildren();x.queries.forEach(r=>{const o=document.createElement('option');o.value=r.query;o.textContent=r.query;sel.appendChild(o)});if(desired&&Array.from(sel.options).some(o=>o.value===desired))sel.value=desired;sel.disabled=false;e('run').disabled=false;e('status').textContent='検索語を選んで開始してください。';if(desired&&sel.value===desired){e('status').textContent='保存済み証拠を照合しています…';e('run').click()}}).withFailureHandler(err=>fail(String(err&&err.message||err))).sssM3ResearchEvidenceCandidates();e('run').onclick=()=>{if(busy)return;busy=true;e('run').disabled=true;e('copy').disabled=true;e('audit').disabled=true;e('prompt').disabled=true;audit=null;verifiedReview=null;e('saveReview').disabled=true;e('auditResult').textContent='';e('reviewSection').hidden=true;e('reviewResult').textContent='';e('steps').replaceChildren();e('result').textContent='';const query=e('query').value;report={format:'S3_M3_RESEARCH_WORKSPACE_RESULT_V1',query,publication_gate:'HOLD',content_action:'NONE',status:'PARTIAL',steps:[],limitations:['SERPと検索意図は未検証','本文は公開HTMLの部分抽出','SBM状態と履歴は取得時点の値','記事処置は行わない']};e('status').textContent='調査計画を照合しています…';google.script.run.withSuccessHandler(plan=>{if(!plan||plan.format!=='S3_M3_RESEARCH_WORKSPACE_PLAN_V1'||plan.query!==query||plan.publication_gate!=='HOLD'||plan.content_action!=='NONE'){fail('調査計画の安全条件が不正です');return}report.site_id=plan.site_id;report.article_ids=plan.article_ids;const tasks=[{name:'GSC_EXACT_QUERY',method:'sssM3ResearchEvidenceCached',args:[query,false]},{name:'GSC_PERIOD_AND_SBM_HISTORY',method:'sssM3ResearchTimelineCached',args:[query,false]}];if(plan.compare_ids.length>=2)tasks.push({name:'PUBLIC_BODY_PARTIAL',method:'sssM3BodyCompareCollect',args:[query,plan.compare_ids]});let i=0;const next=()=>{if(i===tasks.length){busy=false;report.status=report.steps.every(x=>x.status==='OK')?'COLLECTED_PARTIAL_EVIDENCE':'PARTIAL';e('status').textContent='照合終了（'+report.steps.filter(x=>x.status==='OK').length+'/'+tasks.length+'工程）。記事処置なし。';e('run').disabled=false;show();e('audit').click();return}const t=tasks[i++];e('status').textContent='証拠を確認しています（'+i+'/'+tasks.length+'）：'+t.name;const ok=x=>{if(!x||x.publication_gate!=='HOLD'||x.content_action!=='NONE'||x.query!==query){report.steps.push({name:t.name,status:'REJECTED',reason:'安全条件・検索語が不一致'});note(t.name+'：安全条件不一致');next();return}report.steps.push({name:t.name,status:'OK',data:x});note(t.name+'：取得完了'+(x.cache_status?'（'+x.cache_status+'）':''));show();next()};const bad=err=>{report.steps.push({name:t.name,status:'FAILED',reason:String(err&&err.message||err).slice(0,300)});note(t.name+'：取得失敗（他の工程を継続）');show();next()};const rpc=google.script.run.withSuccessHandler(ok).withFailureHandler(bad);if(t.method==='sssM3ResearchEvidenceCached')rpc.sssM3ResearchEvidenceCached(...t.args);else if(t.method==='sssM3ResearchTimelineCached')rpc.sssM3ResearchTimelineCached(...t.args);else rpc.sssM3BodyCompareCollect(...t.args)};next()}).withFailureHandler(err=>fail(String(err&&err.message||err))).sssM3ResearchWorkspacePlan(query)};e('audit').onclick=()=>{if(!report||busy)return;const minimal={format:report.format,site_id:report.site_id,query:report.query,article_ids:report.article_ids,publication_gate:report.publication_gate,content_action:report.content_action,steps:report.steps.map(x=>({name:x.name,status:x.status,data:x.status==='OK'?{query:x.data.query,site_id:x.data.site_id,publication_gate:x.data.publication_gate,content_action:x.data.content_action}:undefined}))};e('audit').disabled=true;e('status').textContent='証拠の充足状況を検査しています…';google.script.run.withSuccessHandler(x=>{audit=x;verifiedReview=null;e('saveReview').disabled=true;e('auditResult').textContent=JSON.stringify(x,null,2);e('prompt').disabled=false;e('reviewSection').hidden=false;e('audit').disabled=false;e('status').textContent='証拠監査完了。判定は暫定・処置は保留です。'}).withFailureHandler(err=>{e('audit').disabled=false;e('status').textContent='証拠監査失敗：'+String(err&&err.message||err)}).sssM3ResearchAudit(minimal)};e('prompt').onclick=()=>{if(!audit||!report)return;const prompt='以下のS3読み取り専用証拠について、記事の役割・検索意図の仮説・不足証拠を慎重に精査してください。SERP未取得、部分本文、SBM状態の変動に注意し、統合・修正・公開の指示は出さず、HOLD/NONEのまま返答してください。\\n\\n【証拠監査】\\n'+JSON.stringify(audit,null,2)+'\\n\\n【収集結果】\\n'+JSON.stringify(report,null,2)+'\\n\\n【回答形式】\\n'+JSON.stringify({format:'S3_M3_RESEARCH_REVIEW_V1',site_id:audit.site_id,query:audit.query,publication_gate:'HOLD',content_action:'NONE',reviews:audit.article_ids.map(id=>({article_id:id,role:'EVIDENCE_NEEDED',confidence:'PROVISIONAL',reason:'根拠と制約を記載',next_evidence:['追加調査事項']}))},null,2);const t=document.createElement('textarea');t.value=prompt;t.style.position='fixed';t.style.left='-9999px';document.body.appendChild(t);t.select();const ok=document.execCommand('copy');t.remove();e('status').textContent=ok?'Claude精査依頼文をコピーしました！':'コピーできません。'};e('verifyReview').onclick=()=>{if(!audit||busy)return;verifiedReview=null;e('saveReview').disabled=true;let obj;try{obj=JSON.parse(e('reviewJson').value)}catch(err){e('reviewResult').textContent='JSONの形式が不正です：'+err.message;return}e('verifyReview').disabled=true;e('reviewResult').textContent='検証中…';google.script.run.withSuccessHandler(x=>{e('verifyReview').disabled=false;e('reviewResult').textContent=JSON.stringify(x,null,2);if(!x||x.format!=='S3_M3_RESEARCH_REVIEW_VALIDATED_V1'||x.site_id!==audit.site_id||x.query!==audit.query||x.publication_gate!=='HOLD'||x.content_action!=='NONE'||x.saved!==false||!Array.isArray(x.reviews)||x.reviews.length!==audit.article_ids.length){e('status').textContent='安全停止：検証結果の契約が不一致です';return}verifiedReview=obj;e('saveReview').disabled=false;e('status').textContent='Claude回答の検証完了（暫定・未保存・処置なし）'}).withFailureHandler(err=>{e('verifyReview').disabled=false;e('reviewResult').textContent='検証拒否：'+String(err&&err.message||err)}).sssM3ResearchReviewValidate(audit,obj)};e('saveReview').onclick=()=>{if(!audit||!verifiedReview||busy)return;e('saveReview').disabled=true;e('status').textContent='調査候補を再照合してS3専用台帳へ保存しています…';google.script.run.withSuccessHandler(x=>{e('reviewResult').textContent=JSON.stringify(x,null,2);e('status').textContent=x&&x.status==='SAVED'?'S3へ暫定精査結果を保存しました。記事処置なし。':x&&x.status==='ALREADY_SAVED'?'同じ精査結果は保存済みです。':'保存応答を確認できません。台帳を確認してください。'}).withFailureHandler(err=>{e('status').textContent='保存を安全停止：'+String(err&&err.message||err);e('saveReview').disabled=false}).sssM3ResearchReviewSave(audit,verifiedReview)};e('copy').onclick=()=>{if(!report)return;const t=document.createElement('textarea');t.value=JSON.stringify(report,null,2);t.style.position='fixed';t.style.left='-9999px';document.body.appendChild(t);t.select();const ok=document.execCommand('copy');t.remove();e('status').textContent=ok?'コピーしました！':'コピーできません。'};e('back').onclick=()=>{if(busy)return;e('back').disabled=true;google.script.run.withSuccessHandler(()=>google.script.host.close()).withFailureHandler(err=>{e('back').disabled=false;e('status').textContent=String(err&&err.message||err)}).sssM3IntegratedDialog()};</script>`).setWidth(900).setHeight(700);
+ SpreadsheetApp.getUi().showModalDialog(html,'追加調査');
+}
+
+
+/** v0.1.181: deterministic evidence audit; NEVER converts partial evidence into a treatment decision. */
+function sssM3ResearchAudit_(report){
+ if(!report||report.format!=='S3_M3_RESEARCH_WORKSPACE_RESULT_V1'||report.publication_gate!=='HOLD'||report.content_action!=='NONE'||typeof report.query!=='string'||!report.query.trim()||!Array.isArray(report.steps)||!Array.isArray(report.article_ids))throw Error('調査結果の形式・安全条件が不正です。');
+ const allowed=['GSC_EXACT_QUERY','GSC_PERIOD_AND_SBM_HISTORY','PUBLIC_BODY_PARTIAL'];
+ const seen={};const issues=[];const completed=[];
+ report.steps.forEach(step=>{if(!step||!allowed.includes(step.name)||seen[step.name])throw Error('調査工程の重複または不正な工程です。');seen[step.name]=true;if(step.status==='OK'){
+  if(!step.data||step.data.query!==report.query||step.data.publication_gate!=='HOLD'||step.data.content_action!=='NONE'||(step.data.site_id&&report.site_id&&step.data.site_id!==report.site_id))throw Error('証拠の検索語・サイト・安全条件が不一致です。');completed.push(step.name);
+ }else if(['FAILED','REJECTED'].includes(step.status)){issues.push(step.name+' の取得が未完了');}else throw Error('調査工程の状態が不正です。');});
+ if(!seen.GSC_EXACT_QUERY)issues.push('検索語別GSC証拠が未取得');
+ if(!seen.GSC_PERIOD_AND_SBM_HISTORY)issues.push('期間別GSCとSBM履歴が未取得');
+ if(report.article_ids.length>=2&&!seen.PUBLIC_BODY_PARTIAL)issues.push('記事本文の比較証拠が未取得');
+ issues.push('実際のSERP・検索意図は未確認','公開本文は部分取得であり全文確認ではない','SBMの処置直前の最新状態は未照合');
+ return {format:'S3_M3_RESEARCH_AUDIT_V1',site_id:report.site_id||'',query:report.query,article_ids:report.article_ids.slice(0,100),completed_steps:completed,missing_evidence:issues,readiness:issues.length>3?'EVIDENCE_INCOMPLETE':'REVIEW_READY_PROVISIONAL',confidence:'PROVISIONAL',publication_gate:'HOLD',content_action:'NONE',next_action:'CLAUDE_REVIEW_ONLY'};
+}
+function sssM3ResearchAudit(report){return sssM3ResearchAudit_(report);}
+
+
+/** v0.1.182: bounded, fail-closed Claude research response validation, no persistence or article actions. */
+function sssM3ResearchReviewValidate_(audit, response){
+ if(!audit||audit.format!=='S3_M3_RESEARCH_AUDIT_V1'||audit.publication_gate!=='HOLD'||audit.content_action!=='NONE'||!audit.query||!Array.isArray(audit.article_ids))throw Error('元の証拠監査が不正です。');
+ if(!response||response.format!=='S3_M3_RESEARCH_REVIEW_V1'||response.publication_gate!=='HOLD'||response.content_action!=='NONE'||response.site_id!==audit.site_id||response.query!==audit.query||!Array.isArray(response.reviews))throw Error('Claude回答の契約・サイト・検索語が不一致です。');
+ if(!audit.article_ids.length||audit.article_ids.length>20||response.reviews.length!==audit.article_ids.length)throw Error('対象記事数が一致しません。');
+ const allowedRoles=['GENERAL','SPECIALIST','OVERLAP_SUSPECTED','EVIDENCE_NEEDED'];
+ const known=new Set(audit.article_ids),seen=new Set();const rows=[];
+ response.reviews.forEach(r=>{
+  if(!r||typeof r.article_id!=='string'||!known.has(r.article_id)||seen.has(r.article_id)||!allowedRoles.includes(r.role)||r.confidence!=='PROVISIONAL'||typeof r.reason!=='string'||!r.reason.trim()||r.reason.length>4000||!Array.isArray(r.next_evidence)||r.next_evidence.length>15||r.next_evidence.some(v=>typeof v!=='string'||v.length>500))throw Error('記事ID・役割・暫定判定・追加証拠が不正です。');
+  seen.add(r.article_id);rows.push({article_id:r.article_id,role:r.role,confidence:'PROVISIONAL',reason:r.reason,next_evidence:r.next_evidence.slice()});
+ });
+ if(audit.article_ids.some(id=>!seen.has(id)))throw Error('対象記事の回答が不足しています。');
+ return {format:'S3_M3_RESEARCH_REVIEW_VALIDATED_V1',site_id:audit.site_id,query:audit.query,reviews:rows,missing_evidence:audit.missing_evidence||[],decision:'RESEARCH_ONLY',confidence:'PROVISIONAL',publication_gate:'HOLD',content_action:'NONE',saved:false,limitations:['検索意図・SERP・全文は未検証','SBM状態は処置前に再照合が必要','記事処置・紹介状は作成しない']};
+}
+function sssM3ResearchReviewValidate(audit,response){return sssM3ResearchReviewValidate_(audit,response);}
+
+
+/** v0.1.185: save only provisional research reviews in an isolated S3 ledger. */
+function sssM3ResearchReviewSave_(audit,response,candidate,cfg,ss,lock){
+ const verified=sssM3ResearchReviewValidate_(audit,response);
+ if(!cfg||!cfg.siteId||cfg.siteId!==verified.site_id)throw Error('現在のサイトと精査結果が一致しません。');
+ if(!candidate||candidate.status!=='PROVISIONAL'||candidate.publication_gate!=='HOLD'||candidate.content_action!=='NONE'||!Array.isArray(candidate.queries))throw Error('最新の調査候補を確認できません。');
+ const found=candidate.queries.find(x=>x.query===verified.query);
+ if(!found||!Array.isArray(found.article_ids)||found.article_ids.length!==verified.reviews.length||found.article_ids.some(id=>!audit.article_ids.includes(id)))throw Error('調査対象記事が変更されました。保存せず停止します。');
+ if(!ss||!lock||!lock.tryLock(10000))throw Error('保存先または保存ロックを確認できません。');
+ try{
+  const name='S3_M3_精査記録',headers=['保存日時','サイトID','検索語','記事ID','役割','確信度','理由','追加証拠','不足証拠','安全条件','保存キー'];
+  let sh=ss.getSheetByName(name);
+  if(!sh){sh=ss.insertSheet(name);sh.getRange(1,1,1,headers.length).setValues([headers]);sh.setFrozenRows(1);}
+  else if(sh.getLastColumn()<headers.length||sh.getRange(1,1,1,headers.length).getDisplayValues()[0].some((v,i)=>v!==headers[i]))throw Error('精査記録の列構成が不一致です。上書きしません。');
+  const n=sh.getLastRow();if(n>10000||n+verified.reviews.length>10001)throw Error('精査記録の上限に達しました。');
+  const key=verified.site_id+'|'+verified.query+'|'+verified.reviews.map(x=>x.article_id+':'+x.role+':'+x.reason+':'+JSON.stringify(x.next_evidence)).sort().join('|');
+  if(n>1&&sh.getRange(2,11,n-1,1).getDisplayValues().some(r=>r[0]===key))return {status:'ALREADY_SAVED',count:verified.reviews.length,publication_gate:'HOLD',content_action:'NONE'};
+  const at=new Date().toISOString(),rows=verified.reviews.map(x=>[at,verified.site_id,verified.query,x.article_id,x.role,'PROVISIONAL',x.reason,JSON.stringify(x.next_evidence),JSON.stringify(verified.missing_evidence),'HOLD / NONE / RESEARCH_ONLY',key]);
+  sh.getRange(n+1,1,rows.length,headers.length).setValues(rows);
+  return {status:'SAVED',count:rows.length,publication_gate:'HOLD',content_action:'NONE',limitations:['Claude回答の内容的な真偽は未確認','記事変更・紹介状・SBM更新は行わない']};
+ }finally{lock.releaseLock();}
+}
+function sssM3ResearchReviewSave(audit,response){
+ const cfg=sssConfig_(),candidate=sssM3ResearchEvidenceCandidates();
+ return sssM3ResearchReviewSave_(audit,response,candidate,cfg,SpreadsheetApp.getActiveSpreadsheet(),LockService.getDocumentLock()||LockService.getScriptLock());
+}
+function sssM3ResearchReviewSavedSummary(){
+ const cfg=sssConfig_(),ss=SpreadsheetApp.getActiveSpreadsheet(),sh=ss&&ss.getSheetByName('S3_M3_精査記録');
+ if(!sh||sh.getLastRow()<2)return {status:'EMPTY',items:[],publication_gate:'HOLD',content_action:'NONE'};
+ const n=Math.min(sh.getLastRow()-1,500),rows=sh.getRange(sh.getLastRow()-n+1,1,n,11).getDisplayValues(),map=new Map();
+ rows.forEach(r=>{if(r[1]!==cfg.siteId||r[9]!=='HOLD / NONE / RESEARCH_ONLY')return;const k=r[2];if(!map.has(k))map.set(k,{query:k,saved_at:r[0],count:0,roles:{GENERAL:0,SPECIALIST:0,OVERLAP_SUSPECTED:0,EVIDENCE_NEEDED:0}});const item=map.get(k);item.count++;if(Object.prototype.hasOwnProperty.call(item.roles,r[4]))item.roles[r[4]]++;});
+ return {status:'PROVISIONAL',items:Array.from(map.values()).slice(0,30),publication_gate:'HOLD',content_action:'NONE',note:'保存履歴の集計。最新SBM状態・SERP・本文全文は未検証。処置の優先順位ではない。'};
+}
+
+
+/** v0.1.185: latest complete review per query; incomplete ledger tails never become a recommendation. */
+function sssM3ReviewLatestJoin_(saved,live,siteId){
+ if(!saved||!Array.isArray(saved.rows)||saved.rows.length>10000||!siteId)throw Error('精査台帳の範囲・サイトが不正です。');
+ if(!live||live.status!=='PROVISIONAL'||live.publication_gate!=='HOLD'||live.content_action!=='NONE'||!Array.isArray(live.items))throw Error('SBM照合が未完了です。');
+ const allowed=new Set(['GENERAL','SPECIALIST','OVERLAP_SUSPECTED','EVIDENCE_NEEDED']);
+ const byQuery=new Map();
+ saved.rows.forEach((r,i)=>{
+  if(!Array.isArray(r)||r.length<11||r[1]!==siteId)return;
+  if(r[9]!=='HOLD / NONE / RESEARCH_ONLY'||!/^A\d{6}$/.test(r[3])||!allowed.has(r[4])||r[5]!=='PROVISIONAL'||!r[10])return;
+  const q=String(r[2]);if(!q||q.length>300)return;
+  if(!byQuery.has(q))byQuery.set(q,new Map());
+  const batches=byQuery.get(q);if(!batches.has(r[10]))batches.set(r[10],{key:r[10],at:r[0],index:i,rows:[]});
+  const b=batches.get(r[10]);b.rows.push(r);b.index=Math.max(b.index,i);
+ });
+ const liveByQuery=new Map();live.items.forEach(r=>{if(!liveByQuery.has(r.query))liveByQuery.set(r.query,new Map());liveByQuery.get(r.query).set(r.article_id,r)});
+ const result=[];
+ for(const [q,articles] of liveByQuery){
+  const batches=Array.from((byQuery.get(q)||new Map()).values()).sort((a,b)=>b.index-a.index);
+  const selected=batches.find(b=>b.rows.length===articles.size&&new Set(b.rows.map(r=>r[3])).size===articles.size&&b.rows.every(r=>articles.has(r[3])));
+  const statuses=Array.from(articles.values());const active=statuses.filter(r=>sssM3ClassifySbmState_(r.sbm_state).kind==='ACTIVE').length;
+  const unknown=statuses.filter(r=>sssM3ClassifySbmState_(r.sbm_state).kind==='UNKNOWN').length;
+  const overlap=selected?selected.rows.filter(r=>r[4]==='OVERLAP_SUSPECTED').length:0;
+  const stage=!selected?'ADDITIONAL_REVIEW_REQUIRED':active?'SBM_ACTIVE_HOLD':unknown?'SBM_UNKNOWN_HOLD':'RESEARCH_REVIEWED_PROVISIONAL';
+  result.push({query:q,article_ids:Array.from(articles.keys()).sort(),reviewed:!!selected,reviewed_at:selected?selected.at:'',overlap_suspected:overlap,sbm_active:active,sbm_unknown:unknown,stage,priority_group:!selected?1:(active||unknown?3:(overlap?2:4)),publication_gate:'HOLD',content_action:'NONE'});
+ }
+ result.sort((a,b)=>a.priority_group-b.priority_group||a.query.localeCompare(b.query,'ja'));
+ return {format:'S3_M3_REVIEW_LIVE_PRIORITY_V1',status:'PROVISIONAL',items:result,checked_at:live.checked_at||'',publication_gate:'HOLD',content_action:'NONE',notice:'優先順位は追加調査の順序のみ。保存履歴とSBM状態を照合。SERP・全文は未確認。記事処置なし。'};
+}
+function sssM3ReviewLivePriority(){
+ const cfg=sssConfig_(),ss=SpreadsheetApp.getActiveSpreadsheet(),sh=ss&&ss.getSheetByName('S3_M3_精査記録');
+ const live=sssM3RoleLivePreview();
+ if(live.status==='EMPTY')return {format:'S3_M3_REVIEW_LIVE_PRIORITY_V1',status:'EMPTY',items:[],publication_gate:'HOLD',content_action:'NONE'};
+ let rows=[];
+ if(sh&&sh.getLastRow()>1){if(sh.getLastRow()>10001||sh.getLastColumn()<11)throw Error('精査台帳の範囲が不正です。');rows=sh.getRange(2,1,sh.getLastRow()-1,11).getDisplayValues();}
+ return sssM3ReviewLatestJoin_({rows},live,cfg.siteId);
 }

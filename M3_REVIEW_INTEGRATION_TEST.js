@@ -1,0 +1,1 @@
+const fs=require('fs'),assert=require('assert');const code=fs.readFileSync(__dirname+'/Code.gs','utf8');assert(code.includes('id="savedReviews"'));assert(code.includes('sssM3ResearchReviewSavedSummary();'));assert(code.includes("getDisplayValues().some(r=>r[0]===key)"));assert(!code.includes('getDisplayValues().includes(key)'));console.log('M3 review integration checks PASS');

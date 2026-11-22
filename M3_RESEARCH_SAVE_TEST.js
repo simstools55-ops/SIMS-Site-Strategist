@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const s=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const start=s.indexOf('function sssM3ResearchSave_(plan,answerText,livePlan){');
+const end=s.indexOf('\nfunction sssM3ResearchSave(plan,answerText){',start);
+assert(start>0&&end>start);
+const rows=[],sheet={getLastColumn:()=>9,getRange:(r,c,n,w)=>({getValues:()=>r===1?[['保存日時','サイトID','SBM確認日時','検索語','観測記事ID','追加確認事項','保留理由','判定','保存キー']]:rows.map(x=>[x[8]]),setValues:v=>rows.push(...v)}),getLastRow:()=>rows.length+1};
+const ctx={sssM3StrategyResearchValidate_:()=>({site_id:'site123',count:1,reviews:[{query:'q',observed_article_ids:['A000001'],evidence_needed:['SERP'],reason:'不足'}]}),sssConfig_:()=>({siteId:'site123'}),SpreadsheetApp:{getActiveSpreadsheet:()=>({getSheetByName:()=>sheet})},LockService:{getDocumentLock:()=>({tryLock:()=>true,releaseLock:()=>{}})},Utilities:{DigestAlgorithm:{SHA_256:'SHA_256'},computeDigest:()=>[1,2,3]}};
+vm.createContext(ctx);vm.runInContext(s.slice(start,end),ctx);
+const plan={format:'S3_M3_STRATEGY_RESEARCH_PLAN_V1',site_id:'site123',checked_at:'now',publication_gate:'HOLD',content_action:'NONE',selected:[{query:'q',observed_article_ids:['A000001'],sbm_states:[{id:'A000001',state:'未着手'}]}]};
+assert.equal(ctx.sssM3ResearchSave_(plan,'{}',plan).status,'SAVED');assert.equal(ctx.sssM3ResearchSave_(plan,'{}',plan).status,'ALREADY_SAVED');
+const changed=JSON.parse(JSON.stringify(plan));changed.selected[0].sbm_states[0].state='モニター中';assert.throws(()=>ctx.sssM3ResearchSave_(plan,'{}',changed));
+console.log('M3_RESEARCH_SAVE_TEST OK');

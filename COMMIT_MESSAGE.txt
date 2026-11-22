@@ -1,1 +1,1 @@
-feat(s3): add read-only M1 article inventory reconciliation
+feat(s3): validate read-only SBM state feedback contract

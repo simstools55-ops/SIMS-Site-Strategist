@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const s=fs.readFileSync(__dirname+'/Code.gs','utf8'),ctx={Map,Set,String,Number,Error,Array};vm.createContext(ctx);
+vm.runInContext(s.slice(s.indexOf('function sssM3ClassifySbmState_'),s.indexOf('function sssM3HealthReviewPreview')),ctx);
+const f=ctx.sssM3HealthReviewTriage_;
+const row=(id,ev,clicks,impressions,state='未着手')=>({article_id:id,evidence_status:ev,clicks,impressions,page_rows:clicks===null?0:1,state});
+const data={format:'S3_M3_ARTICLE_HEALTH_JOIN_V1',status:'VALIDATED',coverage:'ALL_STAGED_PAGES',article_count:6,articles:[row('A','OBSERVED_IMPRESSIONS',0,120),row('B','OBSERVED_IMPRESSIONS',0,120,'モニター中'),row('C','NO_GSC_URL_MATCH',null,null),row('D','IDENTITY_REVIEW',null,null),row('E','MATCHED_ZERO_IMPRESSIONS',0,0),row('F','OBSERVED_IMPRESSIONS',4,120)]};
+const r=f(data);assert.equal(r.counts.SEARCH_REVIEW,1);assert.equal(r.counts.MONITORING,1);assert.equal(r.counts.INSUFFICIENT_EVIDENCE,2);assert.equal(r.counts.DATA_QUALITY,1);assert.equal(r.counts.OBSERVED_NO_TRIGGER,1);assert.equal(r.queue[0].article_id,'D');assert.equal(r.content_action,'NONE');assert.equal(r.publication_gate,'HOLD');
+assert.throws(()=>f({...data,coverage:'PARTIAL'}));assert.throws(()=>f({...data,articles:[...data.articles.slice(0,5),data.articles[0]]}));
+assert.throws(()=>f({...data,articles:[...data.articles.slice(0,5),row('F','NO_GSC_URL_MATCH',0,0)]}));
+assert.throws(()=>f({...data,articles:[...data.articles.slice(0,5),row('F','OBSERVED_IMPRESSIONS',5,0)]}));
+console.log('M3 health triage tests passed');

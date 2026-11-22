@@ -1,0 +1,15 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const src=fs.readFileSync('Code.gs','utf8');
+let rendered='';
+const HtmlService={createHtmlOutput(h){rendered=h;return {setWidth(){return this},setHeight(){return this}}}};
+const SpreadsheetApp={getUi(){return {showModalDialog(){}}}};
+const a=src.indexOf('function sssM3EvidencePackageDialog(){');
+const b=src.indexOf('\n}',a)+2;
+assert(a>=0&&b>a);
+vm.runInNewContext(src.slice(a,b)+';sssM3EvidencePackageDialog();',{HtmlService,SpreadsheetApp});
+const m=rendered.match(/<script>([\s\S]*?)<\/script>/);
+assert(m,'inline script missing');
+new vm.Script(m[1]);
+assert(m[1].includes("x.limitations.join('\\n')"),'escaped separator missing');
+assert(!m[1].includes("x.limitations.join('\n')"),'raw newline inside JS string');
+console.log('rendered integrated evidence dialog JS: PASS');

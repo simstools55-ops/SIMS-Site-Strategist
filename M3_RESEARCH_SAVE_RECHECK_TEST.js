@@ -1,0 +1,10 @@
+const fs=require('fs'),assert=require('assert'),vm=require('vm');
+const s=fs.readFileSync(__dirname+'/Code.gs','utf8');
+const a=s.indexOf('function sssM3ResearchRecheck_('),b=s.indexOf('function sssM3ResearchSave(',a);
+assert(a>=0&&b>a);
+const ctx={sssConfig_:()=>({siteId:'site'}),sssM1FindManagers_:()=>({complete:true,candidates:[{id:'manager'}]}),sssCheckManagerIdentityForSetup_:()=>{},SpreadsheetApp:{openById:()=>({getSheetByName:()=>({getLastRow:()=>2,getLastColumn:()=>2,getRange:()=>({getDisplayValues:()=>[['id','state'],['A000001','モニター中']]})})})},sssM1Articles_:()=>[{article_id:'A000001',state:'モニター中'}],sssM3StrategyLiveStates_:(_site,ids,rows)=>Object.fromEntries(ids.map(id=>[id,rows[0].state]))};vm.createContext(ctx);vm.runInContext(s.slice(a,b),ctx);
+const plan={format:'S3_M3_STRATEGY_RESEARCH_PLAN_V1',site_id:'site',publication_gate:'HOLD',content_action:'NONE',selected:[{query:'test',observed_article_ids:['A000001'],sbm_states:[{id:'A000001',state:'モニター中'}]}]};
+const live=ctx.sssM3ResearchRecheck_(plan);assert.equal(live.selected[0].sbm_states[0].state,'モニター中');assert.equal(live.selected[0].query,'test');
+assert.throws(()=>ctx.sssM3ResearchRecheck_({...plan,site_id:'other'}));
+assert.equal(plan.selected[0].sbm_states[0].state,'モニター中');
+console.log('Stable research recheck tests passed');
